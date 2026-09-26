@@ -1,0 +1,34 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+# Ausgaben niemals versionieren – sie können trotz Schwärzung Reste enthalten
+*_anonymisiert.*
+*_geschwaerzt.*
+
+# Modelle werden lokal erzeugt/geladen (groß) – nicht ins Repository
+models/
+.venv-tools/
+benchmark_ergebnis.md
+# Zwischendateien der ONNX-Quantisierung (ältere Konverter-Version)
+sym_shape_infer_temp*.onnx
+*.data
+
+# Build
+.venv-build/
+
+# Lokale Testordner und Ergebnisse der Ordner-Bearbeitung (können echte Daten enthalten)
+test-samples*/
+pii-redact-arbeitsstand.json
+pii-redact-protokoll*.csv
+
+# Persönliche/rechnerspezifische Konfiguration
+packaging/artifact-signing.json
+
+# Installationspakete gehören an Releases, nicht ins Repository
+*.msi
+*.wixpdb
+*.zip

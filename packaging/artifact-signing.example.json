@@ -1,0 +1,6 @@
+{
+  "Endpoint": "https://weu.codesigning.azure.net",
+  "CodeSigningAccountName": "<Name des Artifact-Signing-Kontos>",
+  "CertificateProfileName": "<Name des Zertifikatprofils>",
+  "ExcludeCredentials": ["ManagedIdentityCredential"]
+}

@@ -1,0 +1,7 @@
+# Prüfsummen (SHA-256) des Transformer-Modells „davlan-xlmr-ner“ (ONNX int8), Stand 26.09.2026
+# Prüfen in PowerShell:  Get-FileHash models\ner\davlan-xlmr-ner\model.onnx -Algorithm SHA256
+08a35bf543da740523dfa210500094d61417ab7b57298328691f9366b6ae7300  model.onnx
+acbd420e2269cdc1ef45332d3d5c418be4aef6b8cb5a0b7ccae0893485307153  tokenizer.json
+111a0085ebdd13d81b06857fe28f9536b49a7d0ebf22fc0c989633a3a234b030  config.json
+f32459bf29bc7bbc1fa7e037abd0270d2befe8109601da5f4eeeb03ba5a7e943  pii_redact_meta.json
+ded5d21f50ad65d500946602b18a0007b431971056f5542bdb7be6e6d3d03bf4  MODEL_CARD.md

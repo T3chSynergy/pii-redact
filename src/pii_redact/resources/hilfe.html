@@ -1,0 +1,440 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>pii-redact – Anwenderhilfe</title>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<h1>pii-redact – Anwenderhilfe</h1>
+<p class="klein">Version {{VERSION}}</p>
+
+<p>pii-redact findet <b>personenbezogene Daten</b> in PDF-, Text- und Markdown-Dateien – zum Beispiel Namen,
+Anschriften, Telefonnummern, E-Mail-Adressen, IBAN oder Steuer-ID – und entfernt sie. Sie prüfen das Ergebnis,
+korrigieren bei Bedarf und speichern eine bereinigte Fassung.</p>
+
+<p class="hinweis"><b>Alles bleibt auf Ihrem Rechner.</b> Das Programm arbeitet vollständig offline und überträgt
+keine Dokumentinhalte.</p>
+
+<p class="wichtig"><b>Die automatische Erkennung ist eine Hilfe, keine Garantie.</b> Sie findet viel, aber nie
+alles – und manchmal etwas, das gar nicht geschwärzt werden muss. Prüfen Sie jedes Dokument, bevor Sie es
+weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
+
+<h2><a name="schnellstart"></a>1. Schnellstart</h2>
+<ol>
+  <li><b>Datei öffnen:</b> <i>Datei → Öffnen</i> (<kbd>Strg+O</kbd>) oder die Datei ins Fenster ziehen.
+      Die Analyse startet sofort (voreingestellt im gründlichen Modus, siehe <a href="#modi">Kapitel 7</a>).</li>
+  <li><b>Prüfen:</b> In der bearbeiteten Fassung ist jede gefundene Stelle durch einen Platzhalter wie
+      <code>[PERSON]</code> ersetzt. Rechts steht die <b>Fundliste</b> mit allen Treffern.</li>
+  <li><b>Korrigieren:</b> Häkchen in der Fundliste entfernen, wenn etwas <i>nicht</i> geschwärzt werden soll.
+      Fehlt etwas: Text markieren und <kbd>Strg+R</kbd> drücken.</li>
+  <li><b>Speichern:</b> <i>Exportieren</i> in der Werkzeugleiste. Das Original bleibt unverändert.</li>
+</ol>
+<p>Viele Dateien auf einmal? Siehe <a href="#ordner">Ordner bearbeiten</a>.</p>
+
+<h2><a name="oberflaeche"></a>2. Die Oberfläche</h2>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="28%">Bereich</th><th>Bedeutung</th></tr>
+  <tr><td><b>Werkzeugleiste</b></td><td>Öffnen, Ordner bearbeiten, Neu analysieren, Rückgängig/Wiederholen,
+      Original anzeigen, Ersetzungsart, Analyse-Modus, Exportieren, Einstellungen.</td></tr>
+  <tr><td><b>Bearbeitet (Vorschau)</b></td><td>So wird das Ergebnis aussehen. Bei PDFs gibt es zwei Reiter:
+      <i>Seiten</i> (das Dokument mit Schwärzungsbalken) und <i>Text</i> (der ausgelesene Text mit Platzhaltern).</td></tr>
+  <tr><td><b>Original</b> (optional)</td><td>Blendet das unveränderte Dokument links daneben ein – mit farbig
+      markierten Funden. Ein- und ausschalten über <i>Original anzeigen</i> (<kbd>Strg+Umschalt+V</kbd>).
+      Das Programm merkt sich Ihre Wahl.</td></tr>
+  <tr><td><b>Funde</b> (rechts)</td><td>Liste aller Treffer mit Datenart, Text, Fundstelle (Seite oder Zeile),
+      Sicherheit (Score) und Herkunft (<i>auto</i> oder <i>manuell</i>).</td></tr>
+  <tr><td><b>Statusleiste</b> (unten)</td><td>Meldungen, Fortschritt der Analyse, der aktive Modus und rechts der
+      <b>Zoom</b> der Seitenansicht.</td></tr>
+</table>
+
+<h3>Zoom der Seitenansicht</h3>
+<p>Unten rechts wählen Sie, wie groß PDF-Seiten angezeigt werden:</p>
+<ul>
+  <li><b>Seitenbreite</b> (Standard, <kbd>Strg+0</kbd>): Die Seite füllt die Breite der Ansicht – auch wenn Sie
+      das Fenster vergrößern, das Original einblenden oder die Trennlinie verschieben.</li>
+  <li><b>Ganze Seite</b> (<kbd>Strg+2</kbd>): Eine komplette Seite ist sichtbar.</li>
+  <li><b>Fester Wert</b>, z. B. 150 %: auswählen, eintippen oder mit <kbd>−</kbd> / <kbd>+</kbd>,
+      <kbd>Strg+Plus/Minus</kbd> bzw. <kbd>Strg</kbd> + Mausrad. <b>100 %</b> (<kbd>Strg+1</kbd>) entspricht der
+      Papiergröße.</li>
+</ul>
+<p>Ihre Wahl gilt für alle Dokumente und bleibt auch nach einem Neustart erhalten.</p>
+
+<p class="tipp"><b>Tipp:</b> Fahren Sie mit der Maus über einen Platzhalter oder Schwärzungsbalken – ein Hinweis
+zeigt, was dahinter steht und ob es geschwärzt wird. So können Sie auch ohne eingeblendetes Original prüfen.</p>
+
+<h2><a name="pruefen"></a>3. Ergebnis prüfen und korrigieren</h2>
+
+<h3>Einen Fund nicht schwärzen</h3>
+<ul>
+  <li>In der Fundliste das <b>Häkchen</b> entfernen, <b>oder</b></li>
+  <li>Rechtsklick auf den Platzhalter bzw. Balken → <i>Nicht schwärzen</i>.</li>
+</ul>
+<p>Abgewählte Funde bleiben in der Vorschau <b>grau gestrichelt</b> sichtbar und lassen sich jederzeit wieder
+aktivieren.</p>
+
+<h3>Etwas zusätzlich schwärzen</h3>
+<ul>
+  <li><b>Text markieren</b> (Reiter <i>Text</i>) → Rechtsklick → <i>Schwärzen als …</i> und die Datenart wählen,
+      oder <kbd>Strg+R</kbd>.</li>
+  <li><b>Alle Vorkommen</b> eines Begriffs: Rechtsklick → <i>Alle Vorkommen schwärzen als …</i>
+      oder <kbd>Strg+Umschalt+R</kbd>.</li>
+  <li><b>Bei PDFs</b> im Reiter <i>Seiten</i> mit gedrückter Maustaste einen <b>Rahmen aufziehen</b> –
+      der Text darin wird zum Schwärzen angeboten.</li>
+</ul>
+
+<h3>Unterschriften, Fotos, Handschrift: Bereich schwärzen</h3>
+<p>Was kein Text ist, findet die Erkennung nicht – etwa eine <b>Unterschrift</b>, ein <b>Foto</b>, ein Stempel
+oder eine <b>handschriftliche Notiz</b>. Solche Stellen schwärzen Sie selbst:</p>
+<ol>
+  <li>Reiter <i>Seiten</i> öffnen und mit gedrückter Maustaste einen <b>Rahmen</b> um die Stelle ziehen.</li>
+  <li>Im Menü <i>Bereich schwärzen als</i> die Art wählen: <b>Unterschrift</b>, <b>Foto/Bild</b>,
+      <b>Handschrift</b> oder allgemein <b>Bereich</b>. Die Art bestimmt nur die Beschriftung im Balken
+      (z. B. „[UNTERSCHRIFT]“).</li>
+</ol>
+<p>Liegt im Rahmen auch Text, bietet das Menü beides an: nur den <i>Text schwärzen</i> oder den
+<i>ganzen Bereich schwärzen</i> – dann verschwindet alles im Rahmen, Text und Bild. Der Text wird dabei
+zusätzlich als Fund eingetragen, damit er auch im Text-Export fehlt.</p>
+<p>Bereiche stehen in der Fundliste als „▭ Bereich … cm“. Sie lassen sich wie andere Funde abwählen,
+umbenennen (Rechtsklick → <i>Typ ändern</i>) oder löschen und rückgängig machen.</p>
+<p class="hinweis">Beim Export wird im Bereich <b>alles</b> echt entfernt: Bildpunkte, Text und Grafik (auch
+gezeichnete Unterschriften). Ziehen Sie den Rahmen <b>großzügig</b> um die Stelle – was außerhalb liegt,
+bleibt sichtbar. Linien und Flächen, die nur kurz in den Bereich hineinragen (z. B. Tabellenrahmen), bleiben
+erhalten.</p>
+
+<h3>Weitere Möglichkeiten (Rechtsklick auf einen Fund)</h3>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="35%">Befehl</th><th>Wirkung</th></tr>
+  <tr><td>Typ ändern</td><td>Datenart korrigieren, z. B. „Ort“ statt „Person“. Auch per Doppelklick in der
+      Spalte <i>Typ</i> der Fundliste.</td></tr>
+  <tr><td>Alle Vorkommen (nicht) schwärzen</td><td>Gilt für jede Stelle mit demselben Text im Dokument.</td></tr>
+  <tr><td>Immer ignorieren (Ausnahmeliste)</td><td>Dieser Begriff wird künftig in allen Dokumenten nicht mehr
+      geschwärzt – z. B. der eigene Firmenname.</td></tr>
+  <tr><td>Immer schwärzen (Sperrliste)</td><td>Dieser Begriff wird künftig in allen Dokumenten geschwärzt – z. B.
+      Projekt- oder Spitznamen, die keine Erkennung findet.</td></tr>
+  <tr><td>Fund löschen</td><td>Entfernt den Eintrag aus der Liste.</td></tr>
+</table>
+
+<h3>Fundliste</h3>
+<ul>
+  <li><b>Filtern</b> nach Text oder Datenart (Felder über der Liste).</li>
+  <li><b>Sichtbare an / Sichtbare aus</b> schaltet alle gerade angezeigten Funde auf einmal –
+      z. B. nach Filter „Datum“ alle Datumsangaben abwählen.</li>
+  <li>Ein Klick auf einen Eintrag springt zur Fundstelle im Dokument.</li>
+</ul>
+
+<h3>Rückgängig und neu analysieren</h3>
+<p><kbd>Strg+Z</kbd> / <kbd>Strg+Y</kbd> machen Änderungen rückgängig bzw. wiederholen sie.
+<i>Neu analysieren</i> (<kbd>F5</kbd>) prüft das Dokument erneut – Ihre manuellen Ergänzungen und abgewählten
+Funde bleiben dabei erhalten.</p>
+
+<h3>Frei bearbeiten</h3>
+<p>Mit <i>Frei bearbeiten</i> (über der Vorschau) können Sie den bereinigten Text direkt ändern. Das wirkt nur
+auf den <b>Text-Export</b>, nicht auf PDFs. In der Ordner-Bearbeitung ist diese Funktion ausgeblendet, damit
+jede Änderung nachvollziehbar bleibt.</p>
+
+<h2><a name="ocr"></a>4. Gescannte Seiten (Texterkennung)</h2>
+<p>Normalerweise haben Ihre Dokumente eine <b>Textebene</b> – entweder weil sie am Computer erstellt wurden oder
+weil sie durch die zentrale Texterkennung gelaufen sind. Manche Dokumente laufen daran vorbei, etwa
+<b>eingescannte Anhänge von Mails</b>. Solche Seiten sind nur ein Bild.</p>
+<p>pii-redact erkennt diese Seiten automatisch und liest sie per <b>Texterkennung (OCR)</b>. Das dauert einige
+Sekunden pro Seite; ein Fortschrittsfenster zeigt den Stand.</p>
+
+<p class="wichtig"><b>Die Texterkennung macht Fehler.</b> Liest sie „Musterrnann“ statt „Mustermann“ oder
+„0l7l“ statt „0171“, wird die Stelle nicht als personenbezogen erkannt – und bleibt ungeschwärzt.
+<b>Prüfen Sie per Texterkennung gelesene Seiten deshalb Zeile für Zeile vollständig</b>, am besten im Reiter
+<i>Seiten</i>, wo Sie das Originalbild sehen.</p>
+
+<h3>So erkennen Sie betroffene Seiten</h3>
+<ul>
+  <li>Ein <b>orangefarbener Hinweis</b> über dem Dokument nennt die Seiten.</li>
+  <li>Im Reiter <i>Seiten</i> haben diese Seiten einen <b>orangefarbenen Rahmen</b> mit dem Vermerk
+      „Texterkennung (OCR)“.</li>
+  <li>In der Fundliste steht in der Spalte <i>Stelle</i> „S. 2 · OCR“, die Zusammenfassung zählt die Funde
+      „aus Texterkennung“.</li>
+  <li>In der Ordner-Bearbeitung zeigt die Arbeitsliste „· OCR“, das Protokoll hat die Spalte
+      <i>OCR-Seiten</i>.</li>
+</ul>
+
+<h3>Beim Speichern</h3>
+<ul>
+  <li>Vor dem Export bzw. <i>Geprüft ✓ &amp; weiter</i> fragt das Programm ausdrücklich, ob Sie die gelesenen
+      Seiten vollständig geprüft haben.</li>
+  <li>Die Stellen werden auch im Bild <b>echt entfernt</b> (die Bildpunkte werden ersetzt). Die Kontrolle nach dem
+      Export liest das Ergebnis dazu noch einmal per Texterkennung.</li>
+  <li>Bei <i>Ungeprüfte trotzdem exportieren</i> werden Dateien mit Texterkennung <b>nicht</b> automatisch
+      exportiert – sie bleiben „zu prüfen“.</li>
+</ul>
+
+<h3>Was die Texterkennung nicht kann</h3>
+<ul>
+  <li><b>Handschrift</b>, <b>Unterschriften</b> und <b>Fotos</b> werden nicht erkannt. Schwärzen Sie sie mit einem
+      Rahmen selbst (siehe <a href="#pruefen">Kapitel 3</a>, „Bereich schwärzen“).</li>
+  <li>Sehr schlechte, schiefe oder auf dem Kopf stehende Scans liefern viele Lesefehler.</li>
+  <li>Ist eine Stelle falsch gelesen, können Sie sie trotzdem schwärzen: im Reiter <i>Seiten</i> einen Rahmen
+      darum aufziehen.</li>
+</ul>
+<p class="klein">Die Texterkennung lässt sich unter <i>Einstellungen</i> abschalten. Gescannte Seiten bleiben
+dann ungeprüft (gelber Hinweis).</p>
+
+<h2><a name="export"></a>5. Speichern (Export)</h2>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="30%">Ausgangsdatei</th><th>Ergebnis</th></tr>
+  <tr><td>PDF</td><td><i>Als geschwärztes PDF exportieren</i> (<kbd>Strg+S</kbd>) → <code>name_geschwaerzt.pdf</code><br>
+      oder <i>Als Text exportieren</i> (<kbd>Strg+Umschalt+S</kbd>) → <code>name_anonymisiert.txt</code></td></tr>
+  <tr><td>TXT / Markdown</td><td><i>Als Text/Markdown exportieren</i> → <code>name_anonymisiert.txt</code> bzw. <code>.md</code></td></tr>
+</table>
+<p><b>Bei PDFs werden die Stellen wirklich entfernt</b>, nicht nur überdeckt – der Text darunter lässt sich
+nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>:</p>
+<ul>
+  <li><b>Kommentare und Markierungen</b> (Notizen, Hervorhebungen, Stempel usw.) samt Autorenname. Sie werden
+      nicht geprüft, sondern immer gelöscht – und sind deshalb schon in der Ansicht ausgeblendet. Enthält ein PDF
+      Kommentare, weist ein gelber Hinweis darauf hin.</li>
+  <li><b>Lesezeichen</b> (Inhaltsverzeichnis in der Seitenleiste des PDF-Programms)</li>
+  <li><b>Metadaten</b> (z. B. Autor, Titel, Erstelldatum), <b>Links</b>, <b>Dateianhänge</b>, Skripte und
+      unsichtbaren Text</li>
+</ul>
+<p><b>Formularfelder</b> werden in normalen Seiteninhalt umgewandelt: Ihre Inhalte werden wie Text geprüft und
+gezielt geschwärzt, die Felder sind im Ergebnis aber nicht mehr ausfüllbar.</p>
+<p>Nach dem Speichern wird das Ergebnis <b>automatisch kontrolliert</b> – der Seitentext ebenso wie Kommentare,
+Formularfelder, Lesezeichen und Metadaten. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
+PDF steckt), erhalten Sie eine Warnung.</p>
+<p>Das Original wird nie überschrieben.</p>
+
+<h2><a name="ordner"></a>6. Ordner bearbeiten (viele Dateien)</h2>
+<p>Für mehrere Dateien – auch mit Unterordnern und über mehrere Tage verteilt.</p>
+
+<h3>Starten</h3>
+<ol>
+  <li><i>Datei → Ordner bearbeiten …</i> (<kbd>Strg+Umschalt+O</kbd>) oder einen Ordner ins Fenster ziehen.</li>
+  <li><b>Quellordner</b> wählen (dort liegen die Originale) und einen <b>Zielordner</b> (dort landen die
+      Ergebnisse; vorgeschlagen wird <code>Ordnername_geschwaerzt</code>).</li>
+  <li><i>Unterordner einbeziehen</i> ist voreingestellt. <i>Starten</i> klicken.</li>
+</ol>
+<p>Links erscheint die <b>Arbeitsliste</b>. Alle Dateien werden im Hintergrund nacheinander analysiert – Sie
+können sofort mit der ersten Datei beginnen.</p>
+
+<h3>Status in der Arbeitsliste</h3>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="30%">Anzeige</th><th>Bedeutung</th></tr>
+  <tr><td>○ wartet</td><td>Noch nicht analysiert.</td></tr>
+  <tr><td>◌ wird analysiert</td><td>Analyse läuft gerade.</td></tr>
+  <tr><td><span class="st-review">● zu prüfen</span></td><td>Analysiert, wartet auf Ihre Prüfung.</td></tr>
+  <tr><td><span class="st-done">✔ geprüft</span></td><td>Von Ihnen bestätigt und exportiert.</td></tr>
+  <tr><td><span class="st-auto">◐ automatisch</span></td><td>Ohne Prüfung exportiert (siehe unten).</td></tr>
+  <tr><td><span class="st-error">✖ Fehler</span></td><td>Datei konnte nicht gelesen oder verarbeitet werden.</td></tr>
+  <tr><td>– fehlt</td><td>Datei ist im Quellordner nicht mehr vorhanden.</td></tr>
+  <tr><td>· OCR (zusätzlich, orange)</td><td>Seiten wurden per Texterkennung gelesen – besonders gründlich
+      prüfen (<a href="#ocr">Kapitel 4</a>).</td></tr>
+  <tr><td>⚠ (zusätzlich)</td><td>Es gibt einen Hinweis, z. B. „Seiten ohne Text“. Maus über den
+      Status halten zeigt Details.</td></tr>
+</table>
+<p>Mit dem Auswahlfeld über der Liste filtern Sie nach <i>Zu prüfen</i>, <i>Erledigt</i> oder
+<i>Hinweise &amp; Fehler</i>.</p>
+
+<h3>Prüfen und weiter</h3>
+<ol>
+  <li>Datei in der Liste anklicken (oder es ist bereits die nächste offene Datei geöffnet).</li>
+  <li>Prüfen und korrigieren wie in <a href="#pruefen">Kapitel 3</a>.</li>
+  <li><b>Geprüft ✓ &amp; weiter</b> (<kbd>Strg+Enter</kbd>) in der Leiste über dem Dokument: Die Datei wird als
+      geprüft vermerkt, sofort in den Zielordner exportiert, und die nächste offene Datei öffnet sich.</li>
+</ol>
+<p>Mit ◀ / ▶ (<kbd>Alt+←</kbd> / <kbd>Alt+→</kbd>) blättern Sie zwischen den Dateien. Beim Wechsel gehen keine
+Änderungen verloren.</p>
+<p class="hinweis">Ändern Sie eine bereits <b>geprüfte</b> Datei noch einmal, springt sie auf „zu prüfen“ zurück
+und muss erneut bestätigt werden. So passen Protokoll und exportierte Datei immer zusammen.</p>
+
+<h3>Unterbrechen und später weitermachen</h3>
+<p>Der Arbeitsstand wird <b>laufend automatisch gespeichert</b>. Sie können das Programm jederzeit schließen.
+Zum Weitermachen:</p>
+<ul>
+  <li><i>Datei → Zuletzt bearbeitete Ordner</i>, oder</li>
+  <li><i>Datei → Ordner-Arbeit fortsetzen …</i> und den <b>Zielordner</b> wählen.</li>
+</ul>
+<p>Hat sich ein Original inzwischen geändert, erkennt das Programm das und analysiert die Datei neu – sie muss
+dann erneut geprüft werden. Neue Dateien im Quellordner kommen automatisch hinzu.</p>
+
+<h3>Ungeprüfte Dateien trotzdem exportieren</h3>
+<p><i>Ungeprüfte trotzdem exportieren …</i> (unten in der Arbeitsliste) schwärzt alle noch offenen Dateien
+automatisch. Diese Dateien stehen im Protokoll ausdrücklich als <b>„automatisch exportiert (nicht geprüft)“</b>.
+Sie können sie später trotzdem noch öffnen, prüfen und mit <i>Geprüft ✓ &amp; weiter</i> bestätigen.</p>
+<p>Dateien mit per Texterkennung gelesenen Seiten sind davon ausgenommen und müssen einzeln geprüft werden.</p>
+<p class="wichtig">Verwenden Sie diese Funktion nur, wenn eine automatische Schwärzung ohne Prüfung ausdrücklich
+zulässig ist.</p>
+
+<h3>Was im Zielordner liegt</h3>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="38%">Datei</th><th>Inhalt</th></tr>
+  <tr><td><code>…_geschwaerzt.pdf</code>, <code>…_anonymisiert.txt/.md</code></td><td>Die bereinigten Dateien,
+      in derselben Ordnerstruktur wie im Quellordner.</td></tr>
+  <tr><td><code>pii-redact-protokoll.csv</code></td><td>Protokoll zum Nachweis der Prüfung (öffnet in Excel):
+      Datei, Status, geprüft von, Zeitpunkt, Anzahl der Funde je Datenart, abgewählte und ergänzte Funde,
+      frei geschwärzte Bereiche,
+      Analyse-Modus, Prüfsumme des Originals, Hinweise. <b>Enthält keine der gefundenen Daten.</b></td></tr>
+  <tr><td><code>pii-redact-arbeitsstand.json</code></td><td>Arbeitsstand zum Fortsetzen. Enthält nur
+      Textpositionen, <b>keine Inhalte</b>. Bitte nicht löschen, solange die Arbeit nicht abgeschlossen ist.</td></tr>
+</table>
+<p>Über die Knöpfe <i>Protokoll</i> und <i>Zielordner</i> unten in der Arbeitsliste öffnen Sie beides direkt.
+<i>Schließen</i> beendet die Ordner-Arbeit (der Stand bleibt gespeichert).</p>
+
+<h2><a name="modi"></a>7. Analyse: Schnell oder Gründlich</h2>
+<p>Voreingestellt ist <b>Gründlich</b>. Umschalten können Sie jederzeit in der Werkzeugleiste unter
+<i>Analyse</i> oder in den Einstellungen. Das aktuelle Dokument wird dann neu analysiert; Ihre Korrekturen
+bleiben erhalten. Das Programm merkt sich Ihre Wahl.</p>
+
+<h3>So arbeiten die Modi</h3>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="18%">Modus</th><th>Arbeitsweise</th></tr>
+  <tr><td><b>Gründlich</b><br><span class="klein">(Standard)</span></td><td>Wie „Schnell“, zusätzlich ein zweites,
+      genaueres KI-Modell für Namen, Orte und Organisationen. Es erkennt Namen auch ohne typische Signalwörter –
+      etwa in Tabellen, Aufzählungen, Unterschriftszeilen, ausländische Namen oder Nachnamen, die zugleich normale
+      Wörter sind („Koch“, „Bauer“, „Winter“).</td></tr>
+  <tr><td><b>Schnell</b></td><td>Ein kompaktes Sprachmodell für Namen und Orte plus feste Muster für IBAN,
+      Telefon, E-Mail, Adressen, Steuer-ID usw.</td></tr>
+</table>
+<p>Die <b>festen Muster</b> (IBAN, Telefon, E-Mail, Adressen, Steuer-ID, Kennzeichen …) sind in beiden Modi
+gleich. Der Unterschied betrifft vor allem <b>Namen, Orte und Organisationen</b>.</p>
+
+<h3>Unterschiede im Überblick</h3>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="30%"></th><th>Gründlich</th><th>Schnell</th></tr>
+  <tr><td><b>Personen gefunden</b>*</td><td>ca. 100 %</td><td>ca. 80 %</td></tr>
+  <tr><td><b>Orte gefunden</b>*</td><td>ca. 100 %</td><td>ca. 67 %</td></tr>
+  <tr><td><b>Fehlalarme</b>*</td><td>gering (ca. 6 % der Personen-Funde)</td><td>gering (ca. 8 %)</td></tr>
+  <tr><td><b>Zeit pro Seite</b></td><td>ca. 0,3–1 Sekunde</td><td>unter 0,2 Sekunden</td></tr>
+  <tr><td><b>Erste Analyse nach dem Start</b></td><td>einige Sekunden länger (Modell wird geladen)</td>
+      <td>kurz</td></tr>
+  <tr><td><b>Arbeitsspeicher</b></td><td>ca. 1 GB</td><td>ca. 0,4 GB</td></tr>
+</table>
+<p class="klein">* Gemessen an einer kleinen Sammlung von Testdokumenten – die Werte zeigen die Tendenz, keine
+Garantie. Auch „Gründlich“ findet nie alles; die Prüfung durch Sie bleibt nötig. Die Zeiten hängen vom Rechner
+ab; bei der Ordner-Bearbeitung läuft die Analyse ohnehin im Hintergrund.</p>
+
+<h3>Wann „Schnell“?</h3>
+<ul>
+  <li>auf älteren Rechnern mit wenig Arbeitsspeicher (4 GB) oder wenn das Programm spürbar träge wird,</li>
+  <li>für einen ersten Überblick über sehr viele Dateien.</li>
+</ul>
+<p>Ist „Gründlich“ ausgegraut, ist das zusätzliche Modell auf diesem Rechner nicht installiert. Das Programm
+verwendet dann automatisch „Schnell“ und meldet das in der Statusleiste – wenden Sie sich an Ihre IT. Ihre
+Organisation kann den Standard auch zentral festlegen.</p>
+
+<h2><a name="ersetzung"></a>8. Ersetzungsarten</h2>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="22%">Art</th><th>Beispiel</th><th>Hinweis</th></tr>
+  <tr><td>Platzhalter</td><td><code>[PERSON] wohnt in [ORT].</code></td><td>Gut lesbar, Standard.</td></tr>
+  <tr><td>Nummeriert</td><td><code>[PERSON_1] schreibt an [PERSON_2]. [PERSON_1] …</code></td><td>Gleiche Werte
+      erhalten dieselbe Nummer – der Zusammenhang bleibt verständlich.</td></tr>
+  <tr><td>Schwärzen</td><td><code>████ wohnt in ██████.</code></td><td>Gleiche Länge wie das Original.</td></tr>
+</table>
+<p>In PDFs erscheinen die Platzhalter als weiße Schrift im schwarzen Balken (abschaltbar in den Einstellungen).</p>
+
+<h2><a name="datenarten"></a>9. Erkannte Datenarten</h2>
+<p>Welche Arten gesucht werden, legen Sie unter <i>Einstellungen</i> fest. Voreingestellt:</p>
+{{DATENARTEN}}
+<p class="klein">Geburtsdaten werden nur geschwärzt, wenn ein Hinweis wie „geboren“, „geb.“ oder „Geburtsdatum“
+davorsteht – damit nicht jedes Rechnungsdatum verschwindet. Andere Datumsangaben können Sie manuell ergänzen.</p>
+
+<h2><a name="einstellungen"></a>10. Einstellungen</h2>
+<p><i>Bearbeiten → Einstellungen …</i> (<kbd>Strg+,</kbd>)</p>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="30%">Einstellung</th><th>Bedeutung</th></tr>
+  <tr><td>Mindest-Score</td><td>Wie sicher sich die Erkennung sein muss (Standard 0,45). Niedriger = mehr Funde,
+      aber auch mehr Fehlalarme.</td></tr>
+  <tr><td>Analyse-Modus / Transformer-Modell</td><td>Siehe <a href="#modi">Kapitel 7</a>.</td></tr>
+  <tr><td>Ersetzung</td><td>Siehe <a href="#ersetzung">Kapitel 8</a>.</td></tr>
+  <tr><td>Platzhalter im PDF-Balken</td><td>Schreibt z. B. „[PERSON]“ in den Schwärzungsbalken.</td></tr>
+  <tr><td>Texterkennung (OCR)</td><td>Gescannte PDF-Seiten automatisch lesen (Standard: an). Siehe
+      <a href="#ocr">Kapitel 4</a>.</td></tr>
+  <tr><td>Gesuchte Datenarten</td><td>Häkchen je Datenart.</td></tr>
+  <tr><td>Ausnahmen</td><td>Begriffe, die nie geschwärzt werden (ein Begriff pro Zeile).</td></tr>
+  <tr><td>Sperrliste</td><td>Begriffe, die immer geschwärzt werden (ein Begriff pro Zeile).</td></tr>
+</table>
+<p>Ihre IT kann Voreinstellungen sowie Ausnahme- und Sperrlisten für alle Nutzer vorgeben. Solche zentralen
+Listen gelten zusätzlich zu Ihren eigenen; ein Hinweis in den Einstellungen zeigt, wie viele es sind.</p>
+
+<h2><a name="tasten"></a>11. Tastenkürzel</h2>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="35%">Taste</th><th>Funktion</th></tr>
+  <tr><td><kbd>F1</kbd></td><td>Diese Hilfe</td></tr>
+  <tr><td><kbd>Strg+O</kbd></td><td>Datei öffnen</td></tr>
+  <tr><td><kbd>Strg+Umschalt+O</kbd></td><td>Ordner bearbeiten</td></tr>
+  <tr><td><kbd>F5</kbd></td><td>Neu analysieren</td></tr>
+  <tr><td><kbd>Strg+R</kbd></td><td>Markierten Text schwärzen</td></tr>
+  <tr><td><kbd>Strg+Umschalt+R</kbd></td><td>Alle Vorkommen des markierten Texts schwärzen</td></tr>
+  <tr><td><kbd>Strg+Z</kbd> / <kbd>Strg+Y</kbd></td><td>Rückgängig / Wiederholen</td></tr>
+  <tr><td><kbd>Strg+S</kbd></td><td>Als geschwärztes PDF exportieren</td></tr>
+  <tr><td><kbd>Strg+Umschalt+S</kbd></td><td>Als Text/Markdown exportieren</td></tr>
+  <tr><td><kbd>Strg+Enter</kbd></td><td>Ordner: Geprüft &amp; weiter</td></tr>
+  <tr><td><kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>Ordner: vorherige / nächste Datei</td></tr>
+  <tr><td><kbd>Strg+Umschalt+V</kbd></td><td>Original ein-/ausblenden</td></tr>
+  <tr><td><kbd>Strg++</kbd> / <kbd>Strg+-</kbd>, <kbd>Strg+Mausrad</kbd></td><td>Seitenansicht vergrößern / verkleinern</td></tr>
+  <tr><td><kbd>Strg+0</kbd></td><td>Zoom: Seitenbreite</td></tr>
+  <tr><td><kbd>Strg+1</kbd></td><td>Zoom: 100 % (Papiergröße)</td></tr>
+  <tr><td><kbd>Strg+2</kbd></td><td>Zoom: Ganze Seite</td></tr>
+  <tr><td><kbd>Strg+,</kbd></td><td>Einstellungen</td></tr>
+</table>
+
+<h2><a name="grenzen"></a>12. Grenzen und wichtige Hinweise</h2>
+<ul>
+  <li><b>Gescannte Seiten</b> werden per Texterkennung gelesen – mit deutlich höherer Fehlerquote. Solche Seiten
+      immer Zeile für Zeile prüfen (<a href="#ocr">Kapitel 4</a>).</li>
+  <li><b>Handschrift, Unterschriften, Fotos</b> und kleine Bilder auf normalen Textseiten (z. B. ein eingefügter
+      Ausweis) werden nicht erkannt – sie müssen mit einem Rahmen selbst geschwärzt werden.</li>
+  <li><b>Kommentare, Notizen und Lesezeichen</b> in PDFs werden nicht geprüft, sondern beim Schwärzen immer
+      entfernt. Werden sie im Ergebnis gebraucht, müssen sie danach von Hand neu angelegt werden.</li>
+  <li><b>Getrennte Wörter</b> am Zeilenende („Muster-<br>mann“) und ungewöhnliche Schreibweisen werden
+      mitunter nicht erkannt.</li>
+  <li>Die Vorschau zeigt das erwartete Ergebnis. Die endgültige Schwärzung entsteht beim Export und wird danach
+      automatisch kontrolliert.</li>
+  <li>Bereinigte Dateien können trotzdem Rückschlüsse zulassen (z. B. Funktion + Abteilung). Achten Sie auf den
+      Zusammenhang.</li>
+</ul>
+
+<h2><a name="faq"></a>13. Häufige Fragen</h2>
+<h3>„Gründlich“ ist ausgegraut.</h3>
+<p>Das zusätzliche Modell ist auf diesem Rechner nicht installiert. Das Programm arbeitet dann automatisch im
+Modus „Schnell“ (findet weniger Namen und Orte – besonders sorgfältig prüfen). Bitte an die IT wenden.</p>
+<h3>Meldung „Sprachmodell wurde nicht gefunden“.</h3>
+<p>Die Installation ist unvollständig. Bitte an die IT wenden.</p>
+<h3>Nach dem Export erscheint „Reste gefunden“.</h3>
+<p>Ein geschwärzter Text steckt noch an anderer Stelle im PDF. Öffnen Sie das Ergebnis und prüfen Sie die
+genannten Begriffe; ergänzen Sie gegebenenfalls weitere Stellen und exportieren Sie erneut.</p>
+<h3>Es gibt eine Datei „pii-redact-protokoll (aktuell).csv“.</h3>
+<p>Das Protokoll war beim Speichern in Excel geöffnet. Der aktuelle Stand steht dann in dieser Datei. Nach dem
+Schließen von Excel wird beim nächsten Speichern wieder die normale Datei verwendet.</p>
+<h3>Eine Datei steht auf „fehlt“.</h3>
+<p>Sie wurde im Quellordner gelöscht oder verschoben. Legen Sie sie zurück, dann wird sie beim nächsten
+Fortsetzen wieder erkannt.</p>
+<h3>Wer hat eine Datei geprüft?</h3>
+<p>Das steht im Protokoll (Spalte „Geprüft von“, Windows-Anmeldename) und im Hinweis, wenn Sie die Maus über den
+Status in der Arbeitsliste halten.</p>
+
+<h2><a name="kommandozeile"></a>14. Kommandozeile</h2>
+<p class="klein">Für Fortgeschrittene und die IT.</p>
+<p>Für die Stapelverarbeitung ohne Oberfläche gibt es <code>pii-redact-cli</code>. Ergebnisse gelten als
+<b>nicht geprüft</b>; bereits in der Oberfläche geprüfte Dateien bleiben unangetastet. Dateien mit
+Texterkennung werden bei Ordnern nicht exportiert (Rückgabewert 3) und müssen in der Oberfläche geprüft
+werden.</p>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="50%">Aufruf</th><th>Wirkung</th></tr>
+  <tr><td><code>pii-redact-cli brief.pdf</code></td><td>Erzeugt <code>brief_geschwaerzt.pdf</code></td></tr>
+  <tr><td><code>pii-redact-cli C:\Akten -o C:\Akten_geschwaerzt</code></td><td>Ganzen Ordner bearbeiten, mit Protokoll</td></tr>
+  <tr><td><code>--schnell</code> / <code>--gruendlich</code></td><td>Modus wählen (Standard: wie in den
+      Einstellungen, voreingestellt „Gründlich“)</td></tr>
+  <tr><td><code>--nur-anzeigen</code></td><td>Funde nur auflisten, nichts speichern</td></tr>
+  <tr><td><code>--ohne-unterordner</code></td><td>Bei Ordnern nur die oberste Ebene</td></tr>
+  <tr><td><code>--ohne-ocr</code></td><td>Gescannte Seiten nicht per Texterkennung lesen</td></tr>
+  <tr><td><code>--selftest</code></td><td>Installation prüfen</td></tr>
+</table>
+
+<h2><a name="komponenten"></a>15. Über pii-redact und verwendete Open-Source-Software</h2>
+<p>pii-redact {{VERSION}} arbeitet vollständig auf Ihrem Rechner. Es baut auf den folgenden
+Open-Source-Komponenten auf – vielen Dank an alle, die daran mitwirken.</p>
+{{KOMPONENTEN}}
+<p class="klein">Versionen und installierte Modelle zeigt <i>Hilfe → Über pii-redact</i>.</p>
+
+<p class="klein">pii-redact {{VERSION}} · Erkennung: Microsoft Presidio, spaCy,
+ONNX Runtime · Texterkennung: RapidOCR (PaddleOCR-Modelle) · PDF: PyMuPDF · Oberfläche: Qt</p>
+</body>
+</html>

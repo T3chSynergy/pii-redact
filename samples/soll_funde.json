@@ -1,0 +1,76 @@
+{
+  "_hinweis": "Soll-Funde für tools/benchmark_models.py. Jeder Eintrag: Kontext mit dem erwarteten Fund in «Guillemets». Nur Personen (PERSON) und Orte (LOCATION) – andere Datenarten decken die Muster ab. Fiktive Daten. „_neutral“: Stellen, die weder als Treffer noch als Fehlalarm zählen (z. B. Straßennamen, Firmen).",
+  "beispiel.txt": {
+    "PERSON": [
+      "Frau Dr. «Anna Schneider»,",
+      "Herr «Maximilian Bergmann», geboren",
+      "erreichen Sie Frau «Kowalski» unter",
+      "Grüßen\n«Jonas Weber»\n"
+    ],
+    "LOCATION": [
+      "in «Hamburg»,",
+      "10969 «Berlin»"
+    ],
+    "_neutral": [
+      "Anschrift: «Lindenstraße» 42a",
+      "bei der «Nordlicht Software GmbH» beschäftigt"
+    ]
+  },
+  "beispiel.md": {
+    "PERSON": [
+      "- «Petra Hoffmann» (Hausverwaltung",
+      "Herr «Yilmaz» (Wohnung",
+      "- Familie «Schulz», vertreten",
+      "vertreten durch «Thomas Schulz»",
+      "- «Lena Krüger», Tel.",
+      "Herr «Yilmaz» berichtet",
+      "Frau «Krüger» (geb.",
+      "an [«Petra Hoffmann»]("
+    ],
+    "LOCATION": [
+      "50667 «Köln»"
+    ],
+    "_neutral": [
+      "Am «Rosengarten 7»,",
+      "- «Familie» Schulz"
+    ]
+  },
+  "schwierig.txt": {
+    "PERSON": [
+      "\n«Frank Winter» | Einkauf",
+      "\n«Sabine Bauer» | Vertrieb",
+      "\n«Nguyen Thi Lan» | IT",
+      "\n«Oluwaseun Adeyemi» | Recht",
+      "\n«Paul Koch» | Küche",
+      "\n\n«Frank Winter» bat darum",
+      "dass «Koch» und",
+      "und «Bauer» die",
+      "an «Lan» schicken",
+      "Laut «Adeyemi» hat",
+      "Herr «Grünewald» aus",
+      "med. «Ayşe Yıldırım-Schäfer»,",
+      "Von: «Katharina von der Heydt»",
+      "Familie «Özdemir» geht",
+      "\n«Moritz», er vertritt",
+      "Frau «Lehmann» aus",
+      "Grüße\n«Katharina»\n",
+      "Gruß, «Jens»"
+    ],
+    "LOCATION": [
+      "Einkauf | «Leipzig»",
+      "Vertrieb | «Bad Homburg»",
+      "IT | «Offenbach am Main»",
+      "Recht | «Gelsenkirchen»",
+      "Küche | «Kiel»",
+      "aus «Wanne-Eickel» bereits",
+      "Lieferung nach «Oberhausen»\n",
+      "Woche nach «Oberhausen» raus",
+      "aus «Chemnitz» ist"
+    ],
+    "_neutral": [
+      "im «Klinikum Nord».",
+      "in der «Bauer-Halle» am",
+      "An: «Team Einkauf»"
+    ]
+  }
+}

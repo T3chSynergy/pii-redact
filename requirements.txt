@@ -1,0 +1,11 @@
+# Laufzeit – alternativ: pip install -e .
+presidio-analyzer>=2.2.360
+spacy>=3.7,<4
+pymupdf>=1.24.3
+PySide6>=6.6
+onnxruntime>=1.17
+tokenizers>=0.15
+rapidocr>=3.9,<4
+opencv-python>=4.8,<5
+# Deutsches Sprachmodell separat laden:
+#   python -m spacy download de_core_news_md

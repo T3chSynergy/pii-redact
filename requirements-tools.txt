@@ -1,0 +1,11 @@
+# Nur für Entwicklung/Build: Modelle vergleichen und nach ONNX umwandeln.
+# NICHT im ausgelieferten Client enthalten. PyTorch (CPU) wird separat installiert:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+transformers>=4.40
+onnx>=1.15
+onnxruntime>=1.17
+huggingface_hub>=0.23
+sentencepiece
+protobuf
+psutil
+gliner>=0.2.10

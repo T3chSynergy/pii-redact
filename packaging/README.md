@@ -1,0 +1,300 @@
+# Build und Verteilung (SCCM)
+
+Diese Anleitung richtet sich an die IT. Anwender finden ihre Hilfe im Programm unter **Hilfe → Anwenderhilfe (F1)**.
+
+## Ergebnis
+
+| Datei | Zweck |
+|---|---|
+| `dist\pii-redact-<version>.msi` | Installationspaket für SCCM (x64, pro Computer) |
+| `dist\pii-redact\` | Programmordner (zum Testen ohne Installation) |
+
+Das MSI installiert nach `C:\Program Files\pii-redact\`:
+
+* `pii-redact.exe` – Oberfläche (Startmenü-Eintrag „pii-redact“)
+* `pii-redact-cli.exe` – Kommandozeile (Stapelverarbeitung, `--selftest`)
+* `_internal\` – Python, Bibliotheken, spaCy-Modell, Transformer-Modell (Modus „Gründlich“),
+  Texterkennung (RapidOCR mit PP-OCRv6-Modellen, ca. 31 MB), Anwenderhilfe
+* `LIZENZEN.txt`, `LIZENZTEXTE.txt` – verwendete Open-Source-Komponenten mit Lizenzen und Lizenztexten
+  (beim Build von `tools\lizenzen.py` erzeugt; Übersicht auch unter *Hilfe → Über pii-redact*)
+
+Auf den Zielrechnern ist **kein Python** nötig. Das Programm arbeitet **vollständig offline** und
+baut keine Netzwerkverbindungen auf – Firewall-Regeln sind nicht erforderlich.
+
+Größe (inkl. Texterkennung): ca. 750–950 MB installiert, MSI ca. 400–500 MB (grobe Schätzung – der erste Build zeigt die genauen Werte). Empfohlen: Windows 10/11 64 Bit, 8 GB RAM.
+
+## Build-Rechner einrichten (einmalig)
+
+1. **Windows 10/11 x64** mit **Python 3.12** (python.org, „py launcher“ mitinstallieren).
+2. **.NET SDK 8** (für WiX) und **WiX Toolset 5**:
+   ```bat
+   dotnet tool install --global wix --version 5.0.2
+   ```
+   Wir verwenden bewusst WiX **5**: Ab WiX 6 gilt für Organisationen, die Umsatz erzielen, die
+   „Open Source Maintenance Fee“ (kostenpflichtiges GitHub-Sponsoring). WiX 5 fällt nicht darunter.
+3. Das **Transformer-Modell** muss unter `models\ner\davlan-xlmr-ner\` liegen – siehe nächster Abschnitt.
+4. Beim ersten Build braucht der Rechner Internet (Python-Pakete, spaCy-Modell). Die Versionen sind in
+   `packaging\requirements-lock.txt` fest vorgegeben – jeder Build ist reproduzierbar.
+
+## Quellcode und Transformer-Modell
+
+Der Quellcode liegt im privaten GitHub-Repository der Organisation (Zugriff über die Organisation bzw. das
+Team, das dort Leserechte hat). Holen z. B. mit GitHub Desktop oder
+`git clone https://github.com/<organisation>/pii-redact.git`.
+
+Das **Transformer-Modell** (Modus „Gründlich“, ≈ 280 MB, Lizenz AFL-3.0) ist bewusst **nicht** im Repository
+(GitHub erlaubt keine Dateien über 100 MB). Es hängt als `davlan-xlmr-ner.zip` am jeweiligen **Release**:
+
+```powershell
+# im Projektordner (PowerShell)
+Expand-Archive davlan-xlmr-ner.zip -DestinationPath models\ner\
+Get-FileHash models\ner\davlan-xlmr-ner\model.onnx -Algorithm SHA256
+```
+
+Die erwarteten Prüfsummen stehen in `packaging\modell.sha256`. Das ZIP erstellt der Entwickler einmalig aus
+seinem Modellordner (`Compress-Archive models\ner\davlan-xlmr-ner davlan-xlmr-ner.zip`) und lädt es beim
+Release hoch. Alternativ lässt sich das Modell mit `tools\modelle_testen.bat` neu erzeugen (braucht Zugriff auf
+huggingface.co; die Prüfsummen können dann abweichen).
+
+Ohne Modell: `build.bat /ohne-gruendlich` (nur Modus „Schnell“).
+
+## Bauen
+
+```bat
+build.bat
+```
+
+Ablauf: eigene Build-Umgebung `.venv-build` → Pakete in festen Versionen → PyInstaller →
+**Selbsttest** des fertigen Programms (beide Analyse-Modi, Anwenderhilfe, Start der Oberfläche) → MSI.
+Schlägt ein Schritt fehl, bricht der Build ab.
+
+| Option | Wirkung |
+|---|---|
+| `/neu` | Build-Umgebung komplett neu anlegen (nach Änderung der Lock-Datei) |
+| `/ohne-msi` | nur `dist\pii-redact\` erzeugen |
+| `/ohne-gruendlich` | ohne Transformer-Modell (kleiner, nur Modus „Schnell“) |
+| `/nur-msi` | nur das MSI aus einem vorhandenen `dist\pii-redact\` bauen (schnell, z. B. nach WiX-Installation) |
+
+Die Ausgabe des MSI-Baus steht zusätzlich in `dist\wix-build.log`. Wird WiX nicht gefunden (häufig, wenn die
+Konsole schon vor `dotnet tool install` geöffnet war), sucht `build.bat` auch unter
+`%USERPROFILE%\.dotnet\tools\wix.exe`. Am Ende zeigt die Zusammenfassung immer, ob das MSI entstanden ist.
+
+**Code-Signierung:** siehe nächsten Abschnitt.
+
+## Code-Signierung
+
+**Warum?** Unsignierte Programme, die mit PyInstaller gebaut wurden, stufen Virenscanner gern als
+verdächtig ein. Außerdem lassen sich AppLocker-/WDAC-Regeln nach Herausgeber nur mit signierten Dateien
+nutzen. Signiert werden `pii-redact.exe`, `pii-redact-cli.exe` und das MSI.
+
+Wichtig: Die EXE-Dateien stecken komprimiert im MSI. Sie müssen **vor** dem Verpacken signiert werden – ein
+nachträglich signiertes MSI enthält sonst unsignierte Programme. `build.bat` erledigt beides in einem
+Durchgang, wenn vor dem Aufruf die Umgebungsvariable `SIGNTOOL_ARGS` gesetzt ist.
+
+### Voraussetzungen
+
+| | |
+|---|---|
+| **Zertifikat** | Codesignatur-Zertifikat (erweiterte Schlüsselverwendung „Codesignatur“, 1.3.6.1.5.5.7.3.3). Für die **interne Verteilung** genügt ein Zertifikat der eigenen PKI (z. B. AD CS, Vorlage „Codesignatur“); die Clients müssen der Stammzertifizierungsstelle vertrauen (meist ohnehin per GPO). Ein öffentliches Zertifikat ist nur für eine Weitergabe nach außen nötig – dessen Schlüssel liegt dann vorschriftsgemäß auf einem Token/HSM. |
+| **signtool.exe** | Teil des Windows SDK (Komponente „Windows SDK Signing Tools for Desktop Apps“). `build.bat` findet es im `PATH` oder automatisch unter `C:\Program Files (x86)\Windows Kits\10\bin\…\x64\`. |
+| **Zeitstempel** | Empfohlen: Mit Zeitstempel (`/tr`) bleibt die Signatur gültig, auch wenn das Zertifikat später abläuft. Übertragen wird dabei nur ein Hashwert. Ohne Zeitstempel (z. B. Build-Rechner ohne Internet und ohne internen Zeitstempeldienst) `/tr … /td SHA256` weglassen – dann vor Ablauf des Zertifikats neu signieren bzw. neu bauen. |
+
+### `SIGNTOOL_ARGS` – Beispiele
+
+Immer in derselben Konsole setzen, in der danach `build.bat` läuft (ohne Anführungszeichen um den ganzen
+Wert; Pfade mit Leerzeichen einzeln in Anführungszeichen):
+
+| Zertifikat liegt … | Beispiel |
+|---|---|
+| im Zertifikatspeicher des Benutzers (auch Token/Smartcard mit Treiber) | `set SIGNTOOL_ARGS=/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 0123456789ABCDEF0123456789ABCDEF01234567` |
+| im Zertifikatspeicher des Computers | wie oben, zusätzlich `/sm` |
+| als PFX-Datei | `set SIGNTOOL_ARGS=/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f "D:\Zertifikate\codesign.pfx" /p <Kennwort>` |
+| in Azure Artifact Signing (früher Trusted Signing) | siehe **Weg D** unten |
+
+* `/sha1 …` ist der **Fingerabdruck** des Zertifikats (Zertifikate-Konsole → Zertifikat → Details →
+  „Fingerabdruck“, ohne Leerzeichen). Alternativ wählt `/a` automatisch das passendste Zertifikat – nur
+  sinnvoll, wenn genau ein Codesignatur-Zertifikat vorhanden ist.
+* Statt DigiCert kann jeder RFC-3161-Zeitstempeldienst verwendet werden, z. B. der Ihrer Zertifizierungsstelle.
+* PFX-Kennwörter mit Sonderzeichen (`% & ^ !`) machen in Batch-Dateien Probleme – besser ein Zertifikat im
+  Speicher oder auf dem Token verwenden.
+
+### Weg A: Die IT baut selbst (empfohlen, der Schlüssel verlässt die IT nicht)
+
+1. **Build-Rechner einrichten** wie oben unter „Build-Rechner einrichten“, zusätzlich signtool (Windows SDK).
+2. **Quellcode und Modell holen:** Repository klonen und das Modell aus dem Release entpacken (siehe
+   „Quellcode und Transformer-Modell“). Ohne GitHub-Zugang geht es auch per Kopie vom Entwicklungsrechner:
+   ```bat
+   robocopy "<Quelle>\pii-redact" "D:\build\pii-redact" /E /XD .venv .venv-build .venv-tools dist build __pycache__ .git test-samples test-samples_geschwaerzt
+   ```
+   (dann kommt `models\ner\davlan-xlmr-ner\` gleich mit).
+3. **Bauen und signieren** (Konsole im Projektordner):
+   ```bat
+   set SIGNTOOL_ARGS=/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 <Fingerabdruck>
+   build.bat
+   ```
+   Der erste Build braucht Internet (Python-Pakete) und legt die Build-Umgebung an. In der Ausgabe erscheinen
+   „Code-Signierung mit: …\signtool.exe“, „Signiere EXE-Dateien …“ und „Signiere MSI …“. Schlägt das
+   Signieren fehl, bricht der Build ab. Der Selbsttest läuft mit den bereits signierten Programmen.
+4. **Prüfen:**
+   ```bat
+   signtool verify /pa /v dist\pii-redact\pii-redact.exe
+   signtool verify /pa /v dist\pii-redact-<version>.msi
+   ```
+   oder im Explorer: Eigenschaften → Registerkarte „Digitale Signaturen“.
+5. `dist\pii-redact-<version>.msi` in SCCM verteilen (siehe unten).
+
+### Weg B: Die IT stellt dem Entwickler ein Zertifikat bereit
+
+Der Entwickler baut und signiert dann selbst mit `build.bat`. Die IT stellt bereit:
+
+* ein **Codesignatur-Zertifikat im persönlichen Zertifikatspeicher** des Entwicklers (Registrierung über die
+  Zertifikate-Konsole oder automatische Registrierung, privater Schlüssel möglichst **nicht exportierbar**),
+  bzw. einen Token samt Treiber – eine PFX-Datei nur, wenn die eigenen Richtlinien das erlauben;
+* den **Fingerabdruck** des Zertifikats für `/sha1`;
+* die Adresse des **Zeitstempeldienstes** (oder die Freigabe, einen öffentlichen zu nutzen).
+
+Ist das Stammzertifikat der ausstellenden Stelle auf dem Entwicklungsrechner nicht vertrauenswürdig, meldet
+`build.bat` eine Warnung („Signatur wird auf diesem Rechner nicht als vertrauenswürdig erkannt“) – das
+Signieren selbst funktioniert trotzdem.
+
+### Weg C: Nachträglich signieren (ohne Zertifikat beim Entwickler)
+
+1. Entwickler: `build.bat /ohne-msi` – erzeugt nur `dist\pii-redact\`.
+2. IT: `signtool sign <Argumente> dist\pii-redact\pii-redact.exe dist\pii-redact\pii-redact-cli.exe`
+3. Entwickler: `build.bat /nur-msi` – verpackt die signierten Dateien, ohne neu zu kompilieren.
+4. IT: `signtool sign <Argumente> dist\pii-redact-<version>.msi`
+
+### Weg D: Azure Artifact Signing (vorhandener Azure-Tenant)
+
+Microsoft-Signierdienst (früher „Trusted Signing“): Microsoft prüft die Organisation einmalig, verwahrt den
+Schlüssel in eigenen HSMs und signiert auf Anfrage – ohne Token, ohne PFX-Datei. Kosten: Tarif *Basic* für bis zu
+5 000 Signaturen im Monat (pii-redact braucht 3 pro Build). Die Zertifikate sind nur wenige Tage gültig und werden
+automatisch erneuert; ein **Zeitstempel ist daher Pflicht**. Öffentlich vertrauenswürdige Zertifikate gibt es für
+Organisationen u. a. in der EU. Anleitungen von Microsoft: *Quickstart: Set up Artifact Signing* und
+*Set up signing integrations* (learn.microsoft.com/azure/artifact-signing).
+
+**Einmalig in Azure (IT):**
+
+1. Im Abonnement den Ressourcenanbieter **`Microsoft.CodeSigning`** registrieren.
+2. Ein **Artifact Signing Account** anlegen (Portal: „Artifact Signing Accounts“), Region z. B. *West Europe*
+   (Endpunkt `https://weu.codesigning.azure.net`), *North Europe* (`https://neu.codesigning.azure.net`) oder
+   *Switzerland North* (`https://swn.codesigning.azure.net`), Tarif *Basic*.
+3. **Identitätsprüfung** der Organisation im Portal (Rolle „Artifact Signing Identity Verifier“ nötig):
+   *Public* für öffentlich vertrauenswürdige Signaturen, *Private* für eine nur intern vertrauenswürdige
+   Signatur (z. B. für App Control/WDAC). Benötigt u. a. Firmendaten, zwei E-Mail-Adressen auf der eigenen
+   Domain, aktuellen Registerauszug und die Ausweisprüfung einer verantwortlichen Person. Dauer laut Microsoft
+   1–20 Werktage.
+4. Ein **Zertifikatprofil** anlegen (Typ *Public Trust* bzw. *Private Trust*).
+5. Wer signiert, erhält die Rolle **„Artifact Signing Certificate Profile Signer“** – der Benutzer, der
+   `build.bat` ausführt, oder ein Dienstprinzipal für unbeaufsichtigte Builds.
+
+**Einmalig auf dem Build-Rechner:**
+
+1. Signaturwerkzeuge installieren: `winget install -e --id Microsoft.Azure.ArtifactSigningClientTools`
+   (enthält die Bibliothek `Azure.CodeSigning.Dlib.dll`; Pfad danach z. B. mit
+   `where /r "%ProgramFiles%" Azure.CodeSigning.Dlib.dll` bzw. unter `%LOCALAPPDATA%` suchen). Außerdem nötig:
+   .NET 8 Runtime (x64) und ein aktuelles Windows SDK mit signtool – die SDK-Version 10.0.20348 wird laut
+   Microsoft **nicht** unterstützt. `build.bat` verwendet automatisch das neueste installierte SDK.
+2. `packaging\artifact-signing.example.json` nach `packaging\artifact-signing.json` kopieren und Endpunkt,
+   Kontoname und Profilname eintragen. Die Datei enthält keine Geheimnisse.
+3. Anmeldung: Die Bibliothek nutzt die üblichen Azure-Anmeldungen der Reihe nach
+   (*DefaultAzureCredential*). Am einfachsten vor dem Build **`az login`** (Azure CLI) mit dem berechtigten
+   Benutzer. Für unbeaufsichtigte Builds einen Dienstprinzipal über die Umgebungsvariablen `AZURE_TENANT_ID`,
+   `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` – bzw. auf einer Azure-VM eine benutzerseitig zugewiesene
+   verwaltete Identität.
+
+**Bauen:**
+
+```bat
+az login
+set SIGNTOOL_ARGS=/fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "<Pfad>\x64\Azure.CodeSigning.Dlib.dll" /dmdf "%CD%\packaging\artifact-signing.json"
+build.bat
+```
+
+Die Signatur trägt den von Microsoft geprüften Namen der Organisation. Bei „403 Forbidden“ passt meist der
+Endpunkt nicht zur Region des Kontos oder die Rolle fehlt; schlägt signtool ohne Meldung fehl, fehlt oft die
+.NET-8-Laufzeit.
+
+### Hinweise für den Betrieb
+
+* **AppLocker:** Herausgeberregel auf das Codesignatur-Zertifikat ist möglich.
+* **WDAC im strengen Modus:** Die Bibliotheken unter `_internal\` (Python, Qt, KI-Laufzeit) sind nur
+  teilweise von ihren Herstellern signiert. Dann eine Pfadregel für `C:\Program Files\pii-redact\` oder
+  Hash-Regeln verwenden – oder zusätzlich alle `*.dll`/`*.pyd` unter `dist\pii-redact\_internal\` vor dem
+  Verpacken signieren (Weg C, Schritt 2 entsprechend erweitern).
+* **Zertifikat läuft ab:** Mit Zeitstempel bleiben bereits verteilte Versionen gültig; neue Versionen mit
+  dem neuen Zertifikat bauen.
+
+## SCCM / Configuration Manager
+
+Anwendung anlegen → Bereitstellungstyp **Windows Installer (*.msi)** → MSI auswählen.
+Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
+
+| Einstellung | Wert |
+|---|---|
+| Installationsprogramm | `msiexec /i "pii-redact-0.3.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
+| Mit Kommandozeile im PATH | zusätzlich `ADDTOPATH=1` |
+| Deinstallationsprogramm | `msiexec /x {Produktcode} /qn /norestart` |
+| Erkennungsmethode | Windows Installer – Produktcode (automatisch) |
+| Installationsverhalten | Für System installieren |
+| Anmeldeanforderung | Unabhängig davon, ob ein Benutzer angemeldet ist |
+| Neustart | nicht erforderlich |
+| Anforderungen | Windows 10/11 64 Bit |
+
+### Updates
+
+1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.3.0` → `0.4.0`;
+   MSI wertet nur die ersten drei Stellen aus).
+2. `build.bat` → neues MSI mit neuem Produktcode.
+3. In SCCM neue Anwendung anlegen und die alte **ersetzen** („Supersedence“). Das MSI entfernt die alte
+   Version dabei selbst (MajorUpgrade). Ein Downgrade wird verhindert.
+
+Die **UpgradeCode-GUID** in `packaging\pii-redact.wxs` darf sich nie ändern.
+
+## Zentrale Vorgaben (optional)
+
+Datei `C:\ProgramData\pii-redact\defaults.json` – z. B. per SCCM-Skript, Paket oder GPO verteilen.
+Vorlage: `deploy\defaults.example.json`.
+
+```json
+{
+  "analysis_mode": "gruendlich",
+  "threshold": 0.45,
+  "replace_mode": "platzhalter",
+  "show_original": false,
+  "allow_list": ["Musterfirma GmbH"],
+  "deny_list": ["Projekt Falke"]
+}
+```
+
+* Werte gelten als **Voreinstellung** für alle Nutzer; persönliche Einstellungen überschreiben sie.
+* `analysis_mode`: Standard im Programm ist `"gruendlich"` (findet deutlich mehr Namen/Orte, ca. 1 GB RAM,
+  ca. 0,3–1 s pro Seite). Für Rechner mit wenig Arbeitsspeicher (≤ 4 GB) `"schnell"` vorgeben (ca. 0,4 GB).
+  Fehlt das Transformer-Modell (Build mit `/ohne-gruendlich`), nutzt das Programm automatisch „Schnell“.
+* `allow_list` (nie schwärzen) und `deny_list` (immer schwärzen) gelten **immer zusätzlich** zu den
+  persönlichen Listen.
+* Weitere Schlüssel: `entities` (Liste der Datenarten), `pdf_labels`, `spacy_model`, `ner_model`,
+  `ocr` (`true`/`false` – Texterkennung für gescannte Seiten, Standard `true`).
+
+Zusätzliche Modelle können – ohne neues MSI – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
+abgelegt werden.
+
+## Wo liegt was auf dem Client?
+
+| Pfad | Inhalt |
+|---|---|
+| `C:\Program Files\pii-redact\` | Programm (schreibgeschützt für Nutzer) |
+| `C:\ProgramData\pii-redact\defaults.json` | zentrale Vorgaben (optional) |
+| `%APPDATA%\pii-redact\settings.json` | persönliche Einstellungen |
+| `%LOCALAPPDATA%\pii-redact\logs\pii-redact.log` | Programmprotokoll für den Support (keine Dokumentinhalte) |
+| Zielordner der Ordner-Bearbeitung | Ergebnisse, `pii-redact-protokoll.csv`, `pii-redact-arbeitsstand.json` |
+
+Registry: nur bei `ADDTOPATH=1` ein Merker unter `HKLM\Software\pii-redact`.
+
+## Prüfen einer Installation
+
+```bat
+"C:\Program Files\pii-redact\pii-redact-cli.exe" --selftest
+```
+
+zeigt Modellordner, spaCy-Modell, Transformer-Modell, Anwenderhilfe und testet beide Analyse-Modi.

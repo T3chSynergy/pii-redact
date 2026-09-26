@@ -1,0 +1,10 @@
+{
+  "_hinweis": "Zentrale Vorgaben der IT. Als C:\\ProgramData\\pii-redact\\defaults.json ablegen. Gilt als Grundeinstellung für alle Nutzer; persönliche Einstellungen überschreiben sie – außer den Listen: allow_list/deny_list gelten immer ZUSÄTZLICH.",
+  "analysis_mode": "gruendlich",
+  "threshold": 0.45,
+  "replace_mode": "platzhalter",
+  "pdf_labels": true,
+  "show_original": false,
+  "allow_list": ["Musterfirma GmbH", "Musterstadt"],
+  "deny_list": ["Projekt Falke"]
+}

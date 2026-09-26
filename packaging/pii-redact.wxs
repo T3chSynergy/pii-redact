@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI-Paket fuer pii-redact, gebaut mit WiX Toolset v5 (Version 5.0.2).
+  Installation von WiX, Build-Aufruf und SCCM-Parameter: siehe packaging\README.md
+  Gebaut wird das MSI von build.bat (Schritt 6/6, oder allein mit build.bat /nur-msi).
+
+  Hinweis fuer Bearbeiter: In XML-Kommentaren sind zwei Bindestriche hintereinander
+  verboten. Befehle mit solchen Optionen deshalb nur in README.md notieren.
+
+  WICHTIG: Die UpgradeCode-GUID darf sich NIE aendern. Nur so ersetzt eine neue Version die alte.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <?ifndef Manufacturer?>
+    <?define Manufacturer = "pii-redact" ?>
+  <?endif?>
+
+  <Package Name="pii-redact"
+           Manufacturer="$(var.Manufacturer)"
+           Version="$(var.Version)"
+           UpgradeCode="705D03F1-09B8-4E20-98E9-5C38D9AD3A56"
+           Language="1031"
+           Codepage="1252"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes">
+
+    <SummaryInformation Description="pii-redact - personenbezogene Daten erkennen und schwaerzen"
+                        Manufacturer="$(var.Manufacturer)" />
+
+    <!-- Neue Version ersetzt die alte automatisch; Downgrade wird verhindert -->
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von pii-redact ist bereits installiert." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.PackagingDir)\pii-redact.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPCOMMENTS" Value="Erkennt und entfernt personenbezogene Daten in PDF-, TXT- und Markdown-Dateien. Arbeitet vollstaendig offline." />
+
+    <!-- Optional: Installationsordner in den System-PATH (fuer pii-redact-cli), z. B. ADDTOPATH=1 -->
+    <Property Id="ADDTOPATH" Value="0" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="pii-redact" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <!-- Hauptprogramm mit Startmenue-Verknuepfung -->
+    <Component Id="MainExecutable" Directory="INSTALLFOLDER">
+      <File Id="PiiRedactExe" Source="$(var.SourceDir)\pii-redact.exe" KeyPath="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ProgramMenuFolder"
+                  Name="pii-redact"
+                  Description="Personenbezogene Daten erkennen und schwaerzen"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon"
+                  Advertise="no" />
+      </File>
+    </Component>
+
+    <!-- Alle uebrigen Dateien aus dem PyInstaller-Ordner (inkl. _internal, Modelle, Hilfe) -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.SourceDir)\**">
+        <Exclude Files="$(var.SourceDir)\pii-redact.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="PathEntry" Directory="INSTALLFOLDER" Guid="4F0C8E4B-7A7D-4C2B-9D55-2E6B1C3A9F10" Condition="ADDTOPATH = 1">
+      <Environment Id="PiiRedactPath" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set"
+                   System="yes" Permanent="no" />
+      <RegistryValue Root="HKLM" Key="Software\pii-redact" Name="AddedToPath" Type="integer" Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Feature Id="Main" Title="pii-redact" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="PathEntry" />
+    </Feature>
+  </Package>
+</Wix>

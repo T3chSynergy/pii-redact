@@ -1,0 +1,15 @@
+pii-redact – Lizenzen der enthaltenen Komponenten
+=================================================
+
+Diese Datei ist nur ein Hinweis. Die Lizenzdateien des Programmpakets werden beim Build erzeugt:
+
+  dist\pii-redact\LIZENZEN.txt     wesentliche Komponenten + alle Python-Pakete mit Version und Lizenz
+  dist\pii-redact\LIZENZTEXTE.txt  Lizenztexte aller Pakete
+
+Erzeugt von tools\lizenzen.py (Aufruf in build.bat). Quellen:
+  * src\pii_redact\about.py        wesentliche Komponenten (auch in „Über pii-redact“ und Hilfe-Kapitel 15)
+  * packaging\lizenztexte\          Standardtexte für Pakete, die keinen Lizenztext mitliefern
+  * Metadaten der installierten Pakete der Build-Umgebung (.venv-build)
+
+Wichtig: PyMuPDF steht unter der GNU AGPL-3.0 (oder kommerzieller Lizenz von Artifex). Vor einer
+Weitergabe an Dritte rechtlich prüfen lassen.

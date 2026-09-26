@@ -1,0 +1,12 @@
+# Zeilenenden: im Repository LF, Windows-Skripte beim Auschecken mit CRLF
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.wxs text eol=crlf
+
+# Binärdateien nie umwandeln
+*.pdf binary
+*.png binary
+*.ico binary
+*.onnx binary
+*.zip binary
