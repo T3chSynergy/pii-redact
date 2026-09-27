@@ -26,9 +26,10 @@ def test_merge_prefers_pattern_type_and_unites_spans():
 
 
 def test_clean_ner_splits_markdown_and_newlines():
-    text = "[Petra Hoffmann](mailto:p@x.de) Berlin\nTelefon"
-    f1 = Finding(1, 31, "PERSON", text[1:31], 0.85, recognizer="SpacyRecognizer")
-    f2 = Finding(32, len(text), "LOCATION", text[32:], 0.85, recognizer="SpacyRecognizer")
+    text = "[Petra Hoffmann](mailto:p@example.de) Berlin\nTelefon"
+    end = text.index(")") + 1
+    f1 = Finding(1, end, "PERSON", text[1:end], 0.85, recognizer="SpacyRecognizer")
+    f2 = Finding(end + 1, len(text), "LOCATION", text[end + 1:], 0.85, recognizer="SpacyRecognizer")
     out = clean_ner([f1, f2], text)
     assert [f.text for f in out] == ["Petra Hoffmann", "Berlin"]
 

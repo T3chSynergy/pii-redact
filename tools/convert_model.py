@@ -142,6 +142,7 @@ def main(argv=None) -> int:
     }
     (tmp / "pii_redact_meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
     _copy_card(args.model, tmp)
+    _copy_license(meta["license"], tmp)
 
     print("[5/5] Prüfe ONNX gegen Original …")
     model.eval()  # torch.onnx.export hinterlässt das Modell ggf. im Trainingsmodus (Dropout!)
@@ -234,6 +235,14 @@ def quantize(fp32: Path, out: Path, mode: str) -> None:
             nodes_to_exclude=exclude,
             extra_options={"MatMulConstBOnly": True},
         )
+
+
+def _copy_license(license_id: str | None, folder: Path) -> None:
+    """Lizenztext neben das Modell legen (Weitergabe im Programmpaket bzw. als Release-Anhang)."""
+    texts = Path(__file__).resolve().parents[1] / "packaging" / "lizenztexte"
+    src = texts / f"{(license_id or '').upper()}.txt"  # z. B. afl-3.0 → AFL-3.0.txt
+    if license_id and src.is_file():
+        shutil.copy(src, folder / f"LICENSE-{src.stem}.txt")
 
 
 def _license(model_id: str) -> str | None:

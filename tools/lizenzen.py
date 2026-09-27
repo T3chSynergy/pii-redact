@@ -110,7 +110,11 @@ def main(target: Path) -> int:
     head = f"pii-redact {__version__} – enthaltene Komponenten und Lizenzen (erzeugt {today})"
 
     lines = [head, "=" * len(head), "",
-             "pii-redact selbst: interne Software (Lizenz durch den Herausgeber festzulegen).", "",
+             "pii-redact selbst: freie Software unter der GNU Affero General Public License, Version 3 oder später",
+             "(AGPL-3.0-or-later), Quellcode: https://github.com/T3chSynergy/pii-redact –",
+             "ohne jede Gewährleistung. Lizenztext: am Anfang von LIZENZTEXTE.txt.", "",
+             "Transformer-Modell „Davlan/xlm-roberta-base-ner-hrl“ (Modus „Gründlich“, falls mitinstalliert):",
+             "Academic Free License v3.0 (AFL-3.0), Lizenztext in LIZENZTEXTE.txt; Basismodell XLM-RoBERTa: MIT.", "",
              "WESENTLICHE KOMPONENTEN", "", components_text(), "",
              "ALLE ENTHALTENEN PYTHON-PAKETE", "",
              f"  {'Paket':32s} {'Version':14s} Lizenz",
@@ -122,6 +126,15 @@ def main(target: Path) -> int:
     (target / "LIZENZEN.txt").write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
 
     texts = [f"{head} – Lizenztexte", ""]
+    own = ROOT / "LICENSE"
+    if own.is_file():
+        texts += ["#" * 78, f"# pii-redact {__version__} – GNU AGPL-3.0-or-later", "#" * 78, "",
+                  own.read_text(encoding="utf-8").strip(), ""]
+    afl = STANDARD_TEXTS / "AFL-3.0.txt"
+    if afl.is_file():
+        texts += ["#" * 78, "# Transformer-Modell Davlan/xlm-roberta-base-ner-hrl – AFL-3.0",
+                  "# https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl", "#" * 78, "",
+                  afl.read_text(encoding="utf-8").strip(), ""]
     py_license = Path(sys.base_prefix) / "LICENSE.txt"
     if py_license.is_file():
         texts += ["#" * 78, f"# Python {sys.version.split()[0]}", "#" * 78, "",

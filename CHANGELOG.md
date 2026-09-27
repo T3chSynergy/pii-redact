@@ -2,6 +2,12 @@
 
 ## 0.5.0 – 27.09.2026
 
+**Lizenz**
+- pii-redact steht jetzt unter der **GNU AGPL-3.0 oder später** (`LICENSE`), passend zu PyMuPDF; Quellcode:
+  https://github.com/T3chSynergy/pii-redact. „Über pii-redact“,
+  Hilfe (Kap. 15), README und `LIZENZTEXTE.txt` nennen die Lizenz; der AFL-3.0-Text des Transformer-Modells
+  liegt bei (`packaging/lizenztexte/AFL-3.0.txt`, im Modellordner `LICENSE-AFL-3.0.txt`).
+
 **Neu**
 - **KI-Nachprüfung (optional, standardmäßig aus):** Ein Sprachmodell bewertet auf Knopfdruck (*KI-Prüfung*,
   Strg+K) das **geschwärzte** Ergebnis – Restrisiko gering/mittel/hoch, Begründung, Hinweise auf übersehene und

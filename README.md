@@ -24,10 +24,11 @@ Alles läuft **offline auf dem eigenen Rechner** – es werden keine Dokumentinh
 
 Voraussetzung: **Python 3.10–3.12** (empfohlen 3.12, [python.org](https://www.python.org/downloads/)).
 
-Quellcode aus dem (privaten) GitHub-Repository holen – z. B. mit GitHub Desktop („Clone repository“) oder:
+Quellcode aus dem GitHub-Repository [github.com/T3chSynergy/pii-redact](https://github.com/T3chSynergy/pii-redact) holen – z. B. mit GitHub Desktop
+(„Clone repository“) oder:
 
 ```bat
-git clone https://github.com/<organisation>/pii-redact.git
+git clone https://github.com/T3chSynergy/pii-redact.git
 ```
 
 Das **Transformer-Modell** für den Modus „Gründlich“ (≈ 280 MB) liegt **nicht** im Repository, sondern als
@@ -253,3 +254,15 @@ mail_mit_scan.pdf – ohne Textebene, für die Texterkennung).
 ## Ideen für später
 
 DOCX-Unterstützung · Pseudonymisierungs-Schlüssel (reversibel, verschlüsselt)
+
+## Lizenz
+
+pii-redact ist freie Software: Sie können es unter den Bedingungen der **GNU Affero General Public License**,
+Version 3 oder (nach Ihrer Wahl) jeder späteren Version, weitergeben und/oder verändern (`AGPL-3.0-or-later`,
+siehe [`LICENSE`](LICENSE)). Das Programm wird ohne jede Gewährleistung bereitgestellt. Die AGPL passt zu PyMuPDF, das ebenfalls unter der AGPL-3.0 steht. Wer das Programm
+(auch als MSI) weitergibt, muss den Quellcode unter derselben Lizenz zugänglich machen.
+
+Mitgelieferte Komponenten behalten ihre eigenen Lizenzen (MIT, BSD, Apache-2.0, LGPL-3.0 für Qt u. a.); der
+Build erzeugt `LIZENZEN.txt` und `LIZENZTEXTE.txt` im Programmordner. Das Transformer-Modell
+(`davlan-xlmr-ner`, Release-Anhang) steht unter der **Academic Free License 3.0** (`AFL-3.0`,
+Text: `packaging/lizenztexte/AFL-3.0.txt`); das Basismodell XLM-RoBERTa unter MIT.

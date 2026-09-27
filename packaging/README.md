@@ -38,9 +38,9 @@ Größe (inkl. Texterkennung): ca. 750–950 MB installiert, MSI ca. 400–500 M
 
 ## Quellcode und Transformer-Modell
 
-Der Quellcode liegt im privaten GitHub-Repository der Organisation (Zugriff über die Organisation bzw. das
-Team, das dort Leserechte hat). Holen z. B. mit GitHub Desktop oder
-`git clone https://github.com/<organisation>/pii-redact.git`.
+Der Quellcode liegt im GitHub-Repository der Organisation (https://github.com/T3chSynergy/pii-redact, Lizenz: GNU AGPL-3.0 oder später, siehe `LICENSE`). Holen z. B.
+mit GitHub Desktop oder
+`git clone https://github.com/T3chSynergy/pii-redact.git`.
 
 Das **Transformer-Modell** (Modus „Gründlich“, ≈ 280 MB, Lizenz AFL-3.0) ist bewusst **nicht** im Repository
 (GitHub erlaubt keine Dateien über 100 MB). Es hängt als `davlan-xlmr-ner.zip` am jeweiligen **Release**:
@@ -53,7 +53,8 @@ Get-FileHash models\ner\davlan-xlmr-ner\model.onnx -Algorithm SHA256
 
 Die erwarteten Prüfsummen stehen in `packaging\modell.sha256`. Das ZIP erstellt der Entwickler einmalig aus
 seinem Modellordner (`Compress-Archive models\ner\davlan-xlmr-ner davlan-xlmr-ner.zip`) und lädt es beim
-Release hoch. Alternativ lässt sich das Modell mit `tools\modelle_testen.bat` neu erzeugen (braucht Zugriff auf
+Release hoch. Der Modellordner enthält den Lizenztext `LICENSE-AFL-3.0.txt` (Academic Free License 3.0), der
+bei jeder Weitergabe mitgehen muss; im Programmpaket steht er zusätzlich in `LIZENZTEXTE.txt`. Alternativ lässt sich das Modell mit `tools\modelle_testen.bat` neu erzeugen (braucht Zugriff auf
 huggingface.co; die Prüfsummen können dann abweichen).
 
 Ohne Modell: `build.bat /ohne-gruendlich` (nur Modus „Schnell“).

@@ -75,10 +75,17 @@ COMPONENTS: list[tuple[str, list[Component]]] = [
     ]),
 ]
 
+#: Lizenz von pii-redact selbst
+LICENSE = "GNU Affero General Public License, Version 3 oder später (AGPL-3.0-or-later)"
+#: Öffentliche Adresse des Quellcodes (für die „Über“-Seite; leer = nicht angezeigt)
+SOURCE_URL = "https://github.com/T3chSynergy/pii-redact"
+
 NOTES = [
-    "PyMuPDF steht unter der GNU AGPL-3.0. Der Einsatz innerhalb der eigenen Organisation gilt in der Regel als "
-    "unkritisch. Bei einer Weitergabe an Dritte sind die Pflichten der AGPL zu erfüllen (u. a. Bereitstellung "
-    "des Quellcodes) oder eine kommerzielle Lizenz bei Artifex zu erwerben.",
+    "pii-redact ist freie Software unter der GNU AGPL, Version 3 oder später: Sie dürfen es nutzen, weitergeben und verändern; "
+    "wer es weitergibt, muss den Quellcode unter derselben Lizenz mitliefern bzw. zugänglich machen. Es gibt "
+    "keine Gewährleistung. Die AGPL passt zu PyMuPDF, das ebenfalls unter der AGPL-3.0 steht.",
+    "Das Transformer-Modell für den Modus „Gründlich“ steht unter der Academic Free License 3.0 (AFL-3.0); "
+    "es wird als eigenständige Datendatei mitgeliefert.",
     "Die Qt-Bibliotheken (LGPL-3.0) liegen als separate Dateien im Programmordner und können ausgetauscht werden.",
     "Die vollständige Liste aller enthaltenen Bibliotheken mit ihren Lizenztexten steht in den Dateien "
     "LIZENZEN.txt und LIZENZTEXTE.txt im Programmordner.",

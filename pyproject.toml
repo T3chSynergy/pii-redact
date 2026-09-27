@@ -7,6 +7,8 @@ name = "pii-redact"
 dynamic = ["version"]
 description = "Lokaler Desktop-Client zum Erkennen und Schwärzen personenbezogener Daten in PDF-, TXT- und Markdown-Dokumenten (Presidio, Deutsch)."
 readme = "README.md"
+license = {text = "AGPL-3.0-or-later"}
+classifiers = ["License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)"]
 requires-python = ">=3.10"
 dependencies = [
     "presidio-analyzer>=2.2.360",

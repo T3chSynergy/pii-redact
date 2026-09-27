@@ -9,7 +9,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
 
 from .. import __version__
-from ..about import components_html
+from ..about import LICENSE, SOURCE_URL, components_html
 from ..paths import app_dir, find_ner_model, find_spacy_model, ner_model_info
 from .help_window import help_css, is_dark
 
@@ -60,6 +60,8 @@ def about_html(settings, dark: bool = False) -> str:
     else:
         lic_line = ("<p class='klein'>LIZENZEN.txt und LIZENZTEXTE.txt entstehen beim Erstellen des "
                     "Programmpakets (build.bat).</p>")
+    source = (f' Quellcode: <a href="{html.escape(SOURCE_URL)}">{html.escape(SOURCE_URL)}</a>'
+              if SOURCE_URL else "")
     versions = " · ".join([
         f"Python {_version('sys', 'version').split()[0]}",
         f"Presidio {_version('presidio_analyzer')}",
@@ -73,6 +75,7 @@ def about_html(settings, dark: bool = False) -> str:
 <p>Erkennt personenbezogene Daten in PDF-, TXT- und Markdown-Dateien und entfernt sie –
 {local}.</p>
 <p class="wichtig">Automatische Erkennung ist nie perfekt – bitte das Ergebnis immer prüfen.</p>
+<p>Freie Software unter der {html.escape(LICENSE)} – ohne Gewährleistung.{source}</p>
 <h3>Installierte Modelle</h3>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
 <tr><td width="30%">Sprachmodell (beide Modi)</td><td>spaCy {html.escape(settings.spacy_model)}{'' if spacy_ref else ' – FEHLT'}</td></tr>
