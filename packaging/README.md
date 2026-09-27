@@ -232,7 +232,7 @@ Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
 
 | Einstellung | Wert |
 |---|---|
-| Installationsprogramm | `msiexec /i "pii-redact-0.3.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
+| Installationsprogramm | `msiexec /i "pii-redact-0.4.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
 | Mit Kommandozeile im PATH | zusätzlich `ADDTOPATH=1` |
 | Deinstallationsprogramm | `msiexec /x {Produktcode} /qn /norestart` |
 | Erkennungsmethode | Windows Installer – Produktcode (automatisch) |
@@ -243,7 +243,7 @@ Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
 
 ### Updates
 
-1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.3.0` → `0.4.0`;
+1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.4.0` → `0.5.0`;
    MSI wertet nur die ersten drei Stellen aus).
 2. `build.bat` → neues MSI mit neuem Produktcode.
 3. In SCCM neue Anwendung anlegen und die alte **ersetzen** („Supersedence“). Das MSI entfernt die alte
@@ -274,7 +274,14 @@ Vorlage: `deploy\defaults.example.json`.
 * `allow_list` (nie schwärzen) und `deny_list` (immer schwärzen) gelten **immer zusätzlich** zu den
   persönlichen Listen.
 * Weitere Schlüssel: `entities` (Liste der Datenarten), `pdf_labels`, `spacy_model`, `ner_model`,
-  `ocr` (`true`/`false` – Texterkennung für gescannte Seiten, Standard `true`).
+  `ocr` (`true`/`false` – Texterkennung für gescannte Seiten, Standard `true`),
+  `compact_notices` (`true` = Hinweise nur als Zähler in der Statusleiste und als Seitensymbol, ohne orange
+  Hinweiszeile; Standard `false`).
+* **Festlegen statt vorschlagen:** Schlüssel, die unter `"locked"` stehen, gelten immer mit dem Wert aus
+  `defaults.json`; persönliche Einstellungen werden ignoriert, das Feld ist in den Einstellungen ausgegraut.
+  Beispiel – Texterkennung erzwingen und kompakte Hinweise verbieten:
+  `"ocr": true, "compact_notices": false, "locked": ["ocr", "compact_notices"]`.
+  Ein Schlüssel wird nur gesperrt, wenn er in `defaults.json` auch einen Wert hat.
 
 Zusätzliche Modelle können – ohne neues MSI – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
 abgelegt werden.

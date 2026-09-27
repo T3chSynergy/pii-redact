@@ -136,8 +136,9 @@ def test_ui_marks_ocr_and_asks_before_export(tmp_path, monkeypatch):
         while w.runner.busy and time.time() - t < 120:
             wait(100)
         wait(100)
-        assert w.ocr_banner.isVisible() and "Texterkennung" in w.ocr_banner.text()
-        assert OCR_WARNING_PREFIX not in w.banner.text()
+        assert w.notice_bar.isVisible() and "Texterkennung" in w.notice_bar.label.text()
+        assert w.notice_btn.isVisible() and "1 Hinweis" in w.notice_btn.text()
+        assert [m.label for m in w.right.pages.page_marks[0]] == ["OCR – Seite vollständig prüfen"]
         assert w.right.pages.ocr_pages == {0}
         assert "aus Texterkennung" in w.findings.summary.text()
 

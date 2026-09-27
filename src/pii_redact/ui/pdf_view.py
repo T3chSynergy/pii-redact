@@ -12,6 +12,8 @@ from PySide6.QtWidgets import QLabel, QRubberBand, QScrollArea, QToolTip, QVBoxL
 
 from ..core.entities import info
 
+ORANGE = "#e8590c"
+
 
 @dataclass
 class Overlay:
@@ -21,6 +23,14 @@ class Overlay:
     active: bool
     entity_type: str
     label: str | None = None
+
+
+@dataclass
+class PageMark:
+    """Kleines Symbol oben auf einer Seite (z. B. „OCR“, „Bild“, „Formular“) mit Erklärung als Tooltip."""
+    label: str
+    tooltip: str
+    critical: bool = False
 
 
 class _PageWidget(QWidget):
@@ -33,6 +43,7 @@ class _PageWidget(QWidget):
         self.overlays: list[Overlay] = []
         self._band: QRubberBand | None = None
         self._origin: QPoint | None = None
+        self._badges: list[tuple[QRectF, str]] = []   # gezeichnete Seitensymbole + Tooltip
         self.setMouseTracking(True)
         self.update_size()
 
@@ -86,22 +97,39 @@ class _PageWidget(QWidget):
                 p.drawRect(r)
         # Seitenrand
         if self.index in self.view.ocr_pages:
-            orange = QColor("#e8590c")
-            p.setPen(QPen(orange, 4))
+            p.setPen(QPen(QColor(ORANGE), 4))
             p.drawRect(self.rect().adjusted(2, 2, -2, -2))
-            f = QFont("Arial")
-            f.setPixelSize(12)
-            f.setBold(True)
-            p.setFont(f)
-            text = "  Texterkennung (OCR) – Seite Zeile für Zeile prüfen  "
-            badge = QRectF(4, 4, p.fontMetrics().horizontalAdvance(text), 20)
-            p.fillRect(badge, orange)
-            p.setPen(QColor("white"))
-            p.drawText(badge, Qt.AlignmentFlag.AlignCenter, text)
         else:
             p.setPen(QColor("#ced4da"))
             p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        self._paint_badges(p)
         p.end()
+
+    def _paint_badges(self, p: QPainter) -> None:
+        """Seitensymbole oben links: kritische (orange) zuerst, dann Informationen (grau)."""
+        self._badges = []
+        marks = sorted(self.view.page_marks.get(self.index, []), key=lambda m: not m.critical)
+        if not marks:
+            return
+        f = QFont("Arial")
+        f.setPixelSize(11)
+        p.setFont(f)
+        x = 6.0
+        for m in marks:
+            f.setBold(m.critical)
+            p.setFont(f)
+            w = p.fontMetrics().horizontalAdvance(m.label) + 14
+            r = QRectF(x, 6, w, 18)
+            if r.right() > self.width() - 4 and x > 6:
+                break  # sehr kleine Zoomstufe: nur so viele Symbole wie passen
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(ORANGE) if m.critical else QColor(73, 80, 87, 200))
+            p.drawRoundedRect(r, 9, 9)
+            p.setPen(QColor("white"))
+            p.drawText(r, Qt.AlignmentFlag.AlignCenter, m.label)
+            self._badges.append((r, m.tooltip))
+            x = r.right() + 4
+        p.setBrush(Qt.BrushStyle.NoBrush)
 
     # Klick = Fund auswählen, Ziehen = Bereich markieren (nur Original)
     def mousePressEvent(self, e):
@@ -138,6 +166,11 @@ class _PageWidget(QWidget):
             self.view.overlayClicked.emit(self._ids_at(e.position()))
 
     def event(self, e):
+        if e.type() == QEvent.Type.ToolTip:
+            badge = next((tip for r, tip in self._badges if r.contains(QPointF(e.pos()))), "")
+            if badge:
+                QToolTip.showText(e.globalPos(), badge, self)
+                return True
         if e.type() == QEvent.Type.ToolTip and self.view.tooltip_provider is not None:
             ids = self._ids_at(QPointF(e.pos()))
             text = self.view.tooltip_provider(ids) if ids else ""
@@ -170,7 +203,8 @@ class PdfPagesView(QScrollArea):
         self.tooltip_provider = None     # Funktion(ids) -> Tooltip-Text
         self.zoom = 1.25
         self.selected_ids: set[int] = set()
-        self.ocr_pages: set[int] = set()   # per Texterkennung gelesene Seiten (werden markiert)
+        self.ocr_pages: set[int] = set()   # per Texterkennung gelesene Seiten (orangefarbener Rahmen)
+        self.page_marks: dict[int, list[PageMark]] = {}   # Seitensymbole je Seite
         self._doc: fitz.Document | None = None
         self._pages: list[_PageWidget] = []
         self.setWidgetResizable(False)
@@ -209,6 +243,11 @@ class PdfPagesView(QScrollArea):
 
     def set_ocr_pages(self, pages) -> None:
         self.ocr_pages = set(pages or ())
+        for w in self._pages:
+            w.update()
+
+    def set_page_marks(self, marks: dict[int, list[PageMark]] | None) -> None:
+        self.page_marks = dict(marks or {})
         for w in self._pages:
             w.update()
 

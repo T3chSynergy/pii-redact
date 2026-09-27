@@ -1,5 +1,24 @@
 # Änderungen
 
+## 0.4.0 – 27.09.2026
+
+**Geändert – Hinweise stören nicht mehr bei häufiger Nutzung**
+- Über dem Dokument steht nur noch eine **einzeilige, schließbare Leiste** – und nur für kritische Hinweise
+  (Seiten aus der Texterkennung, Seiten ohne Text). Der volle Text steht im Tooltip.
+- Neuer **Hinweis-Zähler** in der Statusleiste („ⓘ 2 Hinweise“, orange bei kritischen). Ein Klick zeigt alle
+  Hinweise mit Erklärung und Sprung zur Seite.
+- **Seitensymbole** in der Seitenansicht: „OCR“, „ohne Text“, „Bild“, „Formular“ (Erklärung per Tooltip).
+- Bildhinweis nur noch für Bilder, die Inhalte tragen können: wiederkehrende Logos und kleine Symbole werden
+  übergangen.
+- Erfolgreicher PDF-Export ohne Dialog: kurze Meldung in der Statusleiste mit Link „Ordner öffnen“.
+  Ein Fenster erscheint nur noch, wenn die Kontrolle Reste findet.
+- Freie Bearbeitung ohne eigenen Hinweisbalken (Erklärung im Tooltip der Überschrift).
+- Rückfrage vor dem Export von OCR-Seiten auf zwei Sätze gekürzt (bleibt immer aktiv).
+- Neue Einstellung **„Kompakte Hinweise“** für Vielnutzer: auch die Leiste entfällt, Zähler und Seitensymbole
+  bleiben.
+- `defaults.json`: neuer Schlüssel **`locked`** – dort aufgeführte Einstellungen legt die IT fest
+  (in den Einstellungen ausgegraut).
+
 ## 0.3.0 – 26.09.2026
 
 **Neu**

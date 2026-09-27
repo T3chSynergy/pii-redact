@@ -130,6 +130,7 @@ Modelle werden gesucht in: `models/` im Programmpaket → `models/` neben der EX
 Die IT kann `C:\ProgramData\pii-redact\defaults.json` ablegen (Vorlage: `deploy/defaults.example.json`):
 Standard-Modus, Schwelle, Ersetzung usw. gelten als Grundeinstellung; persönliche Einstellungen überschreiben sie.
 `allow_list`/`deny_list` der Organisation gelten **immer zusätzlich** zu den persönlichen Listen.
+Unter `"locked"` aufgeführte Schlüssel legt die IT fest (in den Einstellungen ausgegraut).
 
 ## Bedienung
 

@@ -1,10 +1,13 @@
 {
-  "_hinweis": "Zentrale Vorgaben der IT. Als C:\\ProgramData\\pii-redact\\defaults.json ablegen. Gilt als Grundeinstellung für alle Nutzer; persönliche Einstellungen überschreiben sie – außer den Listen: allow_list/deny_list gelten immer ZUSÄTZLICH.",
+  "_hinweis": "Zentrale Vorgaben der IT. Als C:\\ProgramData\\pii-redact\\defaults.json ablegen. Gilt als Grundeinstellung für alle Nutzer; persönliche Einstellungen überschreiben sie – außer den Listen: allow_list/deny_list gelten immer ZUSÄTZLICH. Unter locked aufgeführte Schlüssel gelten immer mit dem Wert aus dieser Datei (in den Einstellungen ausgegraut).",
   "analysis_mode": "gruendlich",
   "threshold": 0.45,
   "replace_mode": "platzhalter",
   "pdf_labels": true,
   "show_original": false,
+  "ocr": true,
+  "compact_notices": false,
+  "locked": ["ocr"],
   "allow_list": ["Musterfirma GmbH", "Musterstadt"],
   "deny_list": ["Projekt Falke"]
 }

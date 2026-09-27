@@ -44,9 +44,30 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
       Das Programm merkt sich Ihre Wahl.</td></tr>
   <tr><td><b>Funde</b> (rechts)</td><td>Liste aller Treffer mit Datenart, Text, Fundstelle (Seite oder Zeile),
       Sicherheit (Score) und Herkunft (<i>auto</i> oder <i>manuell</i>).</td></tr>
-  <tr><td><b>Statusleiste</b> (unten)</td><td>Meldungen, Fortschritt der Analyse, der aktive Modus und rechts der
-      <b>Zoom</b> der Seitenansicht.</td></tr>
+  <tr><td><b>Statusleiste</b> (unten)</td><td>Meldungen (z. B. „✓ gespeichert“ mit Link zum Ordner), der
+      <b>Hinweis-Zähler</b>, Fortschritt der Analyse, der aktive Modus und rechts der <b>Zoom</b> der
+      Seitenansicht.</td></tr>
 </table>
+
+<h3><a name="hinweise"></a>Hinweise zum Dokument</h3>
+<p>Das Programm meldet Besonderheiten eines Dokuments so knapp wie möglich – und nur dort, wo sie wichtig sind:</p>
+<table border="1" cellspacing="0" cellpadding="4" width="100%">
+  <tr><th width="28%">Wo</th><th>Was</th></tr>
+  <tr><td><b>Orange Zeile</b> über dem Dokument</td><td>Nur <b>kritische</b> Hinweise, die die Sicherheit des
+      Ergebnisses betreffen: per Texterkennung gelesene Seiten, Seiten ohne Text. Mit <b>✕</b> blenden Sie die
+      Zeile für dieses Dokument aus; beim nächsten betroffenen Dokument erscheint sie wieder.</td></tr>
+  <tr><td><b>Hinweis-Zähler</b> unten in der Statusleiste</td><td>„ⓘ 2 Hinweise“ bzw. „⚠ …“ (orange, wenn ein
+      kritischer dabei ist). Ein Klick zeigt alle Hinweise mit Erklärung und springt auf Wunsch zur Seite.</td></tr>
+  <tr><td><b>Symbol an der Seite</b> (Reiter <i>Seiten</i>)</td><td>„OCR“, „ohne Text“ (orange) oder „Bild“,
+      „Formular“ (grau). Maus darüber zeigt die Erklärung.</td></tr>
+</table>
+<p>Reine Informationen – etwa dass Kommentare und Lesezeichen beim Schwärzen entfernt werden – stehen nur im
+Zähler und im Protokoll. Der Hinweis „Bild“ erscheint bei Bildern, die Inhalte tragen könnten (Foto,
+Unterschrift, eingefügter Scan); Logos, die auf mehreren Seiten wiederkehren, und kleine Symbole werden
+übergangen. Prüfen Sie markierte Bilder und schwärzen Sie sie bei Bedarf mit einem Rahmen.</p>
+<p class="tipp"><b>Für häufige Nutzung:</b> Mit <i>Einstellungen → Kompakte Hinweise</i> entfällt auch die orange
+Zeile; es bleiben Zähler und Seitensymbol. Die Rückfrage vor dem Export von Seiten aus der Texterkennung bleibt
+immer.</p>
 
 <h3>Zoom der Seitenansicht</h3>
 <p>Unten rechts wählen Sie, wie groß PDF-Seiten angezeigt werden:</p>
@@ -147,9 +168,10 @@ Sekunden pro Seite; ein Fortschrittsfenster zeigt den Stand.</p>
 
 <h3>So erkennen Sie betroffene Seiten</h3>
 <ul>
-  <li>Ein <b>orangefarbener Hinweis</b> über dem Dokument nennt die Seiten.</li>
+  <li>Eine <b>orange Zeile</b> über dem Dokument nennt die Seiten (außer bei „Kompakte Hinweise“), der
+      Hinweis-Zähler in der Statusleiste ist orange.</li>
   <li>Im Reiter <i>Seiten</i> haben diese Seiten einen <b>orangefarbenen Rahmen</b> mit dem Vermerk
-      „Texterkennung (OCR)“.</li>
+      „OCR – Seite vollständig prüfen“.</li>
   <li>In der Fundliste steht in der Spalte <i>Stelle</i> „S. 2 · OCR“, die Zusammenfassung zählt die Funde
       „aus Texterkennung“.</li>
   <li>In der Ordner-Bearbeitung zeigt die Arbeitsliste „· OCR“, das Protokoll hat die Spalte
@@ -175,7 +197,7 @@ Sekunden pro Seite; ein Fortschrittsfenster zeigt den Stand.</p>
       darum aufziehen.</li>
 </ul>
 <p class="klein">Die Texterkennung lässt sich unter <i>Einstellungen</i> abschalten. Gescannte Seiten bleiben
-dann ungeprüft (gelber Hinweis).</p>
+dann ungeprüft (Hinweis „ohne Text – nicht geprüft“).</p>
 
 <h2><a name="export"></a>5. Speichern (Export)</h2>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
@@ -189,7 +211,7 @@ nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>
 <ul>
   <li><b>Kommentare und Markierungen</b> (Notizen, Hervorhebungen, Stempel usw.) samt Autorenname. Sie werden
       nicht geprüft, sondern immer gelöscht – und sind deshalb schon in der Ansicht ausgeblendet. Enthält ein PDF
-      Kommentare, weist ein gelber Hinweis darauf hin.</li>
+      Kommentare, steht das im Hinweis-Zähler.</li>
   <li><b>Lesezeichen</b> (Inhaltsverzeichnis in der Seitenleiste des PDF-Programms)</li>
   <li><b>Metadaten</b> (z. B. Autor, Titel, Erstelldatum), <b>Links</b>, <b>Dateianhänge</b>, Skripte und
       unsichtbaren Text</li>
@@ -198,7 +220,8 @@ nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>
 gezielt geschwärzt, die Felder sind im Ergebnis aber nicht mehr ausfüllbar.</p>
 <p>Nach dem Speichern wird das Ergebnis <b>automatisch kontrolliert</b> – der Seitentext ebenso wie Kommentare,
 Formularfelder, Lesezeichen und Metadaten. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
-PDF steckt), erhalten Sie eine Warnung.</p>
+PDF steckt), erhalten Sie eine Warnung. Ist alles in Ordnung, erscheint nur eine kurze Meldung in der
+Statusleiste – mit Link <i>Ordner öffnen</i>; Details zeigt der Tooltip.</p>
 <p>Das Original wird nie überschrieben.</p>
 
 <h2><a name="ordner"></a>6. Ordner bearbeiten (viele Dateien)</h2>
@@ -346,12 +369,15 @@ davorsteht – damit nicht jedes Rechnungsdatum verschwindet. Andere Datumsangab
   <tr><td>Platzhalter im PDF-Balken</td><td>Schreibt z. B. „[PERSON]“ in den Schwärzungsbalken.</td></tr>
   <tr><td>Texterkennung (OCR)</td><td>Gescannte PDF-Seiten automatisch lesen (Standard: an). Siehe
       <a href="#ocr">Kapitel 4</a>.</td></tr>
+  <tr><td>Kompakte Hinweise</td><td>Hinweise nur als Zähler in der Statusleiste und als Symbol an der Seite,
+      ohne orange Zeile (Standard: aus). Siehe <a href="#hinweise">Hinweise zum Dokument</a>.</td></tr>
   <tr><td>Gesuchte Datenarten</td><td>Häkchen je Datenart.</td></tr>
   <tr><td>Ausnahmen</td><td>Begriffe, die nie geschwärzt werden (ein Begriff pro Zeile).</td></tr>
   <tr><td>Sperrliste</td><td>Begriffe, die immer geschwärzt werden (ein Begriff pro Zeile).</td></tr>
 </table>
 <p>Ihre IT kann Voreinstellungen sowie Ausnahme- und Sperrlisten für alle Nutzer vorgeben. Solche zentralen
-Listen gelten zusätzlich zu Ihren eigenen; ein Hinweis in den Einstellungen zeigt, wie viele es sind.</p>
+Listen gelten zusätzlich zu Ihren eigenen; ein Hinweis in den Einstellungen zeigt, wie viele es sind.
+Einstellungen, die Ihre IT fest vorgibt, sind ausgegraut („Von der IT festgelegt“).</p>
 
 <h2><a name="tasten"></a>11. Tastenkürzel</h2>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">

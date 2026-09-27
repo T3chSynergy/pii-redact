@@ -91,7 +91,9 @@ def test_pdf_export(window, tmp_path, monkeypatch):
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: shown.setdefault("info", a[2]))
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: shown.setdefault("warn", a[2]))
     window.export_pdf()
-    assert target.exists() and "info" in shown and "warn" not in shown
+    # Erfolg ohne Dialog – nur Meldung in der Statusleiste mit Link zum Ordner
+    assert target.exists() and not shown
+    assert "out.pdf" in window.status_label.text() and "open-folder" in window.status_label.text()
 
 
 def test_free_edit_roundtrip(window, monkeypatch):

@@ -76,6 +76,12 @@ class SettingsDialog(QDialog):
             "fehleranfälliger – solche Seiten werden deutlich gekennzeichnet und müssen gründlich geprüft werden.\n"
             "Wirkt beim nächsten Öffnen einer Datei."
         )
+        self.compact = QCheckBox("Kompakte Hinweise (für häufige Nutzung)", checked=s.compact_notices)
+        self.compact.setToolTip(
+            "Hinweise erscheinen nur noch als Zähler in der Statusleiste und als Symbol an der betroffenen "
+            "Seite – auch die Leiste für gescannte Seiten entfällt.\n"
+            "Die Rückfrage vor dem Export von Seiten aus der Texterkennung bleibt immer."
+        )
 
         form = QFormLayout()
         form.addRow("Mindest-Score:", self.threshold)
@@ -85,6 +91,7 @@ class SettingsDialog(QDialog):
         form.addRow("Ersetzung:", self.mode)
         form.addRow("", self.pdf_labels)
         form.addRow("", self.ocr)
+        form.addRow("", self.compact)
         general = QGroupBox("Allgemein")
         general.setLayout(form)
 
@@ -128,6 +135,16 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        # Von der IT gesperrte Einstellungen (defaults.json → "locked")
+        widgets = {"threshold": self.threshold, "spacy_model": self.model, "replace_mode": self.mode,
+                   "analysis_mode": self.analysis, "ner_model": self.ner_model, "pdf_labels": self.pdf_labels,
+                   "ocr": self.ocr, "compact_notices": self.compact, "entities": self.entities}
+        for key in s.locked:
+            w = widgets.get(key)
+            if w is not None:
+                w.setEnabled(False)
+                w.setToolTip("Von der IT festgelegt")
+
         lay = QVBoxLayout(self)
         lay.addWidget(general)
         lay.addLayout(middle, 1)
@@ -144,6 +161,7 @@ class SettingsDialog(QDialog):
             s.ner_model = ""  # nur ein Modell → automatisch wählen (robust bei Modell-Updates)
         s.pdf_labels = self.pdf_labels.isChecked()
         s.ocr = self.ocr.isChecked()
+        s.compact_notices = self.compact.isChecked()
         s.entities = [
             self.entities.item(i).data(Qt.ItemDataRole.UserRole)
             for i in range(self.entities.count())

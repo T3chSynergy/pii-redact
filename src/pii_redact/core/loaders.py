@@ -19,6 +19,29 @@ OCR_WARNING_PREFIX = "Per Texterkennung (OCR)"
 SUPPORTED_SUFFIXES = {".txt": "txt", ".text": "txt", ".log": "txt", ".md": "md", ".markdown": "md", ".pdf": "pdf"}
 
 
+class Level:
+    CRITICAL = "kritisch"   # betrifft die Sicherheit des Ergebnisses – bleibt sichtbar
+    INFO = "info"           # nur zur Information – erscheint in der Hinweisliste bzw. an der Seite
+
+
+@dataclass
+class Notice:
+    """Hinweis zu einem geladenen Dokument.
+
+    ``short`` ist eine Zeile für Hinweisleiste und Liste, ``detail`` die ausführliche Fassung (Tooltip,
+    Protokoll, Kommandozeile), ``badge`` die Beschriftung des Seitensymbols in der Seitenansicht."""
+    kind: str                     # "ocr", "ocr_error", "no_text", "pages_no_text", "removed", "widgets", "images"
+    level: str
+    short: str
+    detail: str
+    pages: list[int] = field(default_factory=list)   # betroffene Seiten (0-basiert)
+    badge: str = ""
+
+    @property
+    def critical(self) -> bool:
+        return self.level == Level.CRITICAL
+
+
 @dataclass
 class CharBox:
     page: int
@@ -39,11 +62,18 @@ class LoadedDocument:
     page_count: int = 0
     #: Zeichen-Offset, an dem jede PDF-Seite im Text beginnt.
     page_offsets: list[int] = field(default_factory=list)
+    #: Ausführliche Hinweistexte (für Protokoll und Kommandozeile), entspricht ``notices``.
     warnings: list[str] = field(default_factory=list)
+    #: Strukturierte Hinweise (Stufe, Kurztext, betroffene Seiten) für die Oberfläche.
+    notices: list[Notice] = field(default_factory=list)
     #: Seiten (0-basiert), deren Text ganz oder teilweise per OCR gelesen wurde.
     ocr_pages: list[int] = field(default_factory=list)
     #: Anzahl unsicher erkannter Wörter.
     ocr_uncertain: int = 0
+
+    @property
+    def critical_notices(self) -> list[Notice]:
+        return [n for n in self.notices if n.critical]
 
     @property
     def has_ocr(self) -> bool:
@@ -124,11 +154,10 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     parts: list[str] = []
     boxes: list[CharBox | None] = []
     page_offsets: list[int] = []
-    warnings: list[str] = []
     line_no = 0
     offset = 0
     pages_without_text: list[int] = []
-    pages_with_images: list[int] = []
+    pages_with_images: list[int] = []   # 1-basiert
     ocr_pages: list[int] = []
     ocr_low: list[str] = []
     ocr_error = ""
@@ -156,6 +185,7 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     key = None
     if want_ocr:
         key = ocr_mod.doc_key(data)
+    content_images = _content_image_pages(doc)
 
     for pno, page in enumerate(doc):
         page_offsets.append(offset)
@@ -215,48 +245,67 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
 
         if page_chars == 0:
             pages_without_text.append(pno + 1)
-        if page.get_images(full=False) and pno not in ocr_pages:
+        if pno not in ocr_pages and pno in content_images:
             pages_with_images.append(pno + 1)
 
     text = "".join(parts)
     assert len(text) == len(boxes), "Interner Fehler bei der PDF-Textzuordnung"
 
+    notices: list[Notice] = []
     if ocr_pages:
-        msg = (f"{OCR_WARNING_PREFIX} gelesene Seiten: {_fmt_pages([p + 1 for p in ocr_pages])}. Die Texterkennung macht "
+        pages_txt = _fmt_pages([p + 1 for p in ocr_pages])
+        seite = "Seite" if len(ocr_pages) == 1 else "Seiten"
+        msg = (f"{OCR_WARNING_PREFIX} gelesene Seiten: {pages_txt}. Die Texterkennung macht "
                "Fehler – falsch gelesene Namen oder Nummern werden nicht erkannt. Diese Seiten bitte Zeile für "
                "Zeile vollständig prüfen.")
         if ocr_low:
             n = len(ocr_low)
             msg += f" {n} Wort wurde nur unsicher erkannt." if n == 1 else f" {n} Wörter wurden nur unsicher erkannt."
-        warnings.append(msg)
+        notices.append(Notice("ocr", Level.CRITICAL,
+                              f"{seite} {pages_txt} per Texterkennung gelesen – bitte vollständig prüfen",
+                              msg, list(ocr_pages), "OCR – Seite vollständig prüfen"))
     if ocr_error:
-        warnings.append(ocr_error)
+        notices.append(Notice("ocr_error", Level.CRITICAL, ocr_error, ocr_error))
     if pages_without_text:
         if len(pages_without_text) == doc.page_count:
-            warnings.append(
+            off = "" if ocr else " Die Texterkennung (OCR) ist in den Einstellungen ausgeschaltet."
+            notices.append(Notice(
+                "no_text", Level.CRITICAL, "Kein lesbarer Text – es können keine Daten erkannt werden",
                 "Das PDF enthält keine lesbare Textebene (vermutlich gescannt) – es können keine Daten erkannt "
-                "werden." + ("" if ocr else " Die Texterkennung (OCR) ist in den Einstellungen ausgeschaltet.")
-            )
+                "werden." + off, [p - 1 for p in pages_without_text], "ohne Text – nicht geprüft"))
         else:
-            warnings.append(f"Seiten ohne Text (nicht geprüft): {_fmt_pages(pages_without_text)}")
+            pages_txt = _fmt_pages(pages_without_text)
+            notices.append(Notice(
+                "pages_no_text", Level.CRITICAL, f"{_seiten(pages_without_text)} ohne Text – nicht geprüft",
+                f"Seiten ohne Text (nicht geprüft): {pages_txt}", [p - 1 for p in pages_without_text],
+                "ohne Text – nicht geprüft"))
     removed = []
     if extras["annots"]:
         removed.append(_count(extras["annots"], "Kommentar/Markierung", "Kommentare/Markierungen")
                        + " (in der Ansicht bereits ausgeblendet)")
+    if extras["toc"]:
+        removed.append(_count(extras["toc"], "Lesezeichen", "Lesezeichen"))
     if extras["files"]:
         removed.append(_count(extras["files"], "Dateianhang", "Dateianhänge") + " (Inhalt wird nicht geprüft)")
     if removed:
-        warnings.append("Wird beim Schwärzen entfernt: " + ", ".join(removed) + ".")
+        short = ", ".join(r.split(" (")[0] for r in removed)
+        notices.append(Notice("removed", Level.INFO, f"Wird beim Schwärzen entfernt: {short}",
+                              "Wird beim Schwärzen entfernt: " + ", ".join(removed) + "."))
     if extras["widgets"]:
-        warnings.append(
+        notices.append(Notice(
+            "widgets", Level.INFO,
+            _count(extras["widgets"], "Formularfeld", "Formularfelder") + " – Inhalte werden wie Text geprüft",
             _count(extras["widgets"], "Formularfeld", "Formularfelder") + " gefunden: Inhalte werden wie normaler "
-            "Text geprüft und sind im Ergebnis nicht mehr ausfüllbar."
-        )
+            "Text geprüft und sind im Ergebnis nicht mehr ausfüllbar.",
+            sorted(extras.get("widget_pages", [])), "Formular"))
     if pages_with_images:
-        warnings.append(
-            f"Seiten mit Bildern: {_fmt_pages(pages_with_images)} – Inhalte in Bildern (z. B. Unterschrift, Foto) "
-            "werden nicht erkannt. Bei Bedarf in der Seitenansicht einen Rahmen darum ziehen."
-        )
+        pages_txt = _fmt_pages(pages_with_images)
+        notices.append(Notice(
+            "images", Level.INFO, f"Bilder auf {_seiten(pages_with_images)} – Inhalt wird nicht erkannt",
+            f"Seiten mit Bildern: {pages_txt} – Inhalte in Bildern (z. B. Unterschrift, Foto) "
+            "werden nicht erkannt. Bei Bedarf in der Seitenansicht einen Rahmen darum ziehen.",
+            [p - 1 for p in pages_with_images], "Bild"))
+    warnings = [n.detail for n in notices]
 
     result = LoadedDocument(
         path=path,
@@ -267,6 +316,7 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
         page_count=doc.page_count,
         page_offsets=page_offsets,
         warnings=warnings,
+        notices=notices,
         ocr_pages=ocr_pages,
         ocr_uncertain=len(ocr_low),
     )
@@ -284,10 +334,15 @@ def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:
     * Formularfelder werden in festen Seiteninhalt umgewandelt – ihre Werte sind danach
       normaler Text, der geprüft und exakt geschwärzt wird.
 
-    Ändert ``pdf`` direkt. Rückgabe: Anzahl der gefundenen Elemente je Art."""
-    counts = {"annots": 0, "widgets": 0, "toc": 0, "files": 0}
+    Ändert ``pdf`` direkt. Rückgabe: Anzahl der gefundenen Elemente je Art (dazu ``widget_pages``:
+    Seiten mit Formularfeldern)."""
+    counts: dict = {"annots": 0, "widgets": 0, "toc": 0, "files": 0}
+    widget_pages: list[int] = []
     for page in pdf:
-        counts["widgets"] += sum(1 for _ in page.widgets())
+        n = sum(1 for _ in page.widgets())
+        counts["widgets"] += n
+        if n:
+            widget_pages.append(page.number)
         counts["annots"] += sum(1 for a in page.annots() if a.type[0] != fitz.PDF_ANNOT_POPUP)
     counts["toc"] = len(pdf.get_toc(simple=True))
     counts["files"] = pdf.embfile_count()
@@ -301,6 +356,7 @@ def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:
             page.delete_annot(annot)
     if counts["toc"]:
         pdf.set_toc([])
+    counts["widget_pages"] = widget_pages  # type: ignore[assignment]
     return counts
 
 
@@ -338,8 +394,51 @@ def _covered(r: fitz.Rect, text_rects: list[fitz.Rect]) -> bool:
     return hit >= 0.4 * abs(r)
 
 
+#: Bilder unter diesem Anteil der Seitenfläche gelten als Zierelement (Aufzählungszeichen, Linien, Symbole).
+MIN_IMAGE_SHARE = 0.003
+
+
+def _content_image_pages(pdf: fitz.Document) -> set[int]:
+    """Seiten (0-basiert) mit Bildern, die Inhalte tragen könnten (Foto, Unterschrift, eingefügter Scan).
+
+    Nicht gezählt werden winzige Bilder und Bilder, die auf mehreren Seiten wiederkehren
+    (Briefkopf-Logo, Fußzeile) – sonst stünde der Hinweis an fast jedem PDF."""
+    per_page: list[list[tuple[int, float]]] = []
+    seen_on: dict[int, set[int]] = {}
+    for page in pdf:
+        area = abs(page.rect) or 1.0
+        items = []
+        try:
+            infos = page.get_image_info(xrefs=True)
+        except Exception:  # noqa: BLE001 – defekte Bilddaten: vorsichtshalber als Inhalt werten
+            infos = [{"xref": 0, "bbox": tuple(page.rect)}]
+        for im in infos:
+            share = abs(fitz.Rect(im.get("bbox") or (0, 0, 0, 0)) & page.rect) / area
+            xref = int(im.get("xref") or 0)
+            items.append((xref, share))
+            if xref:
+                seen_on.setdefault(xref, set()).add(page.number)
+        per_page.append(items)
+    out = set()
+    multi = pdf.page_count > 1
+    for pno, items in enumerate(per_page):
+        for xref, share in items:
+            if share < MIN_IMAGE_SHARE:
+                continue
+            if multi and xref and len(seen_on.get(xref, ())) > 1:
+                continue
+            out.add(pno)
+            break
+    return out
+
+
 def _count(n: int, singular: str, plural: str) -> str:
     return f"{n} {singular if n == 1 else plural}"
+
+
+def _seiten(pages: list[int]) -> str:
+    """„Seite 3“ bzw. „Seiten 3, 4“ (Seitenzahlen 1-basiert)."""
+    return f"{'Seite' if len(pages) == 1 else 'Seiten'} {_fmt_pages(pages)}"
 
 
 def _fmt_pages(pages: list[int]) -> str:

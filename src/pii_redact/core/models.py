@@ -84,12 +84,16 @@ class Settings:
     zoom_mode: str = "breite"     # PDF-Ansicht: "breite" (Seitenbreite), "seite" (ganze Seite), "fest" (zoom_percent)
     zoom_percent: int = 100       # bei "fest": 100 % = echte Papiergröße
     show_original: bool = False   # Original neben der bearbeiteten Fassung anzeigen
+    compact_notices: bool = False  # Hinweise nur als Zähler in der Statusleiste und an den Seiten (Vielnutzer)
     recent_batches: list[str] = field(default_factory=list)   # Zielordner zuletzt bearbeiteter Ordner
     # Zentrale Listen der Organisation (aus defaults.json, werden nicht im Nutzerprofil gespeichert)
     org_allow_list: list[str] = field(default_factory=list)
     org_deny_list: list[str] = field(default_factory=list)
+    #: Von der IT festgelegte Einstellungen (defaults.json, Schlüssel "locked"): Wert aus defaults.json gilt,
+    #: persönliche Änderung ist gesperrt.
+    locked: list[str] = field(default_factory=list)
 
-    _NOT_SAVED = ("org_allow_list", "org_deny_list")
+    _NOT_SAVED = ("org_allow_list", "org_deny_list", "locked")
 
     @property
     def all_allow(self) -> list[str]:
@@ -102,11 +106,14 @@ class Settings:
     @classmethod
     def load(cls, path: Path, defaults_path: Path | None = None) -> "Settings":
         """Zentrale Vorgaben (defaults.json) als Grundlage, persönliche Einstellungen darüber.
-        Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich."""
+        Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich; unter ``locked`` aufgeführte
+        Einstellungen kommen immer aus defaults.json."""
         base = _read_json(defaults_path) if defaults_path else {}
         user = _read_json(path)
-        data = {k: v for k, v in base.items() if k not in ("allow_list", "deny_list")}
-        data.update(user)
+        locked = [k for k in base.get("locked", []) if isinstance(k, str) and k in base]
+        data = {k: v for k, v in base.items() if k not in ("allow_list", "deny_list", "locked")}
+        data.update({k: v for k, v in user.items() if k not in locked and k not in cls._NOT_SAVED})
+        data["locked"] = locked
         data["org_allow_list"] = list(base.get("allow_list", []))
         data["org_deny_list"] = list(base.get("deny_list", []))
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}

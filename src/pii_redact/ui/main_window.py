@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import threading
 from pathlib import Path
 
@@ -34,12 +35,13 @@ from .. import __version__
 from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, verify_pdf
 from ..core.batch import Status, Workspace, export_document, findings_from_compact
 from ..core.entities import AREA_KEYS, all_keys, info
-from ..core.loaders import OCR_WARNING_PREFIX, SUPPORTED_SUFFIXES
+from ..core.loaders import SUPPORTED_SUFFIXES
 from ..core.redactor import pdf_redaction_plan, rects_of
 from ..paths import find_ner_model, ner_model_info
 from ..settings_store import defaults_path, settings_path
 from .batch_panel import BatchPanel, NewBatchDialog, ReviewBar, confirm_auto_export, status_style
 from .findings_panel import FindingsPanel
+from .notices import NoticeBar, NoticeButton, page_marks
 from .pdf_view import Overlay, PdfPagesView
 from .session import DocumentSession
 from .settings_dialog import SettingsDialog, needs_reanalysis
@@ -119,6 +121,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._build_ui()
         self._build_actions()
+        self._apply_locks()
         self._update_actions()
         if self._mode_fallback:
             self.status_label.setText("Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – verwende „Schnell“.")
@@ -161,19 +164,10 @@ class MainWindow(QMainWindow):
         self.edit_btn.toggled.connect(self._toggle_free_edit)
         self.right.header.addWidget(self.edit_btn)
 
-        self.banner = QLabel()
-        self.banner.setWordWrap(True)
-        self.banner.setStyleSheet("background:#fff3bf;color:#5c3c00;padding:6px;border-radius:4px;")
-        self.banner.hide()
-        # Deutlicher Hinweis bei per Texterkennung gelesenen Seiten
-        self.ocr_banner = QLabel()
-        self.ocr_banner.setWordWrap(True)
-        self.ocr_banner.setTextFormat(Qt.TextFormat.RichText)
-        self.ocr_banner.setStyleSheet(
-            "background:#ffe8cc;color:#5f1f00;padding:8px;border-radius:4px;border:2px solid #e8590c;"
-        )
-        self.ocr_banner.linkActivated.connect(lambda _l: self.show_help("ocr"))
-        self.ocr_banner.hide()
+        # Kritische Hinweise (OCR, Seiten ohne Text): eine Zeile, pro Dokument schließbar.
+        # Alle übrigen Hinweise stehen im Zähler der Statusleiste und als Symbol an der Seite.
+        self.notice_bar = NoticeBar()
+        self.notice_bar.helpRequested.connect(self.show_help)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.left)
@@ -191,8 +185,7 @@ class MainWindow(QMainWindow):
         self.review_bar.next.connect(lambda: self._step_file(+1))
         self.review_bar.confirm.connect(self.confirm_and_next)
         dl.addWidget(self.review_bar)
-        dl.addWidget(self.ocr_banner)
-        dl.addWidget(self.banner)
+        dl.addWidget(self.notice_bar)
         dl.addWidget(splitter, 1)
 
         self.stack = QStackedWidget()
@@ -229,11 +222,16 @@ class MainWindow(QMainWindow):
 
         # Statusleiste
         self.status_label = QLabel("Bereit")
+        self.status_label.linkActivated.connect(self._on_status_link)
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(220)
         self.progress.hide()
         self.mode_label = QLabel()
+        self.notice_btn = NoticeButton()
+        self.notice_btn.helpRequested.connect(self.show_help)
+        self.notice_btn.pageRequested.connect(self._show_page)
         self.statusBar().addWidget(self.status_label, 1)
+        self.statusBar().addPermanentWidget(self.notice_btn)
         self.statusBar().addPermanentWidget(self.progress)
         self.statusBar().addPermanentWidget(self.mode_label)
         # Zoom der Seitenansicht (unten rechts, wie in Office-Programmen)
@@ -457,8 +455,7 @@ class MainWindow(QMainWindow):
         self.left.text.set_text(doc.text)
         self.right.text.set_text(doc.text)
         self.findings.set_session(self.session)
-        self._show_banner(doc.warnings)
-        self._show_ocr_banner(doc)
+        self._show_notices(doc)
         if doc.has_ocr:
             self.right.tabs.setCurrentWidget(self.right.pages)
         self.stack.setCurrentIndex(1)
@@ -511,7 +508,7 @@ class MainWindow(QMainWindow):
         Path(path).write_text(self.session.output_text(), encoding="utf-8")
         self.session.dirty = False
         self._update_title()
-        self.status_label.setText(f"Exportiert: {path}")
+        self._show_saved(Path(path), "Text gespeichert")
 
     def export_pdf(self) -> None:
         if not self.session:
@@ -557,13 +554,13 @@ class MainWindow(QMainWindow):
                 "(z. B. doppelt im PDF enthaltener Text):\n\n• " + "\n• ".join(leftovers[:20]),
             )
         else:
+            # Erfolg: keine Rückfrage, nur eine Meldung in der Statusleiste (Details im Tooltip)
             n = sum(1 for f in self.session.findings if f.active)
-            QMessageBox.information(
-                self, "Export abgeschlossen",
+            self._show_saved(
+                Path(path), f"{n} {'Stelle' if n == 1 else 'Stellen'} geschwärzt, Kontrolle ohne Reste",
                 f"Gespeichert: {path}\n\n{n} Stellen wurden physisch aus dem PDF entfernt. Die Kontrolle hat "
-                "keine Reste gefunden. Kommentare, Lesezeichen, Metadaten, Links und Anhänge wurden ebenfalls entfernt."
-                + ("\n\nHinweis: " + " ".join(doc.warnings) if doc.warnings else ""),
-            )
+                "keine Reste gefunden. Kommentare, Lesezeichen, Metadaten, Links und Anhänge wurden ebenfalls "
+                "entfernt." + ("\n\nHinweise: " + " ".join(doc.warnings) if doc.warnings else ""))
 
     # ================================================================== Analyse
     def start_analysis(self) -> None:
@@ -689,43 +686,49 @@ class MainWindow(QMainWindow):
         for view in (self.left.text, self.right.text, self.left.pages, self.right.pages):
             view.set_selected_ids(self.selected_ids)
 
-    def _show_ocr_banner(self, doc) -> None:
-        if not doc or not doc.has_ocr:
-            self.ocr_banner.hide()
+    def _show_notices(self, doc) -> None:
+        """Hinweise zum Dokument verteilen: kritische als einzeilige Leiste (außer bei „Kompakte
+        Hinweise“), alle im Zähler der Statusleiste, seitenbezogene als Symbol in der Seitenansicht."""
+        notices = doc.notices if doc else []
+        self.notice_bar.set_notices([] if self.settings.compact_notices else notices)
+        self.notice_btn.set_notices(notices)
+        marks = page_marks(notices)
+        for panel in (self.left, self.right):
+            panel.pages.set_page_marks(marks)
+
+    def _show_page(self, page: int) -> None:
+        if not (self.session and self.session.doc.is_pdf):
             return
-        pages = ", ".join(str(p + 1) for p in doc.ocr_pages)
-        seite = "Seite" if len(doc.ocr_pages) == 1 else "Seiten"
-        unsure = ""
-        if doc.ocr_uncertain:
-            unsure = (f" {doc.ocr_uncertain} Wort wurde nur unsicher gelesen." if doc.ocr_uncertain == 1
-                      else f" {doc.ocr_uncertain} Wörter wurden nur unsicher gelesen.")
-        verb = "hatte keine Textebene und wurde" if len(doc.ocr_pages) == 1 else "hatten keine Textebene und wurden"
-        self.ocr_banner.setText(
-            f"<b>⚠ Achtung – Texterkennung (OCR): {seite} {pages}</b> {verb} "
-            "automatisch per Texterkennung gelesen. Die Erkennung ist dort <b>deutlich fehleranfälliger</b>: "
-            "falsch gelesene Namen, Nummern oder Daten werden nicht als personenbezogen erkannt."
-            f"{unsure}<br><b>Bitte diese Seiten in der Seitenansicht Zeile für Zeile vollständig prüfen.</b> "
-            "Handschrift, Unterschriften und Fotos werden nicht erkannt – ziehen Sie dort in der Seitenansicht "
-            "einen Rahmen darum, um sie zu schwärzen. "
-            "<a href='#ocr' style='color:#a33a00'>Mehr dazu …</a>"
-        )
-        self.ocr_banner.show()
+        for panel in (self.left, self.right):
+            panel.tabs.setCurrentWidget(panel.pages)
+        self.right.pages.reveal(page)
+        if self.left.isVisible():
+            self.left.pages.reveal(page)
+
+    def _show_saved(self, path: Path, what: str, details: str = "") -> None:
+        """Erfolgsmeldung in der Statusleiste mit Link zum Zielordner (statt eines Dialogs)."""
+        self._saved_path = path
+        self.status_label.setText(f"✓ {html.escape(path.name)} – {html.escape(what)} · "
+                                  "<a href='open-folder'>Ordner öffnen</a>")
+        self.status_label.setToolTip(details or f"Gespeichert: {path}")
+
+    def _on_status_link(self, link: str) -> None:
+        if link == "open-folder" and getattr(self, "_saved_path", None):
+            self._open_path(self._saved_path.parent)
 
     def _confirm_ocr(self, doc) -> bool:
         """Vor dem Export eines Dokuments mit OCR-Seiten ausdrücklich die gründliche Prüfung bestätigen lassen."""
         if not doc or not doc.has_ocr:
             return True
+        n = len(doc.ocr_pages)
         pages = ", ".join(str(p + 1) for p in doc.ocr_pages)
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Texterkennung – gründlich geprüft?")
-        box.setText(f"<b>{'Seite' if len(doc.ocr_pages) == 1 else 'Seiten'} {pages} "
-                    f"{'wurde' if len(doc.ocr_pages) == 1 else 'wurden'} per Texterkennung (OCR) gelesen.</b>")
-        box.setInformativeText(
-            "Die Texterkennung liest Namen, Nummern und Daten nicht immer richtig – solche Stellen werden dann "
-            "auch nicht als personenbezogene Daten erkannt. Handschrift, Unterschriften und Fotos werden gar "
-            "nicht erkannt.\n\nHaben Sie diese Seiten Zeile für Zeile mit der Seitenansicht verglichen?"
-        )
+        box.setWindowTitle("Texterkennung – geprüft?")
+        box.setText(f"<b>{'Seite' if n == 1 else 'Seiten'} {pages} {'wurde' if n == 1 else 'wurden'} "
+                    "per Texterkennung gelesen.</b>")
+        box.setInformativeText("Falsch gelesene Namen oder Nummern werden dort nicht erkannt. "
+                               "Haben Sie diese Seiten vollständig geprüft?")
         yes = box.addButton("Ja, vollständig geprüft", QMessageBox.ButtonRole.AcceptRole)
         back = box.addButton("Zurück zur Prüfung", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(back)
@@ -779,14 +782,6 @@ class MainWindow(QMainWindow):
     def _load(self, path: Path):
         return self._run_busy("Dokument wird geladen …",
                               lambda progress: load_document(path, ocr=self.settings.ocr, progress=progress))
-
-    def _show_banner(self, lines: list[str]) -> None:
-        lines = [x for x in lines if not x.startswith(OCR_WARNING_PREFIX)]  # steht im OCR-Hinweis
-        if lines:
-            self.banner.setText("⚠ " + "<br>⚠ ".join(lines))
-            self.banner.show()
-        else:
-            self.banner.hide()
 
     def _update_title(self) -> None:
         if not self.session:
@@ -1199,10 +1194,8 @@ class MainWindow(QMainWindow):
             self.right.text.set_marks([])
             self.right.text.setReadOnly(False)
             self.right.title.setText("<b>Bearbeitet</b> – <span style='color:#e8590c'>freie Bearbeitung aktiv</span>")
-            self._show_banner(s.doc.warnings + [
-                "Freie Bearbeitung: Änderungen an Funden werden rechts erst nach Beenden der freien Bearbeitung "
-                "angezeigt. Beenden verwirft die Handänderungen."
-            ])
+            self.right.title.setToolTip("Änderungen an Funden werden erst nach Beenden der freien Bearbeitung "
+                                        "angezeigt. Beenden verwirft die Handänderungen. Wirkt nur auf den Text-Export.")
         else:
             if s.manual_text is not None and s.manual_text != s.redacted().text:
                 r = QMessageBox.question(self, "Freie Bearbeitung beenden",
@@ -1215,7 +1208,7 @@ class MainWindow(QMainWindow):
             self.right.text.setReadOnly(True)
             s.set_manual_text(None)
             self.right.title.setText("<b>Bearbeitet (Vorschau)</b>")
-            self._show_banner(s.doc.warnings)
+            self.right.title.setToolTip("")
             self.right.text.invalidate()
             self._refresh_views()
 
@@ -1231,6 +1224,15 @@ class MainWindow(QMainWindow):
         self._save_settings()
         if self.session:
             self.session.settings_changed()
+
+    def _apply_locks(self) -> None:
+        """Von der IT gesperrte Einstellungen (defaults.json → "locked") in der Werkzeugleiste sperren."""
+        locked = set(self.settings.locked)
+        tip = "Von der IT festgelegt"
+        for box, key in ((self.mode_box, "replace_mode"), (self.analysis_box, "analysis_mode")):
+            box.setEnabled(key not in locked)
+            if key in locked:
+                box.setToolTip(tip)
 
     def _refresh_analysis_box(self) -> None:
         model_dir = find_ner_model(self.settings.ner_model)
@@ -1275,6 +1277,9 @@ class MainWindow(QMainWindow):
         self.mode_box.setCurrentIndex(max(0, self.mode_box.findData(self.settings.replace_mode)))
         self.mode_box.blockSignals(False)
         self._refresh_analysis_box()
+        self._apply_locks()
+        if self.session:
+            self._show_notices(self.session.doc)
         if reanalyze:
             self._requeue_batch()
         if self.session:
