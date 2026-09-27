@@ -6,7 +6,7 @@ import html
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QEventLoop, QPoint, QSize, Qt, QTimer
+from PySide6.QtCore import QEventLoop, QObject, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 
 from .. import __version__
 from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, verify_pdf
+from ..core import llm_review
 from ..core.batch import Status, Workspace, export_document, findings_from_compact
 from ..core.entities import AREA_KEYS, all_keys, info
 from ..core.loaders import SUPPORTED_SUFFIXES
@@ -41,6 +42,7 @@ from ..paths import find_ner_model, ner_model_info
 from ..settings_store import defaults_path, settings_path
 from .batch_panel import BatchPanel, NewBatchDialog, ReviewBar, confirm_auto_export, status_style
 from .findings_panel import FindingsPanel
+from .ki_panel import KiReviewPanel
 from .notices import NoticeBar, NoticeButton, page_marks
 from .pdf_view import Overlay, PdfPagesView
 from .session import DocumentSession
@@ -86,6 +88,13 @@ ZOOM_PRESETS = [("Seitenbreite", "breite"), ("Ganze Seite", "seite"), ("50 %", 5
 OCR_NOT_AUTO = "Texterkennung (OCR) – wird nicht automatisch exportiert, bitte einzeln prüfen"
 
 
+class _KiBridge(QObject):
+    """Meldet Ergebnisse der KI-Nachprüfung aus dem Hintergrund-Thread an die Oberfläche."""
+    done = Signal(object, object)      # Sitzung, ReviewResult
+    failed = Signal(object, str)       # Sitzung, Fehlermeldung
+    progress = Signal(int, int)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -115,6 +124,12 @@ class MainWindow(QMainWindow):
         self._auto_export = False                  # nach „Ungeprüfte exportieren“: Rest nach Analyse exportieren
         self._model_error_shown = False
         self._analysis_session = None
+        self._ki_session = None                    # Sitzung, deren KI-Nachprüfung gerade läuft
+        self._ki_confirmed = False                 # Senden an den Server in dieser Sitzung bestätigt
+        self._ki_bridge = _KiBridge(self)
+        self._ki_bridge.done.connect(self._on_ki_done)
+        self._ki_bridge.failed.connect(self._on_ki_failed)
+        self._ki_bridge.progress.connect(self._on_ki_progress)
 
         self.setWindowTitle("pii-redact")
         self.resize(1500, 900)
@@ -132,13 +147,8 @@ class MainWindow(QMainWindow):
         welcome = QWidget()
         wl = QVBoxLayout(welcome)
         wl.addStretch(1)
-        hint = QLabel(
-            "<h2>Personenbezogene Daten entfernen</h2>"
-            "<p>PDF-, TXT- oder Markdown-Datei (oder einen ganzen Ordner) hierher ziehen<br>"
-            "oder <b>Datei → Öffnen</b> (Strg+O).</p>"
-            "<p style='color:gray'>Alles läuft lokal auf diesem Rechner – es werden keine Daten übertragen.</p>"
-            "<p style='color:gray'>Hilfe: <b>F1</b> oder <b>Hilfe → Anwenderhilfe</b></p>"
-        )
+        hint = QLabel(self._welcome_html())
+        self.welcome_label = hint
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         btn = QPushButton("Datei öffnen …")
         btn.setFixedWidth(220)
@@ -201,6 +211,21 @@ class MainWindow(QMainWindow):
         dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
         self.resizeDocks([dock], [520], Qt.Orientation.Horizontal)
+        self.findings_dock = dock
+
+        # KI-Nachprüfung (optional) – als Reiter neben den Funden
+        self.ki_panel = KiReviewPanel()
+        self.ki_dock = QDockWidget("KI-Bewertung", self)
+        self.ki_dock.setObjectName("ki")
+        self.ki_dock.setWidget(self.ki_panel)
+        self.ki_dock.setFeatures(dock.features())
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ki_dock)
+        self.tabifyDockWidget(dock, self.ki_dock)
+        dock.raise_()
+        self.ki_panel.runRequested.connect(self.start_ki_review)
+        self.ki_panel.hintActivated.connect(lambda ids: self.select(ids, reveal=True))
+        self.ki_panel.activateAll.connect(lambda: self._ki_set_all(True))
+        self.ki_panel.discardAll.connect(self._ki_discard)
 
         # Arbeitsliste (Ordner-Bearbeitung)
         self.batch_panel = BatchPanel()
@@ -287,6 +312,18 @@ class MainWindow(QMainWindow):
         self._refresh_timer = QTimer(self, singleShot=True, interval=0)
         self._refresh_timer.timeout.connect(self._refresh_views)
 
+    def _welcome_html(self) -> str:
+        if llm_review.is_configured(self.settings):
+            local = (f"Alles läuft lokal auf diesem Rechner – außer der KI-Nachprüfung: Sie sendet auf Knopfdruck "
+                     f"nur den bereits geschwärzten Text an {llm_review.host_of(self.settings)}.")
+        else:
+            local = "Alles läuft lokal auf diesem Rechner – es werden keine Daten übertragen."
+        return ("<h2>Personenbezogene Daten entfernen</h2>"
+                "<p>PDF-, TXT- oder Markdown-Datei (oder einen ganzen Ordner) hierher ziehen<br>"
+                "oder <b>Datei → Öffnen</b> (Strg+O).</p>"
+                f"<p style='color:gray'>{local}</p>"
+                "<p style='color:gray'>Hilfe: <b>F1</b> oder <b>Hilfe → Anwenderhilfe</b></p>")
+
     def _build_actions(self) -> None:
         st = self.style()
         a = self.actions_ = {}
@@ -314,6 +351,8 @@ class MainWindow(QMainWindow):
         act("next_file", "Nächste Datei", lambda: self._step_file(+1), "Alt+Right")
         act("reanalyze", "Neu analysieren", self.start_analysis, "F5", SP.SP_BrowserReload,
             "Dokument erneut prüfen (manuelle Änderungen bleiben erhalten)")
+        act("ki_review", "KI-Prüfung", self.start_ki_review, "Ctrl+K", SP.SP_MessageBoxQuestion,
+            "Geschwärztes Ergebnis von einem Sprachmodell bewerten lassen: Sind Personen trotzdem erkennbar?")
         act("export_text", "Als Text/Markdown exportieren …", self.export_text, "Ctrl+Shift+S")
         act("export_pdf", "Als geschwärztes PDF exportieren …", self.export_pdf, QKeySequence.StandardKey.Save)
         act("quit", "Beenden", self.close, QKeySequence.StandardKey.Quit)
@@ -361,6 +400,8 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         m.addActions([a["mark"], a["mark_all"], a["all_on"], a["all_off"]])
         m.addSeparator()
+        m.addAction(a["ki_review"])
+        m.addSeparator()
         m.addAction(a["settings"])
         m = mb.addMenu("&Ansicht")
         m.addAction(a["show_original"])
@@ -381,7 +422,7 @@ class MainWindow(QMainWindow):
         tb.setIconSize(QSize(18, 18))
         tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.addToolBar(tb)
-        tb.addActions([a["open"], a["open_folder"], a["reanalyze"]])
+        tb.addActions([a["open"], a["open_folder"], a["reanalyze"], a["ki_review"]])
         tb.addSeparator()
         tb.addActions([a["undo"], a["redo"]])
         tb.addSeparator()
@@ -456,6 +497,8 @@ class MainWindow(QMainWindow):
         self.right.text.set_text(doc.text)
         self.findings.set_session(self.session)
         self._show_notices(doc)
+        stored = self.batch.entries[self.batch_rel].ki_review if (self.batch and self.batch_rel in self.batch.entries) else None
+        self.ki_panel.clear(stored if self._batch_loading else None)
         if doc.has_ocr:
             self.right.tabs.setCurrentWidget(self.right.pages)
         self.stack.setCurrentIndex(1)
@@ -735,6 +778,95 @@ class MainWindow(QMainWindow):
         box.exec()
         return box.clickedButton() is yes
 
+    # ================================================================== KI-Nachprüfung
+    def start_ki_review(self) -> None:
+        """Geschwärztes Ergebnis im Hintergrund von einem Sprachmodell bewerten lassen."""
+        s = self.session
+        if not s or self._ki_session is not None or self.runner.busy:
+            return
+        if not llm_review.is_configured(self.settings):
+            QMessageBox.information(self, "KI-Nachprüfung", "Die KI-Nachprüfung ist nicht eingerichtet "
+                                    "(Einstellungen → KI-Nachprüfung).")
+            return
+        if not self._ki_confirmed:
+            host = llm_review.host_of(self.settings)
+            r = QMessageBox.question(
+                self, "KI-Nachprüfung",
+                f"Der geschwärzte Text wird an <b>{html.escape(host)}</b> "
+                f"(Modell {html.escape(self.settings.llm_model)}) gesendet.<br><br>"
+                "Das Original verlässt den Rechner nicht – übersehene Angaben im Ergebnis aber schon. "
+                "Fortfahren?<br><span style='color:gray'>(Diese Frage erscheint einmal pro Programmstart.)</span>",
+            )
+            if r != QMessageBox.StandardButton.Yes:
+                return
+            self._ki_confirmed = True
+        self._ki_session = s
+        doc, findings, settings = s.doc, [f for f in s.findings], self.settings
+        self.ki_dock.show()
+        self.ki_dock.raise_()
+        self.ki_panel.set_running(True, f"Anfrage an {llm_review.host_of(settings)} läuft …")
+        self.status_label.setText("KI-Nachprüfung läuft …")
+        self._update_actions()
+        bridge = self._ki_bridge
+
+        def work() -> None:
+            try:
+                res = llm_review.review(doc, findings, settings, progress=lambda i, n: bridge.progress.emit(i, n))
+            except Exception as exc:  # noqa: BLE001 – Meldung für die Oberfläche
+                bridge.failed.emit(s, str(exc))
+            else:
+                bridge.done.emit(s, res)
+
+        threading.Thread(target=work, name="pii-redact-ki", daemon=True).start()
+
+    def _on_ki_progress(self, done: int, total: int) -> None:
+        if total > 1 and done < total:
+            self.ki_panel.set_running(True, f"Anfrage {done + 1} von {total} läuft …")
+
+    def _on_ki_failed(self, session, message: str) -> None:
+        self._ki_session = None
+        self.ki_panel.set_running(False)
+        self._update_actions()
+        if session is not self.session:
+            return
+        self.ki_panel.clear(text=f"Fehlgeschlagen: {message}")
+        self.status_label.setText("KI-Nachprüfung fehlgeschlagen.")
+        QMessageBox.warning(self, "KI-Nachprüfung fehlgeschlagen", message)
+
+    def _on_ki_done(self, session, res) -> None:
+        self._ki_session = None
+        self.ki_panel.set_running(False)
+        self._update_actions()
+        if session is not self.session:  # inzwischen anderes Dokument geöffnet
+            return
+        new = llm_review.suggestions(res, session.findings, session.doc.text)
+        if new:
+            session.add_findings(new)
+        spans = {(f.start, f.end): f.id for f in session.findings if not f.is_area}
+        ids_by_hint = [[spans[sp] for sp in h.spans if sp in spans] for h in res.hints]
+        self.ki_panel.show_result(res, ids_by_hint)
+        self.ki_dock.raise_()
+        if self.batch and self.batch_rel in self.batch.entries:
+            self.batch.set_ki_review(self.batch_rel, res.compact())
+            self._batch_save_timer.start()
+        n = len(res.hints)
+        self.status_label.setText(f"KI-Nachprüfung: Restrisiko {res.risk}, {n} {'Hinweis' if n == 1 else 'Hinweise'}"
+                                  + (f", {len(new)} {'neuer Vorschlag' if len(new) == 1 else 'neue Vorschläge'} in der "
+                                     "Fundliste" if new else "") + ".")
+
+    def _ki_ids(self, only_inactive: bool) -> list[int]:
+        if not self.session:
+            return []
+        return [f.id for f in self.session.findings if f.source == "ki" and not (only_inactive and f.active)]
+
+    def _ki_set_all(self, active: bool) -> None:
+        if self.session:
+            self.session.set_active(self._ki_ids(False), active)
+
+    def _ki_discard(self) -> None:
+        if self.session:
+            self.session.remove(self._ki_ids(True))
+
     def _run_busy(self, label: str, fn):
         """``fn(progress)`` in einem Hintergrund-Thread ausführen (z. B. Laden mit Texterkennung),
         dabei einen Fortschrittsdialog zeigen. Kurze Aufgaben (< 0,3 s) laufen ohne Dialog."""
@@ -817,6 +949,16 @@ class MainWindow(QMainWindow):
         a["confirm_next"].setEnabled(in_batch and has and not busy and not awaiting)
         for k in ("prev_file", "next_file", "close_folder"):
             a[k].setEnabled(in_batch)
+        ki = llm_review.is_configured(self.settings)
+        a["ki_review"].setVisible(ki)
+        a["ki_review"].setEnabled(ki and has and not busy and not awaiting and self._ki_session is None)
+        self.ki_dock.toggleViewAction().setVisible(ki)
+        if not ki and self.ki_dock.isVisible():
+            self.ki_dock.hide()
+        elif ki and not self.ki_dock.isVisible() and not getattr(self, "_ki_dock_shown", False):
+            self._ki_dock_shown = True
+            self.ki_dock.show()
+            self.findings_dock.raise_()
 
     # ================================================================== Zoom
     def _zoom_views(self) -> list:
@@ -1003,6 +1145,8 @@ class MainWindow(QMainWindow):
                     continue
                 ocr = "  – per Texterkennung gelesen, bitte prüfen" if self.session.doc.is_ocr(f.start, f.end) else ""
                 lines.append(f"{info(f.entity_type).label}: {f.text}  ({state}){ocr}")
+                if f.source == "ki":
+                    lines.append(f"  Vorschlag der {f.recognizer}" if f.recognizer else "  Vorschlag der KI-Nachprüfung")
         return "\n".join(lines)
 
     def _redacted_tooltip(self, offset: int) -> str:
@@ -1278,6 +1422,8 @@ class MainWindow(QMainWindow):
         self.mode_box.blockSignals(False)
         self._refresh_analysis_box()
         self._apply_locks()
+        self.welcome_label.setText(self._welcome_html())
+        self._update_actions()
         if self.session:
             self._show_notices(self.session.doc)
         if reanalyze:

@@ -7,6 +7,9 @@
   "show_original": false,
   "ocr": true,
   "compact_notices": false,
+  "llm_enabled": false,
+  "llm_url": "",
+  "llm_model": "",
   "locked": ["ocr"],
   "allow_list": ["Musterfirma GmbH", "Musterstadt"],
   "deny_list": ["Projekt Falke"]

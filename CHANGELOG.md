@@ -1,5 +1,26 @@
 # Änderungen
 
+## 0.5.0 – 27.09.2026
+
+**Neu**
+- **KI-Nachprüfung (optional, standardmäßig aus):** Ein Sprachmodell bewertet auf Knopfdruck (*KI-Prüfung*,
+  Strg+K) das **geschwärzte** Ergebnis – Restrisiko gering/mittel/hoch, Begründung, Hinweise auf übersehene und
+  indirekt identifizierende Angaben (z. B. Funktion + Abteilung). Gesendet wird nur der Text mit nummerierten
+  Platzhaltern, nie das Original. Nur wörtlich belegte Hinweise werden übernommen – als nicht aktivierte
+  Vorschläge (Quelle „KI“) in der Fundliste; Reiter „KI-Bewertung“ mit Sprung zur Stelle, „Alle Vorschläge
+  schwärzen“, „Vorschläge verwerfen“. Rückfrage vor dem ersten Senden je Programmstart.
+- OpenAI-kompatible Schnittstelle (direkt oder über LLM-Portal/-Proxy); Einstellungen im
+  neuen Reiter *KI-Nachprüfung* mit Verbindungstest; Schlüssel bevorzugt über `PII_REDACT_LLM_KEY`;
+  Vorgabe und Sperre per `defaults.json`.
+- Neue Datenart **„Kontext (indirekt)“** – auch für manuelle Markierungen.
+- Schutz gegen stillschweigend gekürzte Anfragen (z. B. zu kleines Kontextfenster am Server): zweiteilige
+  Prüfkennung je Anfrage; fehlt sie in der Antwort, gibt es eine Fehlermeldung statt einer Bewertung.
+  *Verbindung testen* schickt eine Anfrage in voller Länge und prüft so auch das Kontextfenster.
+- Vorlage `deploy/defaults.ki.example.json` für die IT.
+- Werkzeug **`tools/ki_vergleich.bat`**: vergleicht Sprachmodelle mit sechs erfundenen Testfällen (Restrisiko,
+  gefundene Stellen, Fehlalarme, Zeit) und schreibt einen Bericht.
+- Ordner-Bearbeitung: Protokollspalte „KI-Prüfung“ (ohne Inhalte).
+
 ## 0.4.0 – 27.09.2026
 
 **Geändert – Hinweise stören nicht mehr bei häufiger Nutzung**

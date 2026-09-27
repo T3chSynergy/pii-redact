@@ -32,3 +32,6 @@ packaging/artifact-signing.json
 *.msi
 *.wixpdb
 *.zip
+
+# Ergebnisse des KI-Modellvergleichs (tools/ki_vergleich.py)
+ki_vergleich_*.md

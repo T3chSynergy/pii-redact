@@ -232,7 +232,7 @@ Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
 
 | Einstellung | Wert |
 |---|---|
-| Installationsprogramm | `msiexec /i "pii-redact-0.4.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
+| Installationsprogramm | `msiexec /i "pii-redact-0.5.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
 | Mit Kommandozeile im PATH | zusätzlich `ADDTOPATH=1` |
 | Deinstallationsprogramm | `msiexec /x {Produktcode} /qn /norestart` |
 | Erkennungsmethode | Windows Installer – Produktcode (automatisch) |
@@ -243,7 +243,7 @@ Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
 
 ### Updates
 
-1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.4.0` → `0.5.0`;
+1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.5.0` → `0.6.0`;
    MSI wertet nur die ersten drei Stellen aus).
 2. `build.bat` → neues MSI mit neuem Produktcode.
 3. In SCCM neue Anwendung anlegen und die alte **ersetzen** („Supersedence“). Das MSI entfernt die alte
@@ -285,6 +285,67 @@ Vorlage: `deploy\defaults.example.json`.
 
 Zusätzliche Modelle können – ohne neues MSI – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
 abgelegt werden.
+
+## KI-Nachprüfung (optional)
+
+Ab 0.5.0 kann ein Sprachmodell das **geschwärzte Ergebnis** eines Dokuments bewerten („Sind Personen trotzdem
+erkennbar – durch übersehene Angaben oder den Zusammenhang?“). Die Funktion ist **standardmäßig aus** und
+erscheint erst, wenn Server und Modell eingetragen sind. Das Programm stellt kein Modell bereit – ob und welches
+LLM verwendet wird, entscheidet die IT.
+
+**Was gesendet wird:** Nur auf Knopfdruck der Anwenderin, nur der geschwärzte Text (Platzhalter nummeriert,
+z. B. `[PERSON_1]`), nie das Original, keine Bilder. Lange Dokumente werden auf mehrere Anfragen verteilt (bei
+PDFs an Seitengrenzen). Da übersehene Angaben im gesendeten Text stehen können, gilt die Übertragung
+datenschutzrechtlich als Übermittlung personenbezogener Daten an den Server-Betreiber.
+
+**Anforderungen an den Server**
+
+| Punkt | Anforderung |
+|---|---|
+| Schnittstelle | OpenAI-kompatibel: `POST …/chat/completions` – direkt am Modellserver oder über ein vorgeschaltetes Portal bzw. einen LLM-Proxy. `llm_url` kann die Basis-Adresse (Programm hängt `/chat/completions` an) oder der vollständige Endpunkt sein. |
+| Modell | instruktionsfähig, gutes Deutsch, liefert zuverlässig JSON; Richtwert (nicht gemessen): ab ca. 27–32 Mrd. Parametern für Kontext-Einschätzungen – vor dem Einsatz mit eigenen Testdokumenten prüfen |
+| Kontextfenster | mind. 16 000 Token bei der Voreinstellung `llm_max_chars` = 24 000 Zeichen (kleiner stellen, wenn das Modell weniger kann). Das Kontextfenster muss **auf dem Server tatsächlich so eingestellt** sein – manche Server kürzen zu lange Anfragen sonst stillschweigend. |
+| Antwortzeit | Zeitlimit je Anfrage `llm_timeout` (Standard 180 s) |
+| Datenschutz | Betrieb im eigenen Rechenzentrum oder vertraglich abgesichert (AVV); keine Speicherung/kein Training mit den Anfragen; Datenschutzfreigabe bzw. DSFA nach Hausregeln |
+| Netz | Clients erreichen den Server per HTTPS; Proxy- und Zertifikatseinstellungen von Windows werden verwendet |
+| Anmeldung | optional `Authorization: Bearer <Schlüssel>` |
+
+**Einrichtung per `defaults.json`** – Vorlage: `deploy\defaults.ki.example.json`
+
+```json
+{
+  "llm_enabled": true,
+  "llm_url": "https://llm.intern.example/v1",
+  "llm_model": "modellname-laut-server",
+  "llm_timeout": 300,
+  "llm_max_chars": 24000,
+  "locked": ["llm_enabled", "llm_url", "llm_model", "llm_max_chars"]
+}
+```
+
+> **Wichtig: sperren.** Ohne `locked` gelten die Werte nur als Voreinstellung. Das Programm speichert beim
+> ersten Ändern irgendeiner Einstellung (schon beim Zoom) alle Werte ins Benutzerprofil – spätere Änderungen
+> der IT (anderer Server, anderes Modell) kämen bei diesen Nutzern nicht mehr an. Gesperrte Schlüssel werden
+> immer aus `defaults.json` gelesen und sind in den Einstellungen ausgegraut. Fehlt `llm_enabled` in der
+> Liste, können Nutzer die Funktion für sich ausschalten.
+
+* **API-Schlüssel** möglichst über die Umgebungsvariable `PII_REDACT_LLM_KEY` setzen (z. B. per GPO); sie hat
+  Vorrang. Ein `llm_api_key` in `defaults.json` wäre für alle Nutzer des Rechners lesbar.
+* Verbindung prüfen am Client unter *Einstellungen → KI-Nachprüfung → Verbindung testen*. Der Test schickt eine
+  Anfrage in voller Länge (`llm_max_chars`) und prüft, ob das Modell sie vollständig gesehen hat. Schlägt er mit
+  dem Hinweis auf das Kontextfenster fehl: Kontext am Server vergrößern oder `llm_max_chars` verkleinern.
+* Vor dem ersten Senden nach Programmstart fragt das Programm nach und nennt Server und Modell.
+* Ordner-Bearbeitung: Protokollspalte „KI-Prüfung“ (Risiko, Anzahl Hinweise, Modell, Zeitpunkt – keine Inhalte).
+* **Modell auswählen:** `tools\ki_vergleich.bat --url <Server> --modell <a> --modell <b>` vergleicht Modelle
+  mit sechs frei erfundenen Testfällen (Restrisiko, gefundene Stellen, Fehlalarme, Zeit) und schreibt einen
+  Bericht `ki_vergleich_<Datum>.md`. Die Modelle unterscheiden sich hier deutlich – vor der Freigabe vergleichen.
+* Zum Testen eignet sich auch ein Cloud-Dienst mit OpenAI-kompatibler Schnittstelle (z. B. OpenRouter,
+  Basis-URL `https://openrouter.ai/api/v1`, Modellname wie dort angegeben) – dann **nur mit Beispiel- bzw.
+  Testdaten**.
+
+Das Programm schickt zusätzlich bei **jeder** Anfrage eine zweiteilige Prüfkennung (Anfang und Ende der
+Anfrage) mit und verwirft Antworten, in denen sie fehlt – ein gekürzter Kontext führt so zu einer Fehlermeldung
+statt zu einer scheinbar harmlosen Bewertung.
 
 ## Wo liegt was auf dem Client?
 

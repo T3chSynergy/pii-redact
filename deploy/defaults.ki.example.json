@@ -1,0 +1,9 @@
+{
+  "_hinweis": "Vorlage der IT für die KI-Nachprüfung. Inhalt in C:\\ProgramData\\pii-redact\\defaults.json übernehmen (mit vorhandenen Vorgaben zusammenführen, die Liste locked ggf. ergänzen). Unter locked aufgeführte Schlüssel gelten immer mit diesem Wert und sind in den Einstellungen ausgegraut – ohne Sperre gelten die Werte nur bis zur ersten persönlichen Einstellung. Fehlt llm_enabled in locked, können Nutzer die Funktion für sich ausschalten. API-Schlüssel NICHT hier eintragen (für alle Nutzer lesbar), sondern bei Bedarf per Umgebungsvariable PII_REDACT_LLM_KEY.",
+  "llm_enabled": true,
+  "llm_url": "https://llm.intern.example/v1",
+  "llm_model": "modellname-laut-server",
+  "llm_timeout": 300,
+  "llm_max_chars": 24000,
+  "locked": ["llm_enabled", "llm_url", "llm_model", "llm_max_chars"]
+}

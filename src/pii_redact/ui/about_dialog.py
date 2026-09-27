@@ -42,6 +42,16 @@ def about_html(settings, dark: bool = False) -> str:
         ner = "nicht installiert – Modus „Gründlich“ nicht verfügbar"
     from ..core import ocr
 
+    from ..core import llm_review
+
+    if llm_review.is_configured(settings):
+        ki = (f"eingeschaltet: {html.escape(settings.llm_model)} über {html.escape(llm_review.host_of(settings))} "
+              "(sendet auf Knopfdruck nur geschwärzten Text)")
+        local = ("<b>lokal</b> – nur die eingeschaltete KI-Nachprüfung sendet auf Knopfdruck den bereits "
+                 "geschwärzten Text an den eingestellten Server")
+    else:
+        ki = "aus"
+        local = "<b>vollständig lokal</b>, ohne Internetverbindung"
     ocr_state = f"RapidOCR {_version('rapidocr')} (PP-OCRv6)" if ocr.is_available() else "nicht installiert"
     files = license_files()
     if files:
@@ -61,13 +71,14 @@ def about_html(settings, dark: bool = False) -> str:
     return f"""<html><head><style>{help_css(dark)}</style></head><body>
 <h1>pii-redact {__version__}</h1>
 <p>Erkennt personenbezogene Daten in PDF-, TXT- und Markdown-Dateien und entfernt sie –
-<b>vollständig lokal</b>, ohne Internetverbindung.</p>
+{local}.</p>
 <p class="wichtig">Automatische Erkennung ist nie perfekt – bitte das Ergebnis immer prüfen.</p>
 <h3>Installierte Modelle</h3>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
 <tr><td width="30%">Sprachmodell (beide Modi)</td><td>spaCy {html.escape(settings.spacy_model)}{'' if spacy_ref else ' – FEHLT'}</td></tr>
 <tr><td>KI-Modell „Gründlich“</td><td>{ner}</td></tr>
 <tr><td>Texterkennung (OCR)</td><td>{ocr_state}</td></tr>
+<tr><td>KI-Nachprüfung</td><td>{ki}</td></tr>
 </table>
 <p class="klein">{versions}</p>
 <h3>Open-Source-Komponenten</h3>

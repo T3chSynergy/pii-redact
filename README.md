@@ -132,6 +132,21 @@ Standard-Modus, Schwelle, Ersetzung usw. gelten als Grundeinstellung; persönlic
 `allow_list`/`deny_list` der Organisation gelten **immer zusätzlich** zu den persönlichen Listen.
 Unter `"locked"` aufgeführte Schlüssel legt die IT fest (in den Einstellungen ausgegraut).
 
+### KI-Nachprüfung (optional, ab 0.5.0)
+
+Ein Sprachmodell bewertet auf Knopfdruck das **geschwärzte** Ergebnis (Restrisiko gering/mittel/hoch, Hinweise
+auf übersehene oder indirekt identifizierende Angaben). Gesendet wird nur der Text mit nummerierten Platzhaltern
+an einen OpenAI-kompatiblen Server (`llm_url`, `llm_model`, Schlüssel über `PII_REDACT_LLM_KEY`). Hinweise, die
+wörtlich im Text stehen, werden zu nicht aktivierten Vorschlägen (Quelle „KI“). Code: `core/llm_review.py`,
+`ui/ki_panel.py`; Anforderungen für die IT: `packaging/README.md`.
+
+**Modelle vergleichen:** `tools\ki_vergleich.bat --modell anbieter/modell-a --modell anbieter/modell-b`
+(Server und Schlüssel wie in den Einstellungen oder `--url`; `--wiederholungen 3` prüft die Beständigkeit).
+Schickt sechs frei erfundene, bereits geschwärzte Testfälle (`tools/ki_testfaelle.json`) an jedes Modell und
+zählt: Restrisiko im erwarteten Bereich, erwartete Stellen gefunden (z. B. Funktion + Abteilung, übersehene
+Personalnummer, verschleierte E-Mail), Fehlalarme bei harmlosen Stellen, Zitate ohne Beleg, Fehler, Zeit.
+Bericht: `ki_vergleich_<Datum>.md` (nicht im Repository). Eigene Testfälle im selben Format mit `--faelle`.
+
 ## Bedienung
 
 1. **Öffnen** (Strg+O) oder Datei ins Fenster ziehen → Analyse startet automatisch im Hintergrund.

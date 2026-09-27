@@ -85,6 +85,13 @@ class Settings:
     zoom_percent: int = 100       # bei "fest": 100 % = echte Papiergröße
     show_original: bool = False   # Original neben der bearbeiteten Fassung anzeigen
     compact_notices: bool = False  # Hinweise nur als Zähler in der Statusleiste und an den Seiten (Vielnutzer)
+    # KI-Nachprüfung (optional): Sprachmodell bewertet das geschwärzte Ergebnis – OpenAI-kompatibler Server
+    llm_enabled: bool = False
+    llm_url: str = ""             # Basis-Adresse, z. B. https://llm.intern/v1 oder https://openrouter.ai/api/v1
+    llm_model: str = ""           # Modellname laut Server
+    llm_api_key: str = ""         # besser: Umgebungsvariable PII_REDACT_LLM_KEY
+    llm_timeout: int = 180        # Sekunden je Anfrage
+    llm_max_chars: int = 24000    # Zeichen je Anfrage (längere Dokumente werden seitenweise aufgeteilt)
     recent_batches: list[str] = field(default_factory=list)   # Zielordner zuletzt bearbeiteter Ordner
     # Zentrale Listen der Organisation (aus defaults.json, werden nicht im Nutzerprofil gespeichert)
     org_allow_list: list[str] = field(default_factory=list)

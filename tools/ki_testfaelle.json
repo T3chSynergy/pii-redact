@@ -1,0 +1,81 @@
+{
+  "_hinweis": "Testfälle für tools/ki_vergleich.py – alle Personen, Nummern und Orte sind frei erfunden. Je Fall: Originaltext, was bereits geschwärzt ist (schwaerzen), was ein gutes Modell melden sollte (erwartet – je Eintrag eine Liste gleichwertiger Textstellen), was harmlos ist und NICHT gemeldet werden sollte (harmlos), und welches Restrisiko plausibel ist (risiko).",
+  "faelle": [
+    {
+      "name": "Funktion + Abteilung",
+      "text": "Protokoll der Sitzung des Arbeitsschutzausschusses\n\nDie Sitzung begann um 9 Uhr. Anwesend waren Lena Krüger und Olaf Brandt.\n\nFrau Krüger, Schwerbehindertenvertreterin im Einkauf am Standort Nord, berichtete über die Ergebnisse der Begehung. Herr Brandt sagte zu, die Beleuchtung in Halle 2 bis Ende des Monats zu prüfen.\n\nDie nächste Sitzung findet im Oktober statt.",
+      "schwaerzen": [
+        {"text": "Lena Krüger", "typ": "PERSON"},
+        {"text": "Olaf Brandt", "typ": "PERSON"},
+        {"text": "Krüger", "typ": "PERSON"},
+        {"text": "Brandt", "typ": "PERSON"}
+      ],
+      "erwartet": [
+        ["Schwerbehindertenvertreterin im Einkauf am Standort Nord", "Schwerbehindertenvertreterin"]
+      ],
+      "harmlos": ["Die Sitzung begann um 9 Uhr", "Die nächste Sitzung findet im Oktober statt"],
+      "risiko": ["mittel", "hoch"]
+    },
+    {
+      "name": "Übersehene Nummern",
+      "text": "Betreff: Rückfrage zur Gehaltsabrechnung\n\nSehr geehrte Frau Petra Hoffmann,\n\nzu Ihrer Anfrage vom 4. September teilen wir mit, dass die Nachzahlung mit der Abrechnung für Oktober erfolgt. Bitte geben Sie bei Rückfragen Ihre Personalnummer 48213 und das Aktenzeichen PA-2026-0815 an.\n\nMit freundlichen Grüßen\nIhre Personalabteilung",
+      "schwaerzen": [
+        {"text": "Petra Hoffmann", "typ": "PERSON"}
+      ],
+      "erwartet": [
+        ["Personalnummer 48213", "48213"],
+        ["Aktenzeichen PA-2026-0815", "PA-2026-0815"]
+      ],
+      "harmlos": ["Ihre Personalabteilung", "mit der Abrechnung für Oktober"],
+      "risiko": ["mittel", "hoch"]
+    },
+    {
+      "name": "Harmloser Text (Kontrolle)",
+      "text": "Quartalsbericht Vertrieb\n\nDas Team Vertrieb hat derzeit zwölf Mitglieder. Im dritten Quartal wurden 184 Angebote erstellt, davon wurden 61 angenommen. Das Budget für Messen wurde um 5 Prozent erhöht. Verantwortlich für den Bericht ist Jonas Albrecht.\n\nFür das vierte Quartal ist eine Schulung zum neuen Angebotsprozess geplant.",
+      "schwaerzen": [
+        {"text": "Jonas Albrecht", "typ": "PERSON"}
+      ],
+      "erwartet": [],
+      "harmlos": ["Das Team Vertrieb hat derzeit zwölf Mitglieder", "184 Angebote", "um 5 Prozent erhöht", "Schulung zum neuen Angebotsprozess"],
+      "risiko": ["gering"]
+    },
+    {
+      "name": "Gesundheit + Ereignis",
+      "text": "Aktennotiz\n\nIm Gespräch mit Herrn Tobias Wendt wurde vereinbart, dass die Wiedereingliederung schrittweise erfolgt. Betroffen ist der Kollege aus der Poststelle, der im März nach seinem Herzinfarkt zurückgekehrt ist. Die tägliche Arbeitszeit beträgt zunächst vier Stunden.\n\nDie Vereinbarung wird nach sechs Wochen überprüft.",
+      "schwaerzen": [
+        {"text": "Tobias Wendt", "typ": "PERSON"}
+      ],
+      "erwartet": [
+        ["der Kollege aus der Poststelle, der im März nach seinem Herzinfarkt zurückgekehrt ist", "Kollege aus der Poststelle", "nach seinem Herzinfarkt"]
+      ],
+      "harmlos": ["Die Vereinbarung wird nach sechs Wochen überprüft"],
+      "risiko": ["hoch"]
+    },
+    {
+      "name": "Initialen + Raum",
+      "text": "Hinweis an alle Beschäftigten\n\nFragen zur Zeiterfassung beantwortet ab sofort Frau K. aus der Lohnbuchhaltung, Zimmer 3.14, Durchwahl -271. Die bisherige Ansprechpartnerin Sabine Keller ist in ein anderes Team gewechselt.\n\nDie Zeiterfassung erfolgt weiterhin über das Intranet.",
+      "schwaerzen": [
+        {"text": "Sabine Keller", "typ": "PERSON"}
+      ],
+      "erwartet": [
+        ["Frau K. aus der Lohnbuchhaltung", "Frau K."],
+        ["Zimmer 3.14", "Durchwahl -271"]
+      ],
+      "harmlos": ["Die Zeiterfassung erfolgt weiterhin über das Intranet"],
+      "risiko": ["mittel", "hoch"]
+    },
+    {
+      "name": "Verschleierte Kontaktangabe",
+      "text": "Einladung zum Sommerfest\n\nDas Sommerfest findet am 18. Juli in der Stadthalle statt. Anmeldungen bitte an Markus Weber, erreichbar unter m.weber (at) beispiel-firma.de oder mobil null-eins-sieben-zwei, 5 5 5 12 34.\n\nFür Getränke ist gesorgt.",
+      "schwaerzen": [
+        {"text": "Markus Weber", "typ": "PERSON"}
+      ],
+      "erwartet": [
+        ["m.weber (at) beispiel-firma.de", "m.weber"],
+        ["null-eins-sieben-zwei, 5 5 5 12 34", "null-eins-sieben-zwei"]
+      ],
+      "harmlos": ["Für Getränke ist gesorgt", "in der Stadthalle"],
+      "risiko": ["mittel", "hoch"]
+    }
+  ]
+}

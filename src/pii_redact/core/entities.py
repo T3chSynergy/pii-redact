@@ -13,6 +13,7 @@ class EntityInfo:
     color: str        # Hervorhebungsfarbe (Hex)
     default_on: bool = True
     area: bool = False  # nur für frei gezogene Bereiche im PDF (nicht Teil der automatischen Suche)
+    searchable: bool = True  # in den Einstellungen als „gesuchte Datenart“ wählbar
 
 
 _ENTITIES: list[EntityInfo] = [
@@ -41,6 +42,9 @@ _ENTITIES: list[EntityInfo] = [
     EntityInfo("DE_LANR", "Arztnummer (LANR)", "LANR", "#a61e4d"),
     EntityInfo("DE_BSNR", "Betriebsstättennr.", "BSNR", "#a61e4d", default_on=False),
     EntityInfo("CUSTOM", "Benutzerdefiniert", "GESCHWÄRZT", "#212529"),
+    # Indirekt identifizierende Angaben (Funktion + Abteilung, seltene Merkmale …) – aus der KI-Nachprüfung
+    # oder manuell, nicht Teil der automatischen Suche
+    EntityInfo("CONTEXT", "Kontext (indirekt)", "KONTEXT", "#862e9c", default_on=False, searchable=False),
     # Frei gezogene Bereiche (Unterschriften, Fotos, Handschrift …) – nur manuell
     EntityInfo("AREA", "Bereich", "BEREICH", "#495057", default_on=False, area=True),
     EntityInfo("AREA_SIGNATURE", "Unterschrift", "UNTERSCHRIFT", "#495057", default_on=False, area=True),

@@ -95,7 +95,9 @@ class FindingsModel(QAbstractTableModel):
             if col == COL_SCORE:
                 return f"{f.score:.2f}"
             if col == COL_SOURCE:
-                return f.recognizer if role == Qt.ItemDataRole.ToolTipRole else ("manuell" if f.source == "manuell" else "auto")
+                if role == Qt.ItemDataRole.ToolTipRole:
+                    return f.recognizer
+                return {"manuell": "manuell", "ki": "KI"}.get(f.source, "auto")
         if role == Qt.ItemDataRole.EditRole and col == COL_TYPE:
             return f.entity_type
         if role == Qt.ItemDataRole.ForegroundRole and not f.active:

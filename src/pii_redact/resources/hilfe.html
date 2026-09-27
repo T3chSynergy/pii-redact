@@ -14,7 +14,8 @@ Anschriften, Telefonnummern, E-Mail-Adressen, IBAN oder Steuer-ID – und entfer
 korrigieren bei Bedarf und speichern eine bereinigte Fassung.</p>
 
 <p class="hinweis"><b>Alles bleibt auf Ihrem Rechner.</b> Das Programm arbeitet vollständig offline und überträgt
-keine Dokumentinhalte.</p>
+keine Dokumentinhalte. Einzige Ausnahme ist die optionale <a href="#ki">KI-Nachprüfung</a>, falls Ihre IT sie
+eingerichtet hat: Sie sendet auf Knopfdruck nur den bereits geschwärzten Text an einen festgelegten Server.</p>
 
 <p class="wichtig"><b>Die automatische Erkennung ist eine Hilfe, keine Garantie.</b> Sie findet viel, aber nie
 alles – und manchmal etwas, das gar nicht geschwärzt werden muss. Prüfen Sie jedes Dokument, bevor Sie es
@@ -153,6 +154,29 @@ Funde bleiben dabei erhalten.</p>
 <p>Mit <i>Frei bearbeiten</i> (über der Vorschau) können Sie den bereinigten Text direkt ändern. Das wirkt nur
 auf den <b>Text-Export</b>, nicht auf PDFs. In der Ordner-Bearbeitung ist diese Funktion ausgeblendet, damit
 jede Änderung nachvollziehbar bleibt.</p>
+
+<h3><a name="ki"></a>KI-Nachprüfung (optional)</h3>
+<p>Wenn Ihre IT sie eingerichtet hat, erscheint in der Werkzeugleiste <i>KI-Prüfung</i> (<kbd>Strg+K</kbd>).
+Ein Sprachmodell liest dann das <b>geschwärzte Ergebnis</b> – so, wie es exportiert würde – und schätzt ein, ob
+Personen trotzdem erkennbar sind:</p>
+<ul>
+  <li><b>übersehene Angaben</b>, z. B. eine Personalnummer oder ein Name in ungewöhnlicher Schreibweise,</li>
+  <li><b>der Zusammenhang</b>, z. B. „Schwerbehindertenvertreterin im Einkauf am Standort Nord“ – auch ohne Namen
+      ist klar, wer gemeint ist. Das kann die normale Erkennung grundsätzlich nicht finden.</li>
+</ul>
+<p>Das Ergebnis steht im Reiter <i>KI-Bewertung</i> neben den Funden: das <b>Restrisiko</b> (gering, mittel,
+hoch), eine kurze Begründung und die Hinweise. Jeder Hinweis, der wörtlich im Text steht, wird als
+<b>nicht aktivierter Vorschlag</b> in die Fundliste übernommen (Quelle „KI“, Datenart oft „Kontext
+(indirekt)“). Ein Klick auf den Hinweis zeigt die Stelle; schwärzen Sie sie wie jeden anderen Fund mit einem
+Häkchen – oder alle auf einmal mit <i>Alle Vorschläge schwärzen</i>.</p>
+<p class="wichtig"><b>Das Modell ist nur ein Nachprüfer.</b> Es kann Stellen übersehen und Unsinn melden. Es
+entscheidet nichts: Vorschläge sind nie automatisch aktiv, der Export hängt nicht davon ab. Ein „gering“
+ersetzt Ihre eigene Prüfung nicht.</p>
+<p class="klein">Was gesendet wird: nur der geschwärzte Text mit Platzhaltern wie <code>[PERSON_1]</code> – nie
+das Original und keine Bilder. Übersehene Angaben stehen darin aber noch; deshalb fragt das Programm beim ersten
+Mal nach Programmstart, bevor es sendet, und nennt den Server. Die freie Bearbeitung wird nicht berücksichtigt.
+In der Ordner-Bearbeitung stehen Risiko, Anzahl der Hinweise und Modell im Protokoll (Spalte „KI-Prüfung“); die
+Hinweise selbst werden nicht gespeichert.</p>
 
 <h2><a name="ocr"></a>4. Gescannte Seiten (Texterkennung)</h2>
 <p>Normalerweise haben Ihre Dokumente eine <b>Textebene</b> – entweder weil sie am Computer erstellt wurden oder
@@ -369,6 +393,8 @@ davorsteht – damit nicht jedes Rechnungsdatum verschwindet. Andere Datumsangab
   <tr><td>Platzhalter im PDF-Balken</td><td>Schreibt z. B. „[PERSON]“ in den Schwärzungsbalken.</td></tr>
   <tr><td>Texterkennung (OCR)</td><td>Gescannte PDF-Seiten automatisch lesen (Standard: an). Siehe
       <a href="#ocr">Kapitel 4</a>.</td></tr>
+  <tr><td>KI-Nachprüfung (Reiter)</td><td>Server-Adresse, Modell und ggf. API-Schlüssel für die optionale
+      <a href="#ki">KI-Nachprüfung</a>, mit <i>Verbindung testen</i>. Wird in der Regel von der IT vorgegeben.</td></tr>
   <tr><td>Kompakte Hinweise</td><td>Hinweise nur als Zähler in der Statusleiste und als Symbol an der Seite,
       ohne orange Zeile (Standard: aus). Siehe <a href="#hinweise">Hinweise zum Dokument</a>.</td></tr>
   <tr><td>Gesuchte Datenarten</td><td>Häkchen je Datenart.</td></tr>
@@ -386,6 +412,7 @@ Einstellungen, die Ihre IT fest vorgibt, sind ausgegraut („Von der IT festgele
   <tr><td><kbd>Strg+O</kbd></td><td>Datei öffnen</td></tr>
   <tr><td><kbd>Strg+Umschalt+O</kbd></td><td>Ordner bearbeiten</td></tr>
   <tr><td><kbd>F5</kbd></td><td>Neu analysieren</td></tr>
+  <tr><td><kbd>Strg+K</kbd></td><td>KI-Prüfung (falls eingerichtet)</td></tr>
   <tr><td><kbd>Strg+R</kbd></td><td>Markierten Text schwärzen</td></tr>
   <tr><td><kbd>Strg+Umschalt+R</kbd></td><td>Alle Vorkommen des markierten Texts schwärzen</td></tr>
   <tr><td><kbd>Strg+Z</kbd> / <kbd>Strg+Y</kbd></td><td>Rückgängig / Wiederholen</td></tr>

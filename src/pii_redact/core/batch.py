@@ -73,8 +73,10 @@ def sha256_of(path: Path) -> str:
 def findings_to_compact(findings: list[Finding]) -> list[dict]:
     out = []
     for f in findings:
+        # Begründungen der KI-Nachprüfung können Inhalte zitieren → nicht im Arbeitsstand speichern
+        rec = "KI-Nachprüfung" if f.source == "ki" else f.recognizer
         item = {"s": f.start, "e": f.end, "t": f.entity_type, "a": f.active, "src": f.source,
-                "sc": f.score, "rec": f.recognizer}
+                "sc": f.score, "rec": rec}
         if f.original_type:
             item["ot"] = f.original_type
         if f.area is not None:
@@ -101,6 +103,15 @@ def findings_from_compact(items: list[dict], text: str) -> list[Finding]:
                            active=bool(it.get("a", True)), recognizer=it.get("rec", ""),
                            original_type=it.get("ot", "")))
     return out
+
+
+def ki_summary(review: dict | None) -> str:
+    """„hoch – 3 Hinweise (Modell, Zeitpunkt)“ für Protokoll und Arbeitsliste."""
+    if not review:
+        return ""
+    n = int(review.get("hints", 0))
+    return (f"{review.get('risk', '?')} – {n} {'Hinweis' if n == 1 else 'Hinweise'} "
+            f"({review.get('model', '?')}, {review.get('at', '')})")
 
 
 def finding_stats(findings: list[Finding]) -> dict:
@@ -191,6 +202,7 @@ class FileEntry:
     note: str = ""          # z. B. „nach Prüfung geändert“, „Original geändert“
     text_sha: str = ""      # Prüfsumme des erkannten Texts – Funde passen nur zu genau diesem Text
     ocr_pages: list[int] = field(default_factory=list)   # per Texterkennung gelesene Seiten (1-basiert)
+    ki_review: dict = field(default_factory=dict)         # letzte KI-Nachprüfung: Risiko, Anzahl Hinweise, Modell
 
     @property
     def analyzed(self) -> bool:
@@ -343,6 +355,7 @@ class Workspace:
         e.status = Status.WAITING
         e.reviewed_by = e.reviewed_at = ""
         e.stats = {}
+        e.ki_review = {}
         e.note = note
 
     # ------------------------------------------------------------------ Zustandsänderungen
@@ -358,6 +371,7 @@ class Workspace:
         e.analyzed_at = now_iso()
         e.error = ""
         e.stats = finding_stats(findings)
+        e.ki_review = {}  # neue Analyse → frühere KI-Bewertung passt nicht mehr
         if e.status in (Status.WAITING, Status.ERROR):
             e.status = Status.TO_REVIEW
 
@@ -372,6 +386,9 @@ class Workspace:
             self._reset(e, "Erkannter Text hat sich geändert (z. B. Texterkennung) – neu analysiert, bitte erneut prüfen")
             return None
         return findings_from_compact(e.findings, doc.text)
+
+    def set_ki_review(self, rel: str, summary: dict) -> None:
+        self.entries[rel].ki_review = dict(summary)
 
     def set_error(self, rel: str, message: str) -> None:
         e = self.entries[rel]
@@ -406,7 +423,7 @@ class Workspace:
     def write_protocol(self) -> None:
         cols = ["Datei", "Status", "Geprüft von", "Zeitpunkt", "Exportiert als", "Funde gesamt", "Geschwärzt",
                 "Datenarten", "Manuell hinzugefügt", "Bereiche", "Abgewählt", "Typ geändert", "Analyse-Modus",
-                "OCR-Seiten", "SHA-256 Original", "Hinweise"]
+                "OCR-Seiten", "KI-Prüfung", "SHA-256 Original", "Hinweise"]
         tmp = self.protocol_path.with_name(self.protocol_path.name + ".tmp")
         with open(tmp, "w", encoding="utf-8-sig", newline="") as fh:
             w = csv.writer(fh, delimiter=";")
@@ -437,6 +454,7 @@ class Workspace:
                     st.get("retyped", ""),
                     {"schnell": "Schnell", "gruendlich": "Gründlich"}.get(e.analysis_mode, e.analysis_mode),
                     ", ".join(map(str, e.ocr_pages)),
+                    ki_summary(e.ki_review),
                     e.sha256,
                     " | ".join(hints),
                 ])

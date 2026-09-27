@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import copy
+import os
+import threading
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEventLoop, Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -15,14 +18,19 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from ..core import AnalysisMode, ReplaceMode, Settings
+from ..core import llm_review
 from ..paths import list_ner_models, ner_model_info
 from ..core.entities import all_keys, info
 
@@ -98,7 +106,7 @@ class SettingsDialog(QDialog):
         # ---- Entitäten
         self.entities = QListWidget()
         for key in all_keys():
-            if key == "CUSTOM":
+            if key == "CUSTOM" or not info(key).searchable:
                 continue
             item = QListWidgetItem(info(key).label)
             item.setData(Qt.ItemDataRole.UserRole, key)
@@ -135,20 +143,114 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        ki_page = self._build_ki(s)
+
         # Von der IT gesperrte Einstellungen (defaults.json → "locked")
         widgets = {"threshold": self.threshold, "spacy_model": self.model, "replace_mode": self.mode,
                    "analysis_mode": self.analysis, "ner_model": self.ner_model, "pdf_labels": self.pdf_labels,
-                   "ocr": self.ocr, "compact_notices": self.compact, "entities": self.entities}
+                   "ocr": self.ocr, "compact_notices": self.compact, "entities": self.entities,
+                   "llm_enabled": self.llm_enabled, "llm_url": self.llm_url, "llm_model": self.llm_model,
+                   "llm_api_key": self.llm_key, "llm_timeout": self.llm_timeout, "llm_max_chars": self.llm_chars}
         for key in s.locked:
             w = widgets.get(key)
             if w is not None:
                 w.setEnabled(False)
                 w.setToolTip("Von der IT festgelegt")
 
+        main_page = QWidget()
+        ml = QVBoxLayout(main_page)
+        ml.addWidget(general)
+        ml.addLayout(middle, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(main_page, "Allgemein")
+        self.tabs.addTab(ki_page, "KI-Nachprüfung")
         lay = QVBoxLayout(self)
-        lay.addWidget(general)
-        lay.addLayout(middle, 1)
+        lay.addWidget(self.tabs, 1)
         lay.addWidget(buttons)
+
+    def _build_ki(self, s: Settings) -> QWidget:
+        page = QWidget()
+        intro = QLabel(
+            "<b>Optional.</b> Ein Sprachmodell bewertet auf Knopfdruck das <b>geschwärzte</b> Ergebnis: Sind "
+            "Personen trotzdem erkennbar – durch übersehene Angaben oder den Zusammenhang? Seine Hinweise erscheinen "
+            "als nicht aktivierte Vorschläge. Das Original wird nie gesendet.<br><br>"
+            "Benötigt wird ein Server mit OpenAI-kompatibler Schnittstelle – direkt oder über ein LLM-Portal/-Proxy. "
+            "<b>Nur einen von Ihrer Organisation freigegebenen Server eintragen</b> – übersehene Angaben im "
+            "Ergebnis verlassen dabei den Rechner.")
+        intro.setWordWrap(True)
+        self.llm_enabled = QCheckBox("KI-Nachprüfung einschalten", checked=s.llm_enabled)
+        self.llm_url = QLineEdit(s.llm_url)
+        self.llm_url.setPlaceholderText("z. B. https://llm.intern.example/v1")
+        self.llm_model = QLineEdit(s.llm_model)
+        self.llm_model.setPlaceholderText("Modellname laut Server, z. B. qwen3-27b")
+        self.llm_key = QLineEdit(s.llm_api_key)
+        self.llm_key.setEchoMode(QLineEdit.EchoMode.Password)
+        env = bool(os.environ.get(llm_review.KEY_ENV))
+        self.llm_key.setPlaceholderText(f"wird aus der Umgebungsvariable {llm_review.KEY_ENV} gelesen" if env
+                                        else "falls der Server einen verlangt")
+        self.llm_key.setToolTip(f"Wird im Klartext im Benutzerprofil gespeichert. Besser: Umgebungsvariable "
+                                f"{llm_review.KEY_ENV} setzen (hat Vorrang).")
+        self.llm_timeout = QSpinBox(minimum=10, maximum=1800, suffix=" s", value=int(s.llm_timeout))
+        self.llm_chars = QSpinBox(minimum=2000, maximum=500000, singleStep=2000, value=int(s.llm_max_chars))
+        self.llm_chars.setToolTip("Längere Dokumente werden (bei PDFs seitenweise) auf mehrere Anfragen verteilt.")
+        self.test_btn = QPushButton("Verbindung testen")
+        self.test_btn.clicked.connect(self._test_llm)
+        self.test_result = QLabel()
+        self.test_result.setWordWrap(True)
+        form = QFormLayout()
+        form.addRow("", self.llm_enabled)
+        form.addRow("Server-Adresse:", self.llm_url)
+        form.addRow("Modell:", self.llm_model)
+        form.addRow("API-Schlüssel:", self.llm_key)
+        form.addRow("Zeitlimit je Anfrage:", self.llm_timeout)
+        form.addRow("Zeichen je Anfrage:", self.llm_chars)
+        row = QHBoxLayout()
+        row.addWidget(self.test_btn)
+        row.addWidget(self.test_result, 1)
+        lay = QVBoxLayout(page)
+        lay.addWidget(intro)
+        lay.addLayout(form)
+        lay.addLayout(row)
+        lay.addStretch(1)
+        return page
+
+    def _ki_settings(self) -> Settings:
+        s = copy.deepcopy(self._orig)
+        s.llm_enabled = True
+        s.llm_url = self.llm_url.text().strip()
+        s.llm_model = self.llm_model.text().strip()
+        s.llm_api_key = self.llm_key.text().strip()
+        s.llm_timeout = self.llm_timeout.value()
+        s.llm_max_chars = self.llm_chars.value()
+        return s
+
+    def _test_llm(self) -> None:
+        s = self._ki_settings()
+        if not (s.llm_url and s.llm_model):
+            self.test_result.setText("Bitte Server-Adresse und Modell eintragen.")
+            return
+        self.test_result.setText(f"Teste mit einer Anfrage über {s.llm_max_chars:,} Zeichen … (bis zu "
+                                 f"{s.llm_timeout} s)".replace(",", "."))
+        self.test_btn.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        state: dict = {}
+
+        def work() -> None:
+            try:
+                state["msg"] = "✓ " + llm_review.test_connection(s)
+            except Exception as exc:  # noqa: BLE001
+                state["msg"] = f"✗ {exc}"
+
+        th = threading.Thread(target=work, daemon=True)
+        th.start()
+        try:
+            while th.is_alive():  # Dialog bleibt bedienbar
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
+                th.join(0.05)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.test_btn.setEnabled(True)
+        self.test_result.setText(state.get("msg", ""))
 
     def result_settings(self) -> Settings:
         s = copy.deepcopy(self._orig)
@@ -162,6 +264,12 @@ class SettingsDialog(QDialog):
         s.pdf_labels = self.pdf_labels.isChecked()
         s.ocr = self.ocr.isChecked()
         s.compact_notices = self.compact.isChecked()
+        s.llm_enabled = self.llm_enabled.isChecked()
+        s.llm_url = self.llm_url.text().strip()
+        s.llm_model = self.llm_model.text().strip()
+        s.llm_api_key = self.llm_key.text().strip()
+        s.llm_timeout = self.llm_timeout.value()
+        s.llm_max_chars = self.llm_chars.value()
         s.entities = [
             self.entities.item(i).data(Qt.ItemDataRole.UserRole)
             for i in range(self.entities.count())

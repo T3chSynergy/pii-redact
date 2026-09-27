@@ -77,10 +77,10 @@ class DocumentSession(QObject):
         self._reindex()
 
     def apply_reanalysis(self, new_auto: list[Finding]) -> None:
-        """Neue Analyse übernehmen, ohne Nachbearbeitung zu verlieren: manuelle Funde bleiben,
-        deaktivierte oder umtypisierte Stellen behalten ihren Zustand."""
+        """Neue Analyse übernehmen, ohne Nachbearbeitung zu verlieren: manuelle Funde und Vorschläge der
+        KI-Nachprüfung bleiben, deaktivierte oder umtypisierte Stellen behalten ihren Zustand."""
         previous = {f.key: f for f in self.findings if f.source == "auto"}
-        manual = [f for f in self.findings if f.source == "manuell"]
+        manual = [f for f in self.findings if f.source in ("manuell", "ki")]
         for f in new_auto:
             old = previous.get(f.key)
             if old is not None:
@@ -176,6 +176,15 @@ class DocumentSession(QObject):
         self.findings.sort(key=lambda f: (f.start, f.end))
         self._reindex()
         return [area] + text_new
+
+    def add_findings(self, new: list[Finding]) -> None:
+        """Fertige Funde übernehmen (z. B. Vorschläge der KI-Nachprüfung) – ein Rückgängig-Schritt."""
+        if not new:
+            return
+        self._snapshot()
+        self.findings.extend(new)
+        self.findings.sort(key=lambda f: (f.start, f.end))
+        self._reindex()
 
     def add_all_occurrences(self, value: str, entity_type: str) -> list[Finding]:
         ranges = [(f.start, f.end) for f in find_terms(self.doc.text, [value])]
