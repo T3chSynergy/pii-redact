@@ -4,8 +4,8 @@ Lokaler Desktop-Client (Python 3.12, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.5.0 (KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests grün (Stand 27.09.2026).
-v0.3.0 läuft auf dem Test-PC; 0.5.0 noch nicht gebaut.
+**Stand:** v0.6.0 (Build erzeugt ZIP statt MSI; davor 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz
+AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0.5.0 als MSI gebaut.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -13,7 +13,9 @@ v0.3.0 läuft auf dem Test-PC; 0.5.0 noch nicht gebaut.
 - **Branches:** Standard-Branch auf GitHub bleibt `main` (= letzte veröffentlichte Version für Besucher),
   entwickelt wird auf **`dev`**. Neue Sitzungen starten aber von `main` – deshalb **zu Beginn jeder Sitzung**:
   `git fetch origin dev` und den Sitzungs-Branch `claude/…` auf `origin/dev` aufsetzen, bevor etwas geändert
-  wird. Pull Requests immer gegen **`dev`** (nicht `main`).
+  wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
+  danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
+  Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
   Release: PR `dev → main`, Tag `v0.x.0`, GitHub-Release mit Modell-Zip.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
@@ -46,19 +48,20 @@ v0.3.0 läuft auf dem Test-PC; 0.5.0 noch nicht gebaut.
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,
   Lesezeichen löschen, Formularfelder backen), `verify_pdf` prüft alles nach. OCR (RapidOCR 3.9.2) nur als
   Rückfallebene.
-- **Verteilung:** Die IT bevorzugt den **Programmordner** aus dem Build (`dist\pii-redact`, PyInstaller onedir)
-  und erstellt das MSI mit eigenen Werkzeugen. Der WiX-Teil (`packaging/pii-redact.wxs`, Schritt 6 in
-  `build.bat`, `/nur-msi`) wird **voraussichtlich entfernt** – bis dahin unverändert lassen.
-  Falls WiX bleibt: UpgradeCode `705D03F1-09B8-4E20-98E9-5C38D9AD3A56` nie ändern.
-- **Code-Signierung** (`packaging/README.md`): Wege A–D, noch nicht praktisch getestet.
+- **Verteilung:** Build liefert den **Programmordner** `dist\pii-redact` (PyInstaller onedir) und daraus
+  `dist\pii-redact-<version>.zip`; das Installationspaket (MSI) erstellt die IT mit eigenen Werkzeugen.
+  WiX/MSI wurde aus dem Projekt entfernt.
+- **Code-Signierung** (`packaging/README.md`): nur die beiden EXE-Dateien; Wege A–D, noch nicht praktisch
+  getestet.
 - Transformer-Modell nicht im Repo, sondern `davlan-xlmr-ner.zip` (≈ 234 MB, mit AFL-Text) am GitHub-Release;
   Prüfsummen `packaging/modell.sha256`.
 - Version nur in `src/pii_redact/__init__.py`; jede Version im `CHANGELOG.md` eintragen.
 
 ## Build
-- `build.bat [/neu] [/ohne-msi] [/ohne-gruendlich] [/nur-msi]`; baut die Umgebung `.venv-build` neu, wenn sich
+- `build.bat [/neu] [/ohne-zip] [/ohne-gruendlich]`; baut die Umgebung `.venv-build` neu, wenn sich
   `packaging/requirements-lock.txt` geändert hat; erzeugt Lizenzdateien; optional Signieren über
-  `SIGNTOOL_ARGS`.
+  `SIGNTOOL_ARGS`; packt am Ende per `%SystemRoot%\System32\tar.exe -a` (Rückfall: `Compress-Archive`) das ZIP
+  (`…-schnell.zip` bei `/ohne-gruendlich`). `/ohne-msi` und `/nur-msi` brechen mit Hinweis ab.
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
@@ -81,12 +84,11 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in
   `sys.modules` eintragen.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
-- WiX: kein `--` in XML-Kommentaren.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; Release v0.5.0 mit `davlan-xlmr-ner.zip` (mit AFL-Text); 0.5.0 bauen;
+1. Repo öffentlich stellen; Release v0.6.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
    `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
-2. Klären, ob WiX/MSI aus dem Repo entfernt wird (IT nutzt den Programmordner).
+2. ZIP-Build einmal auf Windows ausprobieren (`build.bat`, `build.bat /ohne-zip`).
 3. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
 4. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.

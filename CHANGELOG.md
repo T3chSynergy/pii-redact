@@ -1,5 +1,15 @@
 # Änderungen
 
+## 0.6.0 – 28.09.2026
+
+**Geändert – Build erzeugt ZIP statt MSI**
+- `build.bat` packt den fertigen Programmordner als `dist\pii-redact-<version>.zip` (mit
+  `/ohne-gruendlich`: `…-schnell.zip`). Das MSI erstellt die IT mit eigenen Werkzeugen aus diesem Ordner.
+- Entfernt: WiX-Paket (`packaging/pii-redact.wxs`), die Schalter `/ohne-msi` und `/nur-msi` (Hinweis beim
+  Aufruf) sowie die Voraussetzungen .NET SDK und WiX. Neu: `/ohne-zip` – nur den Programmordner bauen.
+- Code-Signierung betrifft nur noch die EXE-Dateien; IT-Anleitung (`packaging/README.md`) entsprechend
+  überarbeitet.
+
 ## 0.5.0 – 27.09.2026
 
 **Lizenz**
