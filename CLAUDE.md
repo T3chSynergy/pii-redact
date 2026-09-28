@@ -16,7 +16,12 @@ AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0
   wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
   danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
   Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
-  Release: PR `dev → main`, Tag `v0.x.0`, GitHub-Release mit Modell-Zip.
+  Release: Version in `__init__.py` + `CHANGELOG.md` (PR gegen `dev`), dann PR `dev → main` mergen.
+  Danach `dev` wiederherstellen (GitHub löscht ihn beim Merge automatisch, „Automatically delete head
+  branches“ ist an): `git push origin <Merge-Commit von main>:refs/heads/dev` – so stehen `dev` und `main`
+  gleich. **Tag und GitHub-Release legt der Nutzer an** (Claude kann in der Cloud keine Tags pushen – 403 –
+  und keine Releases anlegen): Beschreibung aus `CHANGELOG.md` zum Einfügen liefern; Anhänge
+  `pii-redact-<version>.zip` (Build auf Windows) und `davlan-xlmr-ner.zip`.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
   `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
