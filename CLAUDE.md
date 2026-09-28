@@ -13,7 +13,9 @@ v0.3.0 läuft auf dem Test-PC; 0.5.0 noch nicht gebaut.
 - **Branches:** Standard-Branch auf GitHub bleibt `main` (= letzte veröffentlichte Version für Besucher),
   entwickelt wird auf **`dev`**. Neue Sitzungen starten aber von `main` – deshalb **zu Beginn jeder Sitzung**:
   `git fetch origin dev` und den Sitzungs-Branch `claude/…` auf `origin/dev` aufsetzen, bevor etwas geändert
-  wird. Pull Requests immer gegen **`dev`** (nicht `main`).
+  wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
+  danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
+  Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
   Release: PR `dev → main`, Tag `v0.x.0`, GitHub-Release mit Modell-Zip.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
