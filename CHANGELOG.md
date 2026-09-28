@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.6.0 – 28.09.2026
 
 **Geändert – Build erzeugt ZIP statt MSI**
 - `build.bat` packt den fertigen Programmordner als `dist\pii-redact-<version>.zip` (mit
