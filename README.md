@@ -212,7 +212,7 @@ src/pii_redact/
 ├── cli.py
 └── app.py
 tools/                    # nur Entwicklung: Modell-Umwandlung, Vergleich, Test-Mini-Modell
-packaging/                # Build: PyInstaller-Spec, WiX-MSI, Lock-Datei, Icon, IT-Anleitung
+packaging/                # Build: PyInstaller-Spec, Lock-Datei, Icon, Lizenztexte, IT-Anleitung
 deploy/                   # Vorlagen für die Softwareverteilung
 ```
 
@@ -226,9 +226,10 @@ Textindex seine Position auf der Seite – so wird jeder Fund exakt auf Schwärz
 build.bat
 ```
 
-erzeugt `dist\pii-redact\` (EXE-Dateien, ohne Python lauffähig) und `dist\pii-redact-<version>.msi`
-für die Softwareverteilung (SCCM). Details für die IT – Voraussetzungen (Python 3.12, WiX 5), Optionen,
-SCCM-Einstellungen, Updates, zentrale Vorgaben: **[packaging/README.md](packaging/README.md)**.
+erzeugt `dist\pii-redact\` (Programmordner mit EXE-Dateien, ohne Python lauffähig) und denselben Ordner als
+`dist\pii-redact-<version>.zip`. Das ZIP geht an die IT, die daraus mit eigenen Werkzeugen das
+Installationspaket erstellt. Details für die IT – Voraussetzungen (Python 3.12), Optionen, Verteilung, Updates,
+zentrale Vorgaben: **[packaging/README.md](packaging/README.md)**.
 
 ## Tests
 
@@ -260,7 +261,7 @@ DOCX-Unterstützung · Pseudonymisierungs-Schlüssel (reversibel, verschlüsselt
 pii-redact ist freie Software: Sie können es unter den Bedingungen der **GNU Affero General Public License**,
 Version 3 oder (nach Ihrer Wahl) jeder späteren Version, weitergeben und/oder verändern (`AGPL-3.0-or-later`,
 siehe [`LICENSE`](LICENSE)). Das Programm wird ohne jede Gewährleistung bereitgestellt. Die AGPL passt zu PyMuPDF, das ebenfalls unter der AGPL-3.0 steht. Wer das Programm
-(auch als MSI) weitergibt, muss den Quellcode unter derselben Lizenz zugänglich machen.
+(auch als fertig gebauten Programmordner) weitergibt, muss den Quellcode unter derselben Lizenz zugänglich machen.
 
 Mitgelieferte Komponenten behalten ihre eigenen Lizenzen (MIT, BSD, Apache-2.0, LGPL-3.0 für Qt u. a.); der
 Build erzeugt `LIZENZEN.txt` und `LIZENZTEXTE.txt` im Programmordner. Das Transformer-Modell
