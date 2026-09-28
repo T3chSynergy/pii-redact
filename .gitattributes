@@ -2,7 +2,6 @@
 * text=auto
 *.bat text eol=crlf
 *.cmd text eol=crlf
-*.wxs text eol=crlf
 
 # Binärdateien nie umwandeln
 *.pdf binary

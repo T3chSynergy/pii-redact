@@ -1,4 +1,4 @@
-# Build und Verteilung (SCCM)
+# Build und Verteilung
 
 Diese Anleitung richtet sich an die IT. Anwender finden ihre Hilfe im Programm unter **Hilfe → Anwenderhilfe (F1)**.
 
@@ -6,10 +6,10 @@ Diese Anleitung richtet sich an die IT. Anwender finden ihre Hilfe im Programm u
 
 | Datei | Zweck |
 |---|---|
-| `dist\pii-redact-<version>.msi` | Installationspaket für SCCM (x64, pro Computer) |
-| `dist\pii-redact\` | Programmordner (zum Testen ohne Installation) |
+| `dist\pii-redact\` | Programmordner – lauffähig ohne Installation |
+| `dist\pii-redact-<version>.zip` | derselbe Ordner als ZIP (oberste Ebene `pii-redact\`) zur Weitergabe an die IT |
 
-Das MSI installiert nach `C:\Program Files\pii-redact\`:
+Das Installationspaket (z. B. MSI) erstellt die IT mit eigenen Werkzeugen aus diesem Ordner. Inhalt:
 
 * `pii-redact.exe` – Oberfläche (Startmenü-Eintrag „pii-redact“)
 * `pii-redact-cli.exe` – Kommandozeile (Stapelverarbeitung, `--selftest`)
@@ -21,19 +21,13 @@ Das MSI installiert nach `C:\Program Files\pii-redact\`:
 Auf den Zielrechnern ist **kein Python** nötig. Das Programm arbeitet **vollständig offline** und
 baut keine Netzwerkverbindungen auf – Firewall-Regeln sind nicht erforderlich.
 
-Größe (inkl. Texterkennung): ca. 750–950 MB installiert, MSI ca. 400–500 MB (grobe Schätzung – der erste Build zeigt die genauen Werte). Empfohlen: Windows 10/11 64 Bit, 8 GB RAM.
+Größe (inkl. Texterkennung): ca. 750–950 MB entpackt, ZIP ca. 500 MB. Empfohlen: Windows 10/11 64 Bit, 8 GB RAM.
 
 ## Build-Rechner einrichten (einmalig)
 
 1. **Windows 10/11 x64** mit **Python 3.12** (python.org, „py launcher“ mitinstallieren).
-2. **.NET SDK 8** (für WiX) und **WiX Toolset 5**:
-   ```bat
-   dotnet tool install --global wix --version 5.0.2
-   ```
-   Wir verwenden bewusst WiX **5**: Ab WiX 6 gilt für Organisationen, die Umsatz erzielen, die
-   „Open Source Maintenance Fee“ (kostenpflichtiges GitHub-Sponsoring). WiX 5 fällt nicht darunter.
-3. Das **Transformer-Modell** muss unter `models\ner\davlan-xlmr-ner\` liegen – siehe nächster Abschnitt.
-4. Beim ersten Build braucht der Rechner Internet (Python-Pakete, spaCy-Modell). Die Versionen sind in
+2. Das **Transformer-Modell** muss unter `models\ner\davlan-xlmr-ner\` liegen – siehe nächster Abschnitt.
+3. Beim ersten Build braucht der Rechner Internet (Python-Pakete, spaCy-Modell). Die Versionen sind in
    `packaging\requirements-lock.txt` fest vorgegeben – jeder Build ist reproduzierbar.
 
 ## Quellcode und Transformer-Modell
@@ -66,19 +60,18 @@ build.bat
 ```
 
 Ablauf: eigene Build-Umgebung `.venv-build` → Pakete in festen Versionen → PyInstaller →
-**Selbsttest** des fertigen Programms (beide Analyse-Modi, Anwenderhilfe, Start der Oberfläche) → MSI.
-Schlägt ein Schritt fehl, bricht der Build ab.
+**Selbsttest** des fertigen Programms (beide Analyse-Modi, Anwenderhilfe, Start der Oberfläche) → ZIP
+(mit SHA-256-Prüfsumme in der Ausgabe). Schlägt ein Schritt fehl, bricht der Build ab.
 
 | Option | Wirkung |
 |---|---|
 | `/neu` | Build-Umgebung komplett neu anlegen (nach Änderung der Lock-Datei) |
-| `/ohne-msi` | nur `dist\pii-redact\` erzeugen |
-| `/ohne-gruendlich` | ohne Transformer-Modell (kleiner, nur Modus „Schnell“) |
-| `/nur-msi` | nur das MSI aus einem vorhandenen `dist\pii-redact\` bauen (schnell, z. B. nach WiX-Installation) |
+| `/ohne-zip` | nur `dist\pii-redact\` erzeugen (schneller, z. B. zum Testen) |
+| `/ohne-gruendlich` | ohne Transformer-Modell (kleiner, nur Modus „Schnell“); das ZIP heißt dann `pii-redact-<version>-schnell.zip` |
 
-Die Ausgabe des MSI-Baus steht zusätzlich in `dist\wix-build.log`. Wird WiX nicht gefunden (häufig, wenn die
-Konsole schon vor `dotnet tool install` geöffnet war), sucht `build.bat` auch unter
-`%USERPROFILE%\.dotnet\tools\wix.exe`. Am Ende zeigt die Zusammenfassung immer, ob das MSI entstanden ist.
+Gepackt wird mit dem `tar.exe` von Windows (ab Windows 10 1803), sonst mit PowerShell (`Compress-Archive`,
+deutlich langsamer). Die früheren Schalter `/ohne-msi` und `/nur-msi` gibt es nicht mehr; `build.bat` bricht
+dann mit einem Hinweis ab.
 
 **Code-Signierung:** siehe nächsten Abschnitt.
 
@@ -86,11 +79,11 @@ Konsole schon vor `dotnet tool install` geöffnet war), sucht `build.bat` auch u
 
 **Warum?** Unsignierte Programme, die mit PyInstaller gebaut wurden, stufen Virenscanner gern als
 verdächtig ein. Außerdem lassen sich AppLocker-/WDAC-Regeln nach Herausgeber nur mit signierten Dateien
-nutzen. Signiert werden `pii-redact.exe`, `pii-redact-cli.exe` und das MSI.
+nutzen. Signiert werden `pii-redact.exe` und `pii-redact-cli.exe`; das Installationspaket signiert die IT beim
+Erstellen mit ihren eigenen Werkzeugen.
 
-Wichtig: Die EXE-Dateien stecken komprimiert im MSI. Sie müssen **vor** dem Verpacken signiert werden – ein
-nachträglich signiertes MSI enthält sonst unsignierte Programme. `build.bat` erledigt beides in einem
-Durchgang, wenn vor dem Aufruf die Umgebungsvariable `SIGNTOOL_ARGS` gesetzt ist.
+Die EXE-Dateien müssen **vor** dem Verpacken signiert werden. `build.bat` signiert sie vor dem Selbsttest und
+dem ZIP, wenn vor dem Aufruf die Umgebungsvariable `SIGNTOOL_ARGS` gesetzt ist.
 
 ### Voraussetzungen
 
@@ -134,15 +127,15 @@ Wert; Pfade mit Leerzeichen einzeln in Anführungszeichen):
    build.bat
    ```
    Der erste Build braucht Internet (Python-Pakete) und legt die Build-Umgebung an. In der Ausgabe erscheinen
-   „Code-Signierung mit: …\signtool.exe“, „Signiere EXE-Dateien …“ und „Signiere MSI …“. Schlägt das
+   „Code-Signierung mit: …\signtool.exe“ und „Signiere EXE-Dateien …“. Schlägt das
    Signieren fehl, bricht der Build ab. Der Selbsttest läuft mit den bereits signierten Programmen.
 4. **Prüfen:**
    ```bat
    signtool verify /pa /v dist\pii-redact\pii-redact.exe
-   signtool verify /pa /v dist\pii-redact-<version>.msi
+   signtool verify /pa /v dist\pii-redact\pii-redact-cli.exe
    ```
    oder im Explorer: Eigenschaften → Registerkarte „Digitale Signaturen“.
-5. `dist\pii-redact-<version>.msi` in SCCM verteilen (siehe unten).
+5. Aus `dist\pii-redact\` bzw. dem ZIP das Installationspaket erstellen und verteilen (siehe unten).
 
 ### Weg B: Die IT stellt dem Entwickler ein Zertifikat bereit
 
@@ -160,16 +153,15 @@ Signieren selbst funktioniert trotzdem.
 
 ### Weg C: Nachträglich signieren (ohne Zertifikat beim Entwickler)
 
-1. Entwickler: `build.bat /ohne-msi` – erzeugt nur `dist\pii-redact\`.
-2. IT: `signtool sign <Argumente> dist\pii-redact\pii-redact.exe dist\pii-redact\pii-redact-cli.exe`
-3. Entwickler: `build.bat /nur-msi` – verpackt die signierten Dateien, ohne neu zu kompilieren.
-4. IT: `signtool sign <Argumente> dist\pii-redact-<version>.msi`
+1. Entwickler: `build.bat` – übergibt das ZIP an die IT.
+2. IT: nach dem Entpacken `signtool sign <Argumente> pii-redact\pii-redact.exe pii-redact\pii-redact-cli.exe`
+3. IT: Installationspaket aus dem signierten Ordner erstellen (und bei Bedarf ebenfalls signieren).
 
 ### Weg D: Azure Artifact Signing (vorhandener Azure-Tenant)
 
 Microsoft-Signierdienst (früher „Trusted Signing“): Microsoft prüft die Organisation einmalig, verwahrt den
 Schlüssel in eigenen HSMs und signiert auf Anfrage – ohne Token, ohne PFX-Datei. Kosten: Tarif *Basic* für bis zu
-5 000 Signaturen im Monat (pii-redact braucht 3 pro Build). Die Zertifikate sind nur wenige Tage gültig und werden
+5 000 Signaturen im Monat (pii-redact braucht 2 pro Build). Die Zertifikate sind nur wenige Tage gültig und werden
 automatisch erneuert; ein **Zeitstempel ist daher Pflicht**. Öffentlich vertrauenswürdige Zertifikate gibt es für
 Organisationen u. a. in der EU. Anleitungen von Microsoft: *Quickstart: Set up Artifact Signing* und
 *Set up signing integrations* (learn.microsoft.com/azure/artifact-signing).
@@ -220,37 +212,35 @@ Endpunkt nicht zur Region des Kontos oder die Rolle fehlt; schlägt signtool ohn
 
 * **AppLocker:** Herausgeberregel auf das Codesignatur-Zertifikat ist möglich.
 * **WDAC im strengen Modus:** Die Bibliotheken unter `_internal\` (Python, Qt, KI-Laufzeit) sind nur
-  teilweise von ihren Herstellern signiert. Dann eine Pfadregel für `C:\Program Files\pii-redact\` oder
-  Hash-Regeln verwenden – oder zusätzlich alle `*.dll`/`*.pyd` unter `dist\pii-redact\_internal\` vor dem
+  teilweise von ihren Herstellern signiert. Dann eine Pfadregel für den Installationsordner oder
+  Hash-Regeln verwenden – oder zusätzlich alle `*.dll`/`*.pyd` unter `pii-redact\_internal\` vor dem
   Verpacken signieren (Weg C, Schritt 2 entsprechend erweitern).
 * **Zertifikat läuft ab:** Mit Zeitstempel bleiben bereits verteilte Versionen gültig; neue Versionen mit
   dem neuen Zertifikat bauen.
 
-## SCCM / Configuration Manager
+## Verteilung
 
-Anwendung anlegen → Bereitstellungstyp **Windows Installer (*.msi)** → MSI auswählen.
-Produktcode und Erkennungsmethode übernimmt SCCM automatisch aus dem MSI.
+Die IT erstellt aus dem Programmordner mit eigenen Werkzeugen ein Installationspaket (z. B. MSI für SCCM).
+Hinweise dazu:
 
-| Einstellung | Wert |
+| Punkt | Empfehlung |
 |---|---|
-| Installationsprogramm | `msiexec /i "pii-redact-0.5.0.msi" /qn /norestart /l*v "%TEMP%\pii-redact-install.log"` |
-| Mit Kommandozeile im PATH | zusätzlich `ADDTOPATH=1` |
-| Deinstallationsprogramm | `msiexec /x {Produktcode} /qn /norestart` |
-| Erkennungsmethode | Windows Installer – Produktcode (automatisch) |
-| Installationsverhalten | Für System installieren |
-| Anmeldeanforderung | Unabhängig davon, ob ein Benutzer angemeldet ist |
-| Neustart | nicht erforderlich |
-| Anforderungen | Windows 10/11 64 Bit |
+| Zielordner | `C:\Program Files\pii-redact\` – den **ganzen** Ordner übernehmen, die Struktur (`_internal\`) nicht verändern |
+| Installation | pro Computer (für alle Benutzer), 64 Bit; kein Neustart nötig |
+| Verknüpfung | Startmenü-Eintrag „pii-redact“ auf `pii-redact.exe` |
+| Kommandozeile | optional den Installationsordner in den `PATH` aufnehmen (für `pii-redact-cli`) |
+| Erkennungsmethode | Datei `pii-redact.exe` mit Dateiversion ≥ `<version>` (die EXE trägt die Versionsnummer aus `src\pii_redact\__init__.py`) |
+| Anforderungen | Windows 10/11 64 Bit, empfohlen 8 GB RAM |
+
+Das Programm schreibt nie in seinen Installationsordner (Einstellungen, Protokoll und Vorgaben: siehe
+„Wo liegt was auf dem Client?“) und legt selbst keine Registry-Einträge an.
 
 ### Updates
 
-1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.5.0` → `0.6.0`;
-   MSI wertet nur die ersten drei Stellen aus).
-2. `build.bat` → neues MSI mit neuem Produktcode.
-3. In SCCM neue Anwendung anlegen und die alte **ersetzen** („Supersedence“). Das MSI entfernt die alte
-   Version dabei selbst (MajorUpgrade). Ein Downgrade wird verhindert.
-
-Die **UpgradeCode-GUID** in `packaging\pii-redact.wxs` darf sich nie ändern.
+1. Versionsnummer erhöhen in `src\pii_redact\__init__.py` (einzige Stelle, z. B. `0.5.0` → `0.6.0`).
+2. `build.bat` → neues ZIP `pii-redact-<version>.zip`.
+3. Die IT erstellt daraus ein neues Paket, das die alte Version ersetzt. Beim Aktualisieren den alten
+   Programmordner vollständig entfernen, nicht nur überschreiben – sonst bleiben veraltete Bibliotheken liegen.
 
 ## Zentrale Vorgaben (optional)
 
@@ -284,7 +274,7 @@ Vorlage: `deploy\defaults.example.json`.
   `"ocr": true, "compact_notices": false, "locked": ["ocr", "compact_notices"]`.
   Ein Schlüssel wird nur gesperrt, wenn er in `defaults.json` auch einen Wert hat.
 
-Zusätzliche Modelle können – ohne neues MSI – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
+Zusätzliche Modelle können – ohne neues Installationspaket – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
 abgelegt werden.
 
 ## KI-Nachprüfung (optional)
@@ -352,13 +342,11 @@ statt zu einer scheinbar harmlosen Bewertung.
 
 | Pfad | Inhalt |
 |---|---|
-| `C:\Program Files\pii-redact\` | Programm (schreibgeschützt für Nutzer) |
+| `C:\Program Files\pii-redact\` (bzw. Zielordner der IT) | Programm (schreibgeschützt für Nutzer) |
 | `C:\ProgramData\pii-redact\defaults.json` | zentrale Vorgaben (optional) |
 | `%APPDATA%\pii-redact\settings.json` | persönliche Einstellungen |
 | `%LOCALAPPDATA%\pii-redact\logs\pii-redact.log` | Programmprotokoll für den Support (keine Dokumentinhalte) |
 | Zielordner der Ordner-Bearbeitung | Ergebnisse, `pii-redact-protokoll.csv`, `pii-redact-arbeitsstand.json` |
-
-Registry: nur bei `ADDTOPATH=1` ein Merker unter `HKLM\Software\pii-redact`.
 
 ## Prüfen einer Installation
 

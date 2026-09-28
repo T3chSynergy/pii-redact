@@ -1,32 +1,37 @@
 @echo off
 rem ==========================================================================
-rem  pii-redact - Build: EXE (PyInstaller) und MSI (WiX v5)
+rem  pii-redact - Build: Programmordner (PyInstaller) und ZIP
 rem
 rem  build.bat                  normaler Build (Umgebung wird wiederverwendet)
 rem  build.bat /neu             Build-Umgebung .venv-build komplett neu anlegen
-rem  build.bat /ohne-msi        nur den Programmordner dist\pii-redact erzeugen
+rem  build.bat /ohne-zip        nur den Programmordner dist\pii-redact erzeugen
 rem  build.bat /ohne-gruendlich ohne Transformer-Modell (nur Modus "Schnell")
-rem  build.bat /nur-msi         nur das MSI aus einem vorhandenen dist\pii-redact bauen
 rem
-rem  Optional vorher:  set SIGNTOOL_ARGS=...   (signiert EXE und MSI mit signtool,
+rem  Optional vorher:  set SIGNTOOL_ARGS=...   (signiert die EXE-Dateien mit signtool,
 rem                    Beispiele: packaging\README.md, Abschnitt "Code-Signierung")
 rem
 rem  Ergebnis: dist\pii-redact\           Programmordner (pii-redact.exe, pii-redact-cli.exe)
-rem            dist\pii-redact-<ver>.msi  Installationspaket fuer SCCM
+rem            dist\pii-redact-<ver>.zip  derselbe Ordner als ZIP zur Weitergabe an die IT
 rem ==========================================================================
 setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "NEU="
-set "OHNE_MSI="
-set "NUR_MSI="
-set "MSI_STATUS=nicht gebaut"
+set "OHNE_ZIP="
+set "ALT_SCHALTER="
+set "ZIP_STATUS=nicht gebaut"
 set "PII_REDACT_BUNDLE_NER=davlan-xlmr-ner"
 for %%A in (%*) do (
     if /I "%%~A"=="/neu" set "NEU=1"
-    if /I "%%~A"=="/ohne-msi" set "OHNE_MSI=1"
+    if /I "%%~A"=="/ohne-zip" set "OHNE_ZIP=1"
     if /I "%%~A"=="/ohne-gruendlich" set "PII_REDACT_BUNDLE_NER="
-    if /I "%%~A"=="/nur-msi" set "NUR_MSI=1"
+    if /I "%%~A"=="/ohne-msi" set "ALT_SCHALTER=%%~A"
+    if /I "%%~A"=="/nur-msi" set "ALT_SCHALTER=%%~A"
+)
+if defined ALT_SCHALTER (
+    echo FEHLER: %ALT_SCHALTER% gibt es nicht mehr - der Build erzeugt kein MSI mehr, sondern ein ZIP.
+    echo        Nur den Programmordner bauen:  build.bat /ohne-zip
+    goto :error
 )
 
 rem Version aus src\pii_redact\__init__.py  (__version__ = "x.y.z")
@@ -47,14 +52,6 @@ if defined SIGNTOOL_ARGS if not defined SIGNTOOL (
     goto :error
 )
 if defined SIGNTOOL echo Code-Signierung mit: %SIGNTOOL%
-
-if defined NUR_MSI (
-    if not exist dist\pii-redact\pii-redact.exe (
-        echo FEHLER: dist\pii-redact fehlt - erst ohne /nur-msi bauen.
-        goto :error
-    )
-    goto :msi
-)
 
 rem ---------------------------------------------------------------- [1/6] Python
 set "PY="
@@ -134,65 +131,46 @@ if errorlevel 1 (
 )
 echo       Oberflaeche startet: OK
 
-rem ---------------------------------------------------------------- [6/6] MSI
-:msi
-if defined OHNE_MSI (
-    set "MSI_STATUS=uebersprungen (/ohne-msi)"
+rem ---------------------------------------------------------------- [6/6] ZIP
+if defined OHNE_ZIP (
+    set "ZIP_STATUS=uebersprungen (/ohne-zip)"
     goto :done
 )
-rem WiX suchen: im PATH oder im Standardordner der dotnet-Tools (PATH ist in bereits
-rem offenen Konsolen nach "dotnet tool install" oft noch nicht aktualisiert)
-set "WIX="
-for /f "delims=" %%w in ('where wix 2^>nul') do if not defined WIX set "WIX=%%w"
-if not defined WIX if exist "%USERPROFILE%\.dotnet\tools\wix.exe" set "WIX=%USERPROFILE%\.dotnet\tools\wix.exe"
-if not defined WIX (
-    echo [6/6] WiX nicht gefunden - MSI wird NICHT gebaut.
-    echo       Einmalig installieren ^(braucht .NET SDK 6+^), danach neue Konsole oeffnen:
-    echo           dotnet tool install --global wix --version 5.0.2
-    echo       Dann nur das MSI nachbauen:  build.bat /nur-msi
-    set "MSI_STATUS=NICHT gebaut - WiX fehlt"
-    goto :done
+set "ZIPNAME=pii-redact-%VERSION%"
+if not defined PII_REDACT_BUNDLE_NER set "ZIPNAME=pii-redact-%VERSION%-schnell"
+set "ZIPFILE=dist\%ZIPNAME%.zip"
+echo [6/6] Packe %ZIPFILE% ...
+if exist "%ZIPFILE%" del /q "%ZIPFILE%"
+rem tar.exe von Windows (ab Windows 10 1803) packt deutlich schneller als PowerShell. Bewusst mit
+rem vollem Pfad - ein tar aus Git fuer Windows im PATH kann kein ZIP.
+if exist "%SystemRoot%\System32\tar.exe" (
+    "%SystemRoot%\System32\tar.exe" -a -c -f "%ZIPFILE%" -C dist pii-redact || goto :ziperror
+) else (
+    powershell -NoProfile -Command "Compress-Archive -Path 'dist\pii-redact' -DestinationPath '%ZIPFILE%'" || goto :ziperror
 )
-set "WIXVER="
-for /f "delims=" %%w in ('call "%WIX%" --version') do if not defined WIXVER set "WIXVER=%%w"
-echo [6/6] Baue MSI mit WiX %WIXVER% ...
-echo %WIXVER% | findstr /b "5." >nul || echo       Hinweis: empfohlen ist WiX 5.x ^(ab v6 gilt die "Open Source Maintenance Fee"^).
-if exist "dist\pii-redact-%VERSION%.msi" del /q "dist\pii-redact-%VERSION%.msi"
-"%WIX%" build packaging\pii-redact.wxs -arch x64 -d Version=%VERSION% -d "SourceDir=%CD%\dist\pii-redact" -d "PackagingDir=%CD%\packaging" -o "dist\pii-redact-%VERSION%.msi" > dist\wix-build.log 2>&1
-set "WIXRC=%ERRORLEVEL%"
-type dist\wix-build.log
-if not "%WIXRC%"=="0" (
-    echo.
-    echo       FEHLER beim MSI-Bau ^(Code %WIXRC%^). Die Ausgabe steht auch in dist\wix-build.log
-    set "MSI_STATUS=FEHLER - siehe dist\wix-build.log"
-    goto :error
-)
-if not exist "dist\pii-redact-%VERSION%.msi" (
-    set "MSI_STATUS=FEHLER - keine MSI-Datei entstanden"
-    goto :error
-)
-if defined SIGNTOOL (
-    echo       Signiere MSI ...
-    "%SIGNTOOL%" sign %SIGNTOOL_ARGS% "dist\pii-redact-%VERSION%.msi" || goto :error
-)
-set "MSI_STATUS=%CD%\dist\pii-redact-%VERSION%.msi"
+if not exist "%ZIPFILE%" goto :ziperror
+set "ZIP_STATUS=%CD%\%ZIPFILE%"
 echo       SHA-256:
-certutil -hashfile "dist\pii-redact-%VERSION%.msi" SHA256 | findstr /v ":"
+certutil -hashfile "%ZIPFILE%" SHA256 | findstr /v ":"
 
 :done
 echo.
 echo ==========================================================================
 echo  Fertig.
 echo    Programmordner: %CD%\dist\pii-redact
-echo    MSI-Paket:      %MSI_STATUS%
+echo    ZIP:            %ZIP_STATUS%
 echo ==========================================================================
 exit /b 0
 
 :error
 echo.
 echo *** Build abgebrochen. Details siehe oben. ***
-echo     MSI: %MSI_STATUS%
+echo     ZIP: %ZIP_STATUS%
 exit /b 1
+
+:ziperror
+set "ZIP_STATUS=FEHLER beim Packen"
+goto :error
 
 :setversion
 rem Hilfsroutine: entfernt Anfuehrungszeichen/Leerzeichen um die Versionsnummer

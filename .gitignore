@@ -28,9 +28,7 @@ pii-redact-protokoll*.csv
 # Persönliche/rechnerspezifische Konfiguration
 packaging/artifact-signing.json
 
-# Installationspakete gehören an Releases, nicht ins Repository
-*.msi
-*.wixpdb
+# Build-Ergebnisse (ZIP) gehören an Releases, nicht ins Repository
 *.zip
 
 # Ergebnisse des KI-Modellvergleichs (tools/ki_vergleich.py)
