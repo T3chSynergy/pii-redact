@@ -10,6 +10,8 @@ v0.3.0 läuft auf dem Test-PC; 0.5.0 noch nicht gebaut.
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
 - Commits nur auf Zuruf. Git-Autor im Repo: `uncurious866`.
+- **Branches:** Arbeit auf dem Sitzungs-Branch `claude/…`, Pull Requests gegen **`dev`** (nicht `main`).
+  Release: PR `dev → main`, Tag `v0.x.0`, GitHub-Release mit Modell-Zip.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
   `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
