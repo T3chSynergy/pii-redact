@@ -1,11 +1,13 @@
 # pii-redact – Projektstand für Claude
 
-Lokaler Desktop-Client (Python 3.12, PySide6), der PDF/TXT/Markdown auf personenbezogene Daten prüft und
+Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personenbezogene Daten prüft und
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
 **Stand:** v0.6.0 (Build erzeugt ZIP statt MSI; davor 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz
 AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0.5.0 als MSI gebaut.
+In `dev` (unveröffentlicht): Python 3.14 – `setup.bat`, `run.bat` und `build.bat` inkl. ZIP auf Windows mit
+3.14 erfolgreich getestet (30.09.2026).
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -67,6 +69,9 @@ AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0
   `packaging/requirements-lock.txt` geändert hat; erzeugt Lizenzdateien; optional Signieren über
   `SIGNTOOL_ARGS`; packt am Ende per `%SystemRoot%\System32\tar.exe -a` (Rückfall: `Compress-Archive`) das ZIP
   (`…-schnell.zip` bei `/ohne-gruendlich`). `/ohne-msi` und `/nur-msi` brechen mit Hinweis ab.
+- Python: bevorzugt 3.14, dann 3.13, 3.12 (`setup.bat`, `build.bat`, `tools\modelle_testen.bat`). Lock-Datei
+  läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `setup.bat` baut `.venv` immer neu (`--clear`, sonst bleiben
+  cp312-Pakete liegen); `build.bat` legt `.venv-build` bei anderer Python-Version neu an. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
@@ -93,8 +98,7 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 ## Offene Schritte
 1. Repo öffentlich stellen; Release v0.6.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
    `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
-2. ZIP-Build einmal auf Windows ausprobieren (`build.bat`, `build.bat /ohne-zip`).
-3. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
+2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
-4. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
-5. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
+4. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
