@@ -6,6 +6,8 @@ IT-Anleitung: `packaging/README.md`.
 
 **Stand:** v0.6.0 (Build erzeugt ZIP statt MSI; davor 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz
 AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0.5.0 als MSI gebaut.
+In `dev` (unveröffentlicht): Python 3.14 – `setup.bat`, `run.bat` und `build.bat` inkl. ZIP auf Windows mit
+3.14 erfolgreich getestet (30.09.2026).
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -96,8 +98,7 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 ## Offene Schritte
 1. Repo öffentlich stellen; Release v0.6.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
    `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
-2. ZIP-Build einmal auf Windows ausprobieren (`build.bat`, `build.bat /ohne-zip`).
-3. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
+2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
-4. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
-5. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
+4. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
