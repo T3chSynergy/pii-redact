@@ -8,7 +8,7 @@ cd /d "%~dp0\.."
 if not exist .venv-tools\Scripts\python.exe (
     echo [1/4] Lege Werkzeug-Umgebung .venv-tools an ...
     set "PY="
-    for %%V in (3.12 3.11 3.13 3.10) do (
+    for %%V in (3.14 3.13 3.12) do (
         if not defined PY (
             py -%%V --version >nul 2>nul && set "PY=py -%%V"
         )

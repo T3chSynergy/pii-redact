@@ -22,7 +22,7 @@ Alles läuft **offline auf dem eigenen Rechner** – es werden keine Dokumentinh
 
 ## Installation (Windows)
 
-Voraussetzung: **Python 3.10–3.12** (empfohlen 3.12, [python.org](https://www.python.org/downloads/)).
+Voraussetzung: **Python 3.12–3.14** (empfohlen 3.14, [python.org](https://www.python.org/downloads/)).
 
 Quellcode aus dem GitHub-Repository [github.com/T3chSynergy/pii-redact](https://github.com/T3chSynergy/pii-redact) holen – z. B. mit GitHub Desktop
 („Clone repository“) oder:
@@ -228,7 +228,7 @@ build.bat
 
 erzeugt `dist\pii-redact\` (Programmordner mit EXE-Dateien, ohne Python lauffähig) und denselben Ordner als
 `dist\pii-redact-<version>.zip`. Das ZIP geht an die IT, die daraus mit eigenen Werkzeugen das
-Installationspaket erstellt. Details für die IT – Voraussetzungen (Python 3.12), Optionen, Verteilung, Updates,
+Installationspaket erstellt. Details für die IT – Voraussetzungen (Python 3.14), Optionen, Verteilung, Updates,
 zentrale Vorgaben: **[packaging/README.md](packaging/README.md)**.
 
 ## Tests

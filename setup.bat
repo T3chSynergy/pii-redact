@@ -3,9 +3,9 @@ rem Einmalige Einrichtung unter Windows: virtuelle Umgebung, Pakete, deutsches S
 setlocal
 cd /d "%~dp0"
 
-rem Bevorzugt Python 3.12/3.11 ueber den py-Launcher, sonst "python" aus dem PATH
+rem Bevorzugt Python 3.14 (sonst 3.13/3.12) ueber den py-Launcher, sonst "python" aus dem PATH
 set "PY="
-for %%V in (3.12 3.11 3.13 3.10) do (
+for %%V in (3.14 3.13 3.12) do (
     if not defined PY (
         py -%%V --version >nul 2>nul && set "PY=py -%%V"
     )
@@ -14,8 +14,10 @@ if not defined PY set "PY=python"
 echo Verwende: %PY%
 %PY% --version || goto :error
 
-echo [1/4] Erzeuge virtuelle Umgebung .venv ...
-%PY% -m venv .venv || goto :error
+rem --clear: eine vorhandene .venv wird geleert und komplett neu aufgebaut. Sonst blieben nach einem
+rem Wechsel der Python-Version (z. B. 3.12 -> 3.14) die alten, fuer 3.12 kompilierten Pakete liegen.
+echo [1/4] Erzeuge virtuelle Umgebung .venv (eine vorhandene wird neu aufgebaut) ...
+%PY% -m venv --clear .venv || goto :error
 call .venv\Scripts\activate.bat || goto :error
 
 echo [2/4] Aktualisiere pip ...

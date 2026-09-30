@@ -8,6 +8,7 @@ enthaltenen Python-Pakete (samt Lizenztexten) erzeugt ``tools/lizenzen.py`` beim
 from __future__ import annotations
 
 import html
+import sys
 from dataclasses import dataclass
 
 
@@ -63,7 +64,7 @@ COMPONENTS: list[tuple[str, list[Component]]] = [
                   "LGPL-3.0 (Qt-Bibliotheken als separate, austauschbare Dateien)", "https://www.qt.io"),
     ]),
     ("Grundlage", [
-        Component("Python 3.12", "Programmiersprache und Laufzeit", "PSF-2.0", "https://www.python.org"),
+        Component(f"Python {sys.version_info.major}.{sys.version_info.minor}", "Programmiersprache und Laufzeit", "PSF-2.0", "https://www.python.org"),
         Component("NumPy", "Numerik", "BSD-3-Clause", "https://numpy.org"),
         Component("pydantic", "Datenprüfung (von spaCy/Presidio genutzt)", "MIT", "https://docs.pydantic.dev"),
         Component("PyYAML", "Konfigurationsdateien", "MIT", "https://pyyaml.org"),

@@ -1,11 +1,12 @@
 # pii-redact – Projektstand für Claude
 
-Lokaler Desktop-Client (Python 3.12, PySide6), der PDF/TXT/Markdown auf personenbezogene Daten prüft und
+Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personenbezogene Daten prüft und
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.6.0 (Build erzeugt ZIP statt MSI; davor 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz
-AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0.5.0 als MSI gebaut.
+**Stand:** v0.7.0 (Python 3.14; davor 0.6.0: Build erzeugt ZIP statt MSI, 0.5.0: KI-Nachprüfung +
+Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests (Stand 30.09.2026). `setup.bat`, `run.bat` und
+`build.bat` inkl. ZIP auf Windows mit 3.14 erfolgreich getestet (30.09.2026). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -16,7 +17,12 @@ AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0
   wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
   danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
   Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
-  Release: PR `dev → main`, Tag `v0.x.0`, GitHub-Release mit Modell-Zip.
+  Release: Version in `__init__.py` + `CHANGELOG.md` (PR gegen `dev`), dann PR `dev → main` mergen.
+  Danach `dev` wiederherstellen (GitHub löscht ihn beim Merge automatisch, „Automatically delete head
+  branches“ ist an): `git push origin <Merge-Commit von main>:refs/heads/dev` – so stehen `dev` und `main`
+  gleich. **Tag und GitHub-Release legt der Nutzer an** (Claude kann in der Cloud keine Tags pushen – 403 –
+  und keine Releases anlegen): Beschreibung aus `CHANGELOG.md` zum Einfügen liefern; Anhänge
+  `pii-redact-<version>.zip` (Build auf Windows) und `davlan-xlmr-ner.zip`.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
   `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
@@ -62,6 +68,9 @@ AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0
   `packaging/requirements-lock.txt` geändert hat; erzeugt Lizenzdateien; optional Signieren über
   `SIGNTOOL_ARGS`; packt am Ende per `%SystemRoot%\System32\tar.exe -a` (Rückfall: `Compress-Archive`) das ZIP
   (`…-schnell.zip` bei `/ohne-gruendlich`). `/ohne-msi` und `/nur-msi` brechen mit Hinweis ab.
+- Python: bevorzugt 3.14, dann 3.13, 3.12 (`setup.bat`, `build.bat`, `tools\modelle_testen.bat`). Lock-Datei
+  läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `setup.bat` baut `.venv` immer neu (`--clear`, sonst bleiben
+  cp312-Pakete liegen); `build.bat` legt `.venv-build` bei anderer Python-Version neu an. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
@@ -86,10 +95,9 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; Release v0.6.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
+1. Repo öffentlich stellen; Release v0.7.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
    `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
-2. ZIP-Build einmal auf Windows ausprobieren (`build.bat`, `build.bat /ohne-zip`).
-3. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
+2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
-4. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
-5. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
+4. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.

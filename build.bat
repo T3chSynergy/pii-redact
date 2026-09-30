@@ -55,7 +55,7 @@ if defined SIGNTOOL echo Code-Signierung mit: %SIGNTOOL%
 
 rem ---------------------------------------------------------------- [1/6] Python
 set "PY="
-for %%V in (3.12 3.11) do (
+for %%V in (3.14 3.13 3.12) do (
     if not defined PY (
         py -%%V --version >nul 2>nul && set "PY=py -%%V"
     )
@@ -63,6 +63,15 @@ for %%V in (3.12 3.11) do (
 if not defined PY set "PY=python"
 echo [1/6] Python: %PY%
 %PY% --version || goto :error
+
+rem Build-Umgebung mit anderer Python-Version (z. B. nach Umstieg auf eine neuere Version)? Dann neu
+rem anlegen. Der Vergleich laeuft in Python selbst (Rueckgabewert 1 = abweichend).
+if exist .venv-build\Scripts\python.exe (
+    %PY% -c "import subprocess,sys;v=subprocess.run([r'.venv-build\Scripts\python.exe','-c','import sys;print(sys.version_info[:2])'],capture_output=True,text=True).stdout.strip();sys.exit(v!=str(sys.version_info[:2]))" || (
+        echo       Build-Umgebung nutzt eine andere Python-Version - wird neu angelegt.
+        set "NEU=1"
+    )
+)
 
 rem ---------------------------------------------------------------- [2/6] Build-Umgebung
 if defined NEU if exist .venv-build (
