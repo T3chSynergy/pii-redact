@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.7.0 – 30.09.2026
 
 **Geändert – Python 3.14**
 - Empfohlene Python-Version ist jetzt **3.14** (3.12 erhält nur noch Sicherheitskorrekturen, ohne neue
@@ -8,6 +8,8 @@
   3.12. Alle Pakete der Lock-Datei bleiben unverändert (getestet mit 3.13 und 3.14).
 - `setup.bat` baut `.venv` immer frisch auf (`venv --clear`); `build.bat` legt `.venv-build` automatisch neu an,
   wenn sie mit einer anderen Python-Version erstellt wurde.
+- „Über pii-redact“ und Hilfe (Komponentenliste) nennen die tatsächlich verwendete Python-Version statt fest
+  „Python 3.12“.
 
 ## 0.6.0 – 28.09.2026
 

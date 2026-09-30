@@ -4,10 +4,9 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.6.0 (Build erzeugt ZIP statt MSI; davor 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz
-AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0.5.0 als MSI gebaut.
-In `dev` (unveröffentlicht): Python 3.14 – `setup.bat`, `run.bat` und `build.bat` inkl. ZIP auf Windows mit
-3.14 erfolgreich getestet (30.09.2026).
+**Stand:** v0.7.0 (Python 3.14; davor 0.6.0: Build erzeugt ZIP statt MSI, 0.5.0: KI-Nachprüfung +
+Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests (Stand 30.09.2026). `setup.bat`, `run.bat` und
+`build.bat` inkl. ZIP auf Windows mit 3.14 erfolgreich getestet (30.09.2026). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -96,7 +95,7 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; Release v0.6.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
+1. Repo öffentlich stellen; Release v0.7.0 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
    `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
 2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
