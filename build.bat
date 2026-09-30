@@ -55,7 +55,7 @@ if defined SIGNTOOL echo Code-Signierung mit: %SIGNTOOL%
 
 rem ---------------------------------------------------------------- [1/6] Python
 set "PY="
-for %%V in (3.12 3.11) do (
+for %%V in (3.14 3.13 3.12) do (
     if not defined PY (
         py -%%V --version >nul 2>nul && set "PY=py -%%V"
     )
@@ -63,6 +63,16 @@ for %%V in (3.12 3.11) do (
 if not defined PY set "PY=python"
 echo [1/6] Python: %PY%
 %PY% --version || goto :error
+
+rem Python-Version einer vorhandenen Umgebung pruefen (z. B. nach Umstieg auf eine neuere Version)
+set "PYV="
+set "VENVPYV="
+for /f "delims=" %%a in ('%PY% -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "PYV=%%a"
+if exist .venv-build\Scripts\python.exe for /f "delims=" %%a in ('.venv-build\Scripts\python -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "VENVPYV=%%a"
+if defined VENVPYV if not "%VENVPYV%"=="%PYV%" (
+    echo       Build-Umgebung nutzt Python %VENVPYV%, gewaehlt ist %PYV% - wird neu angelegt.
+    set "NEU=1"
+)
 
 rem ---------------------------------------------------------------- [2/6] Build-Umgebung
 if defined NEU if exist .venv-build (

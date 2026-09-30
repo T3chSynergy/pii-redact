@@ -25,7 +25,9 @@ Größe (inkl. Texterkennung): ca. 750–950 MB entpackt, ZIP ca. 500 MB. Empfoh
 
 ## Build-Rechner einrichten (einmalig)
 
-1. **Windows 10/11 x64** mit **Python 3.12** (python.org, „py launcher“ mitinstallieren).
+1. **Windows 10/11 x64** mit **Python 3.14** (python.org, „py launcher“ mitinstallieren; 3.13 und 3.12
+   funktionieren ebenfalls). Nutzt eine vorhandene Build-Umgebung `.venv-build` eine andere Python-Version,
+   legt `build.bat` sie automatisch neu an.
 2. Das **Transformer-Modell** muss unter `models\ner\davlan-xlmr-ner\` liegen – siehe nächster Abschnitt.
 3. Beim ersten Build braucht der Rechner Internet (Python-Pakete, spaCy-Modell). Die Versionen sind in
    `packaging\requirements-lock.txt` fest vorgegeben – jeder Build ist reproduzierbar.
