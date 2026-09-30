@@ -68,8 +68,8 @@ AGPL-3.0-or-later. 78 Tests (Stand 28.09.2026). v0.3.0 läuft auf dem Test-PC; 0
   `SIGNTOOL_ARGS`; packt am Ende per `%SystemRoot%\System32\tar.exe -a` (Rückfall: `Compress-Archive`) das ZIP
   (`…-schnell.zip` bei `/ohne-gruendlich`). `/ohne-msi` und `/nur-msi` brechen mit Hinweis ab.
 - Python: bevorzugt 3.14, dann 3.13, 3.12 (`setup.bat`, `build.bat`, `tools\modelle_testen.bat`). Lock-Datei
-  läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `build.bat`/`setup.bat` legen die Umgebung neu an, wenn
-  deren Python-Version abweicht. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
+  läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `setup.bat` baut `.venv` immer neu (`--clear`, sonst bleiben
+  cp312-Pakete liegen); `build.bat` legt `.venv-build` bei anderer Python-Version neu an. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.

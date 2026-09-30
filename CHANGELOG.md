@@ -6,8 +6,8 @@
 - Empfohlene Python-Version ist jetzt **3.14** (3.12 erhält nur noch Sicherheitskorrekturen, ohne neue
   Windows-Installer). `setup.bat`, `build.bat` und `tools\modelle_testen.bat` bevorzugen 3.14, dann 3.13 und
   3.12. Alle Pakete der Lock-Datei bleiben unverändert (getestet mit 3.13 und 3.14).
-- `build.bat` und `setup.bat` legen eine vorhandene Umgebung automatisch neu an, wenn sie mit einer anderen
-  Python-Version erstellt wurde.
+- `setup.bat` baut `.venv` immer frisch auf (`venv --clear`); `build.bat` legt `.venv-build` automatisch neu an,
+  wenn sie mit einer anderen Python-Version erstellt wurde.
 
 ## 0.6.0 – 28.09.2026
 

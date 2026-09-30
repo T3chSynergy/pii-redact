@@ -14,18 +14,10 @@ if not defined PY set "PY=python"
 echo Verwende: %PY%
 %PY% --version || goto :error
 
-rem Python-Version einer vorhandenen Umgebung pruefen (z. B. nach Umstieg auf eine neuere Version)
-set "PYV="
-set "VENVPYV="
-for /f "delims=" %%a in ('%PY% -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "PYV=%%a"
-if exist .venv\Scripts\python.exe for /f "delims=" %%a in ('.venv\Scripts\python -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "VENVPYV=%%a"
-if defined VENVPYV if not "%VENVPYV%"=="%PYV%" (
-    echo Vorhandene .venv nutzt Python %VENVPYV% - wird mit %PYV% neu angelegt ...
-    rmdir /s /q .venv || goto :error
-)
-
-echo [1/4] Erzeuge virtuelle Umgebung .venv ...
-%PY% -m venv .venv || goto :error
+rem --clear: eine vorhandene .venv wird geleert und komplett neu aufgebaut. Sonst blieben nach einem
+rem Wechsel der Python-Version (z. B. 3.12 -> 3.14) die alten, fuer 3.12 kompilierten Pakete liegen.
+echo [1/4] Erzeuge virtuelle Umgebung .venv (eine vorhandene wird neu aufgebaut) ...
+%PY% -m venv --clear .venv || goto :error
 call .venv\Scripts\activate.bat || goto :error
 
 echo [2/4] Aktualisiere pip ...

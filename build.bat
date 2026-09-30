@@ -64,14 +64,13 @@ if not defined PY set "PY=python"
 echo [1/6] Python: %PY%
 %PY% --version || goto :error
 
-rem Python-Version einer vorhandenen Umgebung pruefen (z. B. nach Umstieg auf eine neuere Version)
-set "PYV="
-set "VENVPYV="
-for /f "delims=" %%a in ('%PY% -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "PYV=%%a"
-if exist .venv-build\Scripts\python.exe for /f "delims=" %%a in ('.venv-build\Scripts\python -c "import sys;print(sys.version_info[0],sys.version_info[1],sep=chr(46))"') do set "VENVPYV=%%a"
-if defined VENVPYV if not "%VENVPYV%"=="%PYV%" (
-    echo       Build-Umgebung nutzt Python %VENVPYV%, gewaehlt ist %PYV% - wird neu angelegt.
-    set "NEU=1"
+rem Build-Umgebung mit anderer Python-Version (z. B. nach Umstieg auf eine neuere Version)? Dann neu
+rem anlegen. Der Vergleich laeuft in Python selbst (Rueckgabewert 1 = abweichend).
+if exist .venv-build\Scripts\python.exe (
+    %PY% -c "import subprocess,sys;v=subprocess.run([r'.venv-build\Scripts\python.exe','-c','import sys;print(sys.version_info[:2])'],capture_output=True,text=True).stdout.strip();sys.exit(v!=str(sys.version_info[:2]))" || (
+        echo       Build-Umgebung nutzt eine andere Python-Version - wird neu angelegt.
+        set "NEU=1"
+    )
 )
 
 rem ---------------------------------------------------------------- [2/6] Build-Umgebung
