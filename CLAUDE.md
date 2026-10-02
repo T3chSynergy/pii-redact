@@ -17,6 +17,9 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests (Stand 30.09.2026). `setup.
   wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
   danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
   Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
+  PR-Beschreibungen nach `.github/pull_request_template.md` gliedern (Was/Warum/Wie getestet/Checkliste).
+  Issue- und PR-Vorlagen sowie `SECURITY.md` wirken nur aus `main` – Änderungen daran direkt per `dev → main`
+  übernehmen (ohne Release).
   Release: Version in `__init__.py` + `CHANGELOG.md` + Tabelle in `SECURITY.md` (PR gegen `dev`), dann PR `dev → main` mergen.
   Danach `dev` wiederherstellen (GitHub löscht ihn beim Merge automatisch, „Automatically delete head
   branches“ ist an): `git push origin <Merge-Commit von main>:refs/heads/dev` – so stehen `dev` und `main`
