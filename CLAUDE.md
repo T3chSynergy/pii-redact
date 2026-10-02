@@ -4,8 +4,8 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.7.1 (Refactoring Hauptfenster, `.tmp`-Export; davor 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI,
-0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 81 Tests (Stand 02.10.2026). `run.bat` und
+**Stand:** v0.7.2 (Office-Hinweis, CI mit automatischem Release-Build; davor 0.7.1: Refactoring Hauptfenster,
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 81 Tests (Stand 02.10.2026). `run.bat` und
 `build.bat` auf Windows mit 3.14 erfolgreich getestet (02.10.2026, nach dem Refactoring). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -85,7 +85,7 @@ IT-Anleitung: `packaging/README.md`.
   - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
     Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
   - Stand 02.10.2026: keine bekannten Lücken; 9 kleine Updates offen (u. a. numpy 2.5, pydantic-core, regex)
-    → beim nächsten Release mitnehmen.
+    → eigene Aktualisierungsrunde vor einem der nächsten Releases (0.7.2 ging ohne raus).
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
   eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
   Release die Versionstabelle anpassen (`0.x.x`).
