@@ -73,7 +73,7 @@ IT-Anleitung: `packaging/README.md`.
 - Version nur in `src/pii_redact/__init__.py`; jede Version im `CHANGELOG.md` eintragen.
 - **Abhängigkeiten:** `pyproject.toml` = Bereiche (Entwicklung), `packaging/requirements-lock.txt` = exakte
   Versionen (Build, reproduzierbar). Neue Versionen nie automatisch übernehmen.
-  - **Sicherheitslücken zeitnah** beheben (Dependabot-Warnungen sind eingeschaltet bzw. sollen es sein; Prüfung
+  - **Sicherheitslücken zeitnah** beheben (Dependabot-Warnungen sind eingeschaltet; Prüfung
     auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
   - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
   - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
