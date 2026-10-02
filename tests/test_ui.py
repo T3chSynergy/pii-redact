@@ -27,7 +27,7 @@ def _wait(ms: int) -> None:
 def window(tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    app = QApplication.instance() or QApplication([])
+    _app = QApplication.instance() or QApplication([])  # Referenz halten, sonst räumt Python die App ab
     from pii_redact.ui.main_window import MainWindow
 
     w = MainWindow()
