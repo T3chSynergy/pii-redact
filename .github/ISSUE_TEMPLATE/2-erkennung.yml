@@ -1,0 +1,65 @@
+name: 🔍 Erkennung verbessern
+description: Eine Angabe wurde nicht erkannt (übersehen) oder fälschlich geschwärzt.
+labels: ["erkennung"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Die automatische Erkennung ist nie vollständig – Hinweise helfen, sie zu verbessern.
+
+        > ⚠️ **Keine echten Daten!** Bitte ein **erfundenes Beispiel** mit derselben Form angeben
+        > (z. B. statt eines echten Namens „Familie Okonkwo-Brandt“, statt einer echten Nummer eine mit
+        > gleichem Aufbau und anderen Ziffern).
+  - type: input
+    id: version
+    attributes:
+      label: Version von pii-redact
+      placeholder: z. B. 0.7.0
+    validations:
+      required: true
+  - type: dropdown
+    id: richtung
+    attributes:
+      label: Was ist passiert?
+      options:
+        - Übersehen – hätte geschwärzt werden müssen
+        - Fehlalarm – wurde geschwärzt, ist aber keine personenbezogene Angabe
+        - Falscher Typ – richtig gefunden, aber falsche Datenart
+    validations:
+      required: true
+  - type: dropdown
+    id: modus
+    attributes:
+      label: Analyse-Modus
+      options:
+        - Gründlich (Standard)
+        - Schnell
+        - beide
+        - weiß nicht
+  - type: input
+    id: datenart
+    attributes:
+      label: Datenart
+      placeholder: z. B. Person, Adresse, Steuer-ID, Kfz-Kennzeichen …
+  - type: textarea
+    id: beispiel
+    attributes:
+      label: Erfundenes Beispiel mit etwas Umgebungstext
+      description: Der Satz drumherum ist oft entscheidend für die Erkennung.
+      placeholder: "Rückfragen bitte an Frau Dr. Okonkwo-Brandt, Durchwahl -4711."
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hätte erkannt bzw. nicht erkannt werden sollen?
+    validations:
+      required: true
+  - type: checkboxes
+    id: daten
+    attributes:
+      label: Datenschutz
+      options:
+        - label: Das Beispiel enthält nur erfundene Daten.
+          required: true

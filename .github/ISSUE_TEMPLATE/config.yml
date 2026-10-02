@@ -1,0 +1,9 @@
+# Auswahlseite für neue Issues (Vorlagen in diesem Ordner)
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Sicherheitslücke melden (vertraulich)
+    url: https://github.com/T3chSynergy/pii-redact/security/advisories/new
+    about: Reste im geschwärzten PDF, Datenabfluss o. Ä. – bitte NICHT als öffentliches Issue, siehe SECURITY.md.
+  - name: 📖 Anleitung und Hilfe
+    url: https://github.com/T3chSynergy/pii-redact#readme
+    about: Bedienung, Installation und Build. Im Programm außerdem Hilfe → Anwenderhilfe (F1).
