@@ -7,6 +7,7 @@
   Hinweis, keine echten Daten anzuhängen; Sicherheitslücken verweisen auf die vertrauliche Meldung.
 - Neu: Vorlage für Pull Requests (`.github/pull_request_template.md`) – Ziel-Branch `dev`, Checkliste mit
   Datenschutz, Tests und Lizenz.
+- Neu: `CONTRIBUTING.md` – Entwicklungsumgebung, Tests, Ablauf (PR gegen `dev`) und Grundregeln des Projekts.
 
 ## 0.7.0 – 30.09.2026
 
