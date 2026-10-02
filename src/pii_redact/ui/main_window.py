@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QEventLoop, QObject, QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QKeySequence
+from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -31,10 +31,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__
 from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, verify_pdf
 from ..core import llm_review
-from ..core.batch import Status, Workspace, export_document, findings_from_compact
+from ..core.batch import Status, Workspace, export_document
 from ..core.entities import AREA_KEYS, all_keys, info
 from ..core.loaders import SUPPORTED_SUFFIXES
 from ..core.redactor import pdf_redaction_plan, rects_of
@@ -1014,7 +1013,7 @@ class MainWindow(QMainWindow):
 
     def _on_zoom_box_edited(self) -> None:
         text = self.zoom_box.currentText().strip()
-        for label, value in ZOOM_PRESETS:
+        for label, _value in ZOOM_PRESETS:
             if text.casefold() == label.casefold():
                 self._on_zoom_box_activated(self.zoom_box.findText(label))
                 return
@@ -1562,9 +1561,9 @@ class MainWindow(QMainWindow):
         self._update_title()
 
     def _store_batch_session(self) -> None:
-        if self.batch and self.batch_rel and self.session and self._awaiting_rel != self.batch_rel:
-            if self.batch_rel in self.batch.entries:
-                self.batch.update_findings(self.batch_rel, self.session.findings)
+        if (self.batch and self.batch_rel and self.session and self._awaiting_rel != self.batch_rel
+                and self.batch_rel in self.batch.entries):
+            self.batch.update_findings(self.batch_rel, self.session.findings)
 
     def _save_batch(self) -> None:
         if not self.batch:

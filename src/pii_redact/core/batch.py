@@ -270,7 +270,7 @@ class Workspace:
 
     # ------------------------------------------------------------------ Anlegen / Laden
     @classmethod
-    def create(cls, source: Path, target: Path, recursive: bool = True) -> "Workspace":
+    def create(cls, source: Path, target: Path, recursive: bool = True) -> Workspace:
         ws = cls(source, target, recursive)
         if not ws.source.is_dir():
             raise FileNotFoundError(f"Quellordner nicht gefunden: {ws.source}")
@@ -280,7 +280,7 @@ class Workspace:
         return ws
 
     @classmethod
-    def load(cls, target: Path) -> "Workspace":
+    def load(cls, target: Path) -> Workspace:
         path = Path(target) / WORKSPACE_NAME
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("version", 0) > FORMAT_VERSION:

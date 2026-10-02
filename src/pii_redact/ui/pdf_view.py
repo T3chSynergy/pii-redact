@@ -34,7 +34,7 @@ class PageMark:
 
 
 class _PageWidget(QWidget):
-    def __init__(self, view: "PdfPagesView", index: int, size: QRectF):
+    def __init__(self, view: PdfPagesView, index: int, size: QRectF):
         super().__init__()
         self.view = view
         self.index = index

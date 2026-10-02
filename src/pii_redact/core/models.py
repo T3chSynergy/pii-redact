@@ -43,7 +43,7 @@ class Finding:
     def key(self) -> tuple[int, int]:
         return (self.start, self.end)
 
-    def overlaps(self, other: "Finding") -> bool:
+    def overlaps(self, other: Finding) -> bool:
         if self.area is not None or other.area is not None:
             return False
         return self.start < other.end and other.start < self.end
@@ -111,7 +111,7 @@ class Settings:
         return self.org_deny_list + self.deny_list
 
     @classmethod
-    def load(cls, path: Path, defaults_path: Path | None = None) -> "Settings":
+    def load(cls, path: Path, defaults_path: Path | None = None) -> Settings:
         """Zentrale Vorgaben (defaults.json) als Grundlage, persönliche Einstellungen darüber.
         Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich; unter ``locked`` aufgeführte
         Einstellungen kommen immer aus defaults.json."""
