@@ -204,6 +204,8 @@ class FindingsPanel(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked
                                    | QAbstractItemView.EditTrigger.SelectedClicked
                                    | QAbstractItemView.EditTrigger.EditKeyPressed)   # F2: Typ ändern
+        # Tab verlässt die Tabelle (statt von Zelle zu Zelle zu springen) – Auswahl mit den Pfeiltasten
+        self.table.setTabKeyNavigation(False)
         self.table.setAccessibleName("Fundliste")
         self.table.setAccessibleDescription(
             "Pfeiltasten: Fund wählen · Leertaste: schwärzen an/aus · F2 in der Spalte Typ: Typ ändern · "

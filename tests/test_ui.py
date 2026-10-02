@@ -371,6 +371,23 @@ def test_keyboard_selection_and_detail(window):
     assert window.left.pages.accessibleDescription()
 
 
+def test_tab_leaves_findings_table(window):
+    """Barrierefreiheit: Tab springt aus der Fundliste heraus, nicht von Zelle zu Zelle."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    _open(window, SAMPLES / "beispiel.txt")
+    table = window.findings.table
+    assert table.model().rowCount() > 0
+    table.setFocus()
+    table.setCurrentIndex(table.model().index(0, 0))
+    _wait(20)
+    QTest.keyClick(table, Qt.Key.Key_Tab)
+    _wait(20)
+    assert QApplication.focusWidget() is not table
+
+
 def test_keyboard_context_menu_at_cursor():
     """Menütaste / Umschalt+F10 öffnet das Kontextmenü an der Textcursor-Position."""
     from PySide6.QtCore import QPoint
