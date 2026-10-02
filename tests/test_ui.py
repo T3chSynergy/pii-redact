@@ -337,3 +337,74 @@ def test_sync_scroll(window):
     assert right.value() > 0                                          # bleibt stehen
     window.actions_["sync"].setChecked(True)
     window.actions_["show_original"].setChecked(False)
+
+
+def test_keyboard_selection_and_detail(window):
+    """Barrierefreiheit: Textcursor per Tastatur auf einem Platzhalter wählt den Fund; die Angaben stehen
+    dauerhaft unter der Fundliste (nicht nur im Tooltip); Leertaste-Funktion schaltet an/aus."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QTextCursor
+    from PySide6.QtTest import QTest
+
+    _open(window, SAMPLES / "beispiel.txt")
+    s = window.session
+    f = next(x for x in s.findings if x.text == "Hamburg")
+    view = window.right.text
+    r = s.redacted().to_redacted(f.start)
+    cur = view.textCursor()
+    cur.setPosition(view._map.to_qt(r))
+    view.setTextCursor(cur)
+    assert window.findings.detail.text() == "" or f.id not in window.findings.selected_ids()
+    QTest.keyClick(view, Qt.Key.Key_Right)          # in den Platzhalter hinein
+    _wait(50)
+    assert f.id in window.findings.selected_ids()
+    detail = window.findings.detail
+    assert detail.isVisible() and "Hamburg" in detail.text() and "wird geschwärzt" in detail.text()
+
+    window.findings.toggle_selected()               # wie Leertaste in der Fundliste
+    assert not s.get(f.id).active
+    _wait(50)
+    assert "NICHT geschwärzt" in window.findings.detail.text()
+    window.findings.toggle_selected()
+    assert s.get(f.id).active
+
+    assert window.findings.table.accessibleName() == "Fundliste"
+    assert window.left.pages.accessibleDescription()
+
+
+def test_keyboard_context_menu_at_cursor():
+    """Menütaste / Umschalt+F10 öffnet das Kontextmenü an der Textcursor-Position."""
+    from PySide6.QtCore import QPoint
+    from PySide6.QtGui import QContextMenuEvent
+    from PySide6.QtWidgets import QApplication
+
+    from pii_redact.ui.text_view import HighlightTextView
+
+    _app = QApplication.instance() or QApplication([])
+    view = HighlightTextView()
+    view.set_text("Hallo Welt, hier ist ein Test.")
+    cur = view.textCursor()
+    cur.setPosition(6)
+    view.setTextCursor(cur)
+    got = []
+    view.contextAt.connect(lambda off, pos: got.append(off))
+    QApplication.sendEvent(view, QContextMenuEvent(QContextMenuEvent.Reason.Keyboard, QPoint(0, 0), QPoint(0, 0)))
+    assert got == [6]
+
+
+def test_notice_bar_details_accessible():
+    """Hinweisleiste: voller Text als Beschreibung für Bildschirmleser, Knopf „Details …“."""
+    from PySide6.QtWidgets import QApplication
+
+    from pii_redact.core.loaders import Level, Notice
+    from pii_redact.ui.notices import NoticeBar
+
+    _app = QApplication.instance() or QApplication([])
+    bar = NoticeBar()
+    bar.set_notices([Notice("ocr", Level.CRITICAL, "Seite 2 per Texterkennung", "Ausführlicher Hinweis zur OCR.")])
+    assert "Ausführlicher Hinweis" in bar.accessibleDescription()
+    assert bar.close_btn.accessibleName() and bar.details_btn.accessibleName()
+    hits = []
+    bar.detailsRequested.connect(lambda: hits.append(1))
+    bar.details_btn.click()
+    assert hits == [1]

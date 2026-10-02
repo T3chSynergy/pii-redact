@@ -60,6 +60,7 @@ class DocPanel(QWidget):
     def __init__(self, title: str, mode: str, parent=None):
         super().__init__(parent)
         self.title = QLabel(f"<b>{title}</b>")
+        self.setAccessibleName(title)
         self.header = QHBoxLayout()
         self.header.addWidget(self.title)
         self.header.addStretch(1)
@@ -67,6 +68,8 @@ class DocPanel(QWidget):
         self.tabs.setDocumentMode(True)
         self.pages = PdfPagesView(mode)
         self.text = HighlightTextView()
+        self.text.setAccessibleName(f"{title} – Text")
+        self.tabs.setAccessibleName(f"{title}: Ansicht wählen")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
         lay.addLayout(self.header)
@@ -152,6 +155,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         # Alle übrigen Hinweise stehen im Zähler der Statusleiste und als Symbol an der Seite.
         self.notice_bar = NoticeBar()
         self.notice_bar.helpRequested.connect(self.show_help)
+        self.notice_bar.detailsRequested.connect(lambda: self.notice_btn.show_popup())
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.left)
@@ -221,9 +225,11 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
 
         # Statusleiste
         self.status_label = QLabel("Bereit")
+        self.status_label.setAccessibleName("Status")
         self.status_label.linkActivated.connect(self._on_status_link)
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(220)
+        self.progress.setAccessibleName("Fortschritt der Analyse")
         self.progress.hide()
         self.mode_label = QLabel()
         self.notice_btn = NoticeButton()
@@ -242,6 +248,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.zoom_box.setMinimumContentsLength(11)
         for label, value in ZOOM_PRESETS:
             self.zoom_box.addItem(label, value)
+        self.zoom_out_btn.setAccessibleName("Seitenansicht verkleinern")
+        self.zoom_in_btn.setAccessibleName("Seitenansicht vergrößern")
+        self.zoom_box.setAccessibleName("Zoom der Seitenansicht")
         self.zoom_box.setToolTip("Zoom der Seitenansicht – Seitenbreite (Strg+0), Ganze Seite (Strg+2), "
                                  "100 % = Papiergröße (Strg+1), oder Wert eintippen")
         self.zoom_out_btn.clicked.connect(lambda: self.zoom_step(-1))
@@ -261,6 +270,10 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.left.text.contextAt.connect(self._on_left_text_context)
         self.right.text.clickedAt.connect(self._on_right_text_click)
         self.right.text.contextAt.connect(self._on_right_text_context)
+        # Tastatur: Textcursor auf einem Fund wählt ihn aus (wie ein Klick) → Angaben unter der Fundliste
+        self.left.text.caretAt.connect(lambda off: self._on_left_text_click(off, None))
+        self.right.text.caretAt.connect(lambda off: self._on_right_text_click(off, None))
+        self.findings.detail_provider = self._ids_tooltip
         self.right.text.textChanged.connect(self._on_free_text_changed)
         for panel in (self.left, self.right):
             panel.pages.overlayClicked.connect(lambda ids: ids and self.select(ids, reveal=True))
@@ -408,6 +421,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             self.mode_box.addItem(label, key)
         self.mode_box.setCurrentIndex(max(0, self.mode_box.findData(self.settings.replace_mode)))
         self.mode_box.currentIndexChanged.connect(self._on_mode_changed)
+        self.mode_box.setAccessibleName("Ersetzung")
         tb.addWidget(self.mode_box)
         tb.addSeparator()
         tb.addWidget(QLabel(" Analyse: "))
@@ -417,6 +431,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.analysis_box.setItemData(0, "spaCy + Muster – Sekundenbruchteile pro Seite", Qt.ItemDataRole.ToolTipRole)
         self._refresh_analysis_box()
         self.analysis_box.currentIndexChanged.connect(self._on_analysis_mode_changed)
+        self.analysis_box.setAccessibleName("Analyse-Modus")
         tb.addWidget(self.analysis_box)
         tb.addSeparator()
         export_btn_menu = QMenu(self)

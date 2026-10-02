@@ -10,7 +10,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -185,20 +185,29 @@ class FindingsPanel(QWidget):
         self.proxy.setSourceModel(self.model)
 
         self.summary = QLabel("Kein Dokument geladen")
+        self.summary.setAccessibleName("Zusammenfassung der Funde")
         self.search = QLineEdit(placeholderText="Filtern …", clearButtonEnabled=True)
+        self.search.setAccessibleName("Funde nach Text filtern")
         self.search.textChanged.connect(self._apply_filter)
         self.type_box = QComboBox()
         self.type_box.addItem("Alle Typen", "")
         for key in all_keys(include_areas=True):
             self.type_box.addItem(info(key).label, key)
         self.type_box.currentIndexChanged.connect(self._apply_filter)
+        self.type_box.setAccessibleName("Funde nach Datenart filtern")
 
         self.table = QTableView()
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.sortByColumn(COL_WHERE, Qt.SortOrder.AscendingOrder)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.SelectedClicked)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked
+                                   | QAbstractItemView.EditTrigger.SelectedClicked
+                                   | QAbstractItemView.EditTrigger.EditKeyPressed)   # F2: Typ ändern
+        self.table.setAccessibleName("Fundliste")
+        self.table.setAccessibleDescription(
+            "Pfeiltasten: Fund wählen · Leertaste: schwärzen an/aus · F2 in der Spalte Typ: Typ ändern · "
+            "Menütaste oder Umschalt+F10: weitere Möglichkeiten")
         self.table.setItemDelegateForColumn(COL_TYPE, _TypeDelegate(self.table))
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
@@ -216,7 +225,25 @@ class FindingsPanel(QWidget):
             lambda pos: self.contextRequested.emit(self.selected_ids(), self.table.viewport().mapToGlobal(pos))
         )
         self.table.selectionModel().currentRowChanged.connect(self._on_current)
+        self.table.selectionModel().selectionChanged.connect(lambda *_: self._update_detail())
         self.table.clicked.connect(lambda idx: self._on_current(idx, None))
+        # Leertaste schaltet die gewählten Funde an/aus (auch wenn nicht die Häkchen-Spalte aktiv ist)
+        toggle = QShortcut(QKeySequence(Qt.Key.Key_Space), self.table)
+        toggle.setContext(Qt.ShortcutContext.WidgetShortcut)
+        toggle.activated.connect(self.toggle_selected)
+
+        # Dauerhaft sichtbare Angaben zum gewählten Fund – was sonst nur im Tooltip steht
+        # (Originaltext, Status, Texterkennung, Quelle); per Tastatur und Bildschirmleser erreichbar.
+        self.detail = QLabel()
+        self.detail.setTextFormat(Qt.TextFormat.PlainText)
+        self.detail.setWordWrap(True)
+        self.detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                            | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.detail.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.detail.setAccessibleName("Gewählter Fund")
+        self.detail.hide()
+        #: Funktion(ids) -> Beschreibung der Funde (setzt das Hauptfenster)
+        self.detail_provider = None
 
         self.btn_on = QPushButton("Sichtbare an")
         self.btn_off = QPushButton("Sichtbare aus")
@@ -235,18 +262,29 @@ class FindingsPanel(QWidget):
         lay.addWidget(self.summary)
         lay.addLayout(top)
         lay.addWidget(self.table, 1)
+        lay.addWidget(self.detail)
         lay.addLayout(bottom)
 
     # ------------------------------------------------------------------ API
     def set_session(self, session: DocumentSession | None) -> None:
         self.model.set_session(session)
         self._update_summary()
+        self._update_detail()
 
     def reload(self) -> None:
         keep = self.selected_ids()
         self.model.reload()
         self._update_summary()
         self.select_ids(keep, scroll=False)
+
+    def toggle_selected(self) -> None:
+        """Gewählte Funde an/aus: sind alle an, werden sie abgeschaltet, sonst eingeschaltet."""
+        s = self.model.session
+        ids = self.selected_ids()
+        if not s or not ids:
+            return
+        findings = [f for f in (s.get(i) for i in ids) if f]
+        s.set_active(ids, not all(f.active for f in findings))
 
     def selected_ids(self) -> list[int]:
         return [self.proxy.data(idx, ID_ROLE) for idx in self.table.selectionModel().selectedRows()]
@@ -264,6 +302,8 @@ class FindingsPanel(QWidget):
                     first = idx
                     sel.setCurrentIndex(idx, sel.SelectionFlag.NoUpdate)
         sel.blockSignals(False)
+        self.table.viewport().update()
+        self._update_detail()
         if first is not None and scroll:
             self.table.scrollTo(first, QAbstractItemView.ScrollHint.PositionAtCenter)
 
@@ -279,6 +319,12 @@ class FindingsPanel(QWidget):
             n = sum(1 for f in s.findings if s.doc.is_ocr(f.start, f.end))
             text += f" · <span style='color:#e8590c'><b>{n}</b> aus Texterkennung</span>"
         self.summary.setText(text)
+
+    def _update_detail(self) -> None:
+        ids = self.selected_ids() if self.model.session else []
+        text = self.detail_provider(ids) if (ids and self.detail_provider) else ""
+        self.detail.setText(text)
+        self.detail.setVisible(bool(text))
 
     def _apply_filter(self) -> None:
         self.proxy.text_filter = self.search.text().strip().casefold()
