@@ -27,13 +27,16 @@ IT-Anleitung: `packaging/README.md`.
   und keine Releases anlegen): Beschreibung aus `CHANGELOG.md` zum Einfügen liefern. Die **Anhänge kommen
   automatisch**: Workflow `build.yml` baut beim Veröffentlichen auf Windows, hängt `pii-redact-<version>.zip`
   + `.sha256` an und übernimmt `davlan-xlmr-ner.zip` aus einem älteren Release, falls es fehlt. Tag muss
-  `v<Version aus __init__.py>` heißen, sonst bricht der Build ab. Danach prüfen, ob die Anhänge da sind.
+  `v<Version aus __init__.py>` heißen, sonst bricht der Build ab. Danach prüfen, ob die Anhänge da sind
+  (`get_release_by_tag`; erster automatischer Release-Build v0.7.2 am 02.10.2026 erfolgreich, ca. 7 Minuten,
+  mit Attestation).
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
   `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
   nur auf dem Rechner des Nutzers.
-- Das Repository soll öffentlich werden: keine persönlichen Daten, Pfade, Geheimnisse oder echten Namen/Adressen
-  einchecken – nur erfundene Beispiele und `.example`-Adressen.
+- Das Repository ist **öffentlich** (seit 02.10.2026): keine persönlichen Daten, Pfade, Geheimnisse oder echten
+  Namen/Adressen einchecken – nur erfundene Beispiele und `.example`-Adressen. Eingeschaltet: Dependabot-Warnungen,
+  CodeQL, Secret Scanning mit Push-Schutz, Dependency Review (Anzeige im PR), Private vulnerability reporting.
 - **Laufende .bat-Dateien nie überschreiben.** Vor Löschaktionen nachfragen.
 
 ## Entscheidungen
@@ -84,8 +87,11 @@ IT-Anleitung: `packaging/README.md`.
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
   - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
     Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
-  - Stand 02.10.2026: keine bekannten Lücken; 9 kleine Updates offen (u. a. numpy 2.5, pydantic-core, regex)
-    → eigene Aktualisierungsrunde vor einem der nächsten Releases (0.7.2 ging ohne raus).
+  - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 7 kleine Updates
+    – charset-normalizer, cloudpathlib, filelock, regex, smart-open, srsly, wrapt. Nicht möglich: numpy 2.5
+    (Presidio 2.2.364 verlangt numpy < 2.5), pydantic-core 2.49 (gehört zu pydantic 2.14, nur Beta; pydantic
+    2.13.5 braucht exakt 2.46.5). Prüfen, was zusammen auflösbar ist:
+    `uv pip compile <Pakete> --python-version 3.14 --python-platform windows`.
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
   eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
   Release die Versionstabelle anpassen (`0.x.x`).
@@ -133,7 +139,7 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
+1. `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
 2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
 3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
