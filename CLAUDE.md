@@ -4,8 +4,8 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.7.1 (Refactoring Hauptfenster, `.tmp`-Export; davor 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI,
-0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 81 Tests (Stand 02.10.2026). `run.bat` und
+**Stand:** v0.7.2 (Office-Hinweis, CI mit automatischem Release-Build; davor 0.7.1: Refactoring Hauptfenster,
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 81 Tests (Stand 02.10.2026). `run.bat` und
 `build.bat` auf Windows mit 3.14 erfolgreich getestet (02.10.2026, nach dem Refactoring). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -24,8 +24,10 @@ IT-Anleitung: `packaging/README.md`.
   Danach `dev` wiederherstellen (GitHub löscht ihn beim Merge automatisch, „Automatically delete head
   branches“ ist an): `git push origin <Merge-Commit von main>:refs/heads/dev` – so stehen `dev` und `main`
   gleich. **Tag und GitHub-Release legt der Nutzer an** (Claude kann in der Cloud keine Tags pushen – 403 –
-  und keine Releases anlegen): Beschreibung aus `CHANGELOG.md` zum Einfügen liefern; Anhänge
-  `pii-redact-<version>.zip` (Build auf Windows) und `davlan-xlmr-ner.zip`.
+  und keine Releases anlegen): Beschreibung aus `CHANGELOG.md` zum Einfügen liefern. Die **Anhänge kommen
+  automatisch**: Workflow `build.yml` baut beim Veröffentlichen auf Windows, hängt `pii-redact-<version>.zip`
+  + `.sha256` an und übernimmt `davlan-xlmr-ner.zip` aus einem älteren Release, falls es fehlt. Tag muss
+  `v<Version aus __init__.py>` heißen, sonst bricht der Build ab. Danach prüfen, ob die Anhänge da sind.
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
   `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
@@ -42,6 +44,12 @@ IT-Anleitung: `packaging/README.md`.
   `LICENSE-AFL-3.0.txt`; `tools/convert_model.py` legt ihn bei). Einordnung soll noch rechtlich bestätigt werden.
 - Erkennung: Presidio 2.2.364 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
   Davlan XLM-R als ONNX int8 – **ohne PyTorch**.
+- **Formate (Entscheidung 02.10.2026): nur PDF, TXT, Markdown – keine Office-Formate** (DOCX/XLSX/PPTX).
+  Grund: ein komplexes Format sicher bearbeiten statt mehrere halb. Office-Dateien haben viele versteckte
+  Datenkopien (Änderungsverfolgung, Kommentare, ausgeblendeter Text, Diagramm-/Pivot-Caches, Eigenschaften);
+  jedes Format bräuchte eigene Bereinigung, Kontrolle (wie `verify_pdf`) und Tests. Weg für Anwender: im
+  Office-Programm als PDF speichern (Word ohne Markup) – Hinweis in Fehlermeldung (`OFFICE_HINT`), Hilfe
+  (FAQ `#office`) und README. Nicht wieder vorschlagen, außer der Nutzer fragt danach.
 - **Grundsatz: schlankes, lokal skalierendes Programm** (jeder PC rechnet selbst). Keine schwer abgrenzbaren
   Erkennungen (Art.-9-Daten, Zugehörigkeiten wie „er ist im Betriebsrat“).
 - **KI-Nachprüfung** (optional, standardmäßig aus): LLM ist **nur Nachprüfer** des **geschwärzten** Ergebnisses
@@ -65,6 +73,19 @@ IT-Anleitung: `packaging/README.md`.
 - Transformer-Modell nicht im Repo, sondern `davlan-xlmr-ner.zip` (≈ 234 MB, mit AFL-Text) am GitHub-Release;
   Prüfsummen `packaging/modell.sha256`.
 - Version nur in `src/pii_redact/__init__.py`; jede Version im `CHANGELOG.md` eintragen.
+- **Abhängigkeiten:** `pyproject.toml` = Bereiche (Entwicklung), `packaging/requirements-lock.txt` = exakte
+  Versionen (Build, reproduzierbar). Neue Versionen nie automatisch übernehmen.
+  - **Sicherheitslücken zeitnah** beheben (Dependabot-Warnungen sind eingeschaltet; Prüfung
+    auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
+  - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
+  - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
+    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf), huggingface-hub < 2 (über tokenizers).
+  - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
+    onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
+  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
+    Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - Stand 02.10.2026: keine bekannten Lücken; 9 kleine Updates offen (u. a. numpy 2.5, pydantic-core, regex)
+    → eigene Aktualisierungsrunde vor einem der nächsten Releases (0.7.2 ging ohne raus).
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
   eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
   Release die Versionstabelle anpassen (`0.x.x`).
@@ -80,6 +101,15 @@ IT-Anleitung: `packaging/README.md`.
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
+- **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
+  auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
+  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
+  `pytest`. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
+  `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
+  (`PII_REDACT_PYTHON=python`, `QT_QPA_PLATFORM=offscreen`) bei Release, bei PRs, die Build-Dateien ändern,
+  und auf Knopfdruck; ZIP als Artefakt, bei Release als Anhang + Herkunftsnachweis (Attestation, nur bei
+  öffentlichem Repo). Modell im CI immer aus dem neuesten Release, das `davlan-xlmr-ner.zip` enthält. Ergebnisse per GitHub-MCP
+  (Check-Runs/Job-Logs) lesbar – bei rotem Haken selbst untersuchen. Nur PRs mit grünem Haken mergen.
 
 ## Beispiele
 `samples/`: beispiel.pdf/.txt/.md, schwierig.txt, kommentare.pdf, formular.pdf, scan.pdf, mail_mit_scan.pdf,
@@ -103,9 +133,8 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; Release v0.7.1 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
-   `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
+1. Repo öffentlich stellen; `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
 2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
 3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
-4. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+4. Später bei Bedarf: Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.

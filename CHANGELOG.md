@@ -1,5 +1,16 @@
 # Änderungen
 
+## 0.7.2 – 02.10.2026
+
+- Releases: Das Programm-ZIP (`pii-redact-<version>.zip` mit `.sha256`) baut GitHub jetzt automatisch beim
+  Veröffentlichen eines Releases; bei öffentlichem Repository mit Herkunftsnachweis. `build.bat` versteht
+  dafür `PII_REDACT_PYTHON` (fester Python-Aufruf).
+- Beim Öffnen von Word-, Excel- oder PowerPoint-Dateien nennt die Fehlermeldung jetzt den Weg über
+  *Speichern als PDF*. Neuer Abschnitt in der Hilfe (Häufige Fragen) und in der README, warum pii-redact sich
+  bewusst auf PDF konzentriert.
+- Intern: automatische Prüfung jedes Pull Requests (Tests auf Windows, Lint, bekannte Sicherheitslücken),
+  Pull Requests gegen `main` nur von `dev`; Regeln zum Umgang mit Abhängigkeiten.
+
 ## 0.7.1 – 02.10.2026
 
 - Neu: `SECURITY.md` – wie Sicherheitslücken (z. B. Reste im geschwärzten PDF) vertraulich gemeldet werden.

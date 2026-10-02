@@ -430,6 +430,8 @@ Einstellungen, die Ihre IT fest vorgibt, sind ausgegraut („Von der IT festgele
 
 <h2><a name="grenzen"></a>12. Grenzen und wichtige Hinweise</h2>
 <ul>
+  <li><b>Nur PDF, TXT und Markdown.</b> Word-, Excel- und PowerPoint-Dateien bitte vorher als PDF speichern –
+      siehe <a href="#office">Häufige Fragen</a>.</li>
   <li><b>Gescannte Seiten</b> werden per Texterkennung gelesen – mit deutlich höherer Fehlerquote. Solche Seiten
       immer Zeile für Zeile prüfen (<a href="#ocr">Kapitel 4</a>).</li>
   <li><b>Handschrift, Unterschriften, Fotos</b> und kleine Bilder auf normalen Textseiten (z. B. ein eingefügter
@@ -445,6 +447,21 @@ Einstellungen, die Ihre IT fest vorgibt, sind ausgegraut („Von der IT festgele
 </ul>
 
 <h2><a name="faq"></a>13. Häufige Fragen</h2>
+<h3><a name="office"></a>Wie bearbeite ich Word-, Excel- oder PowerPoint-Dateien?</h3>
+<p>Speichern Sie die Datei zuerst als PDF: im jeweiligen Programm <i>Datei → Speichern unter</i> (bzw.
+<i>Exportieren</i>) → Dateityp <b>PDF</b>. Öffnen Sie dann die PDF-Datei in pii-redact.</p>
+<ul>
+  <li><b>Word:</b> Beim Speichern als PDF unter <i>Optionen</i> darauf achten, dass <b>kein Markup</b>
+      (Kommentare, Änderungsverfolgung) mit ausgegeben wird – sonst stehen Kommentare und gelöschte Textstellen
+      als normaler Text im PDF.</li>
+  <li><b>Excel:</b> Es wird nur gedruckt, was sichtbar ist. Ausgeblendete Zeilen, Spalten und Blätter fehlen im
+      PDF; wählen Sie bei Bedarf <i>Gesamte Arbeitsmappe</i> und prüfen Sie den Druckbereich.</li>
+</ul>
+<p>Warum nicht direkt? Word- und Excel-Dateien enthalten viele versteckte Stellen, an denen Daten zusätzlich
+stehen (Änderungsverfolgung, Kommentare, ausgeblendeter Text, Kopien von Daten in Diagrammen und
+Pivot-Tabellen, Dateieigenschaften). pii-redact konzentriert sich bewusst auf <b>ein</b> Format und bearbeitet
+es dafür gründlich: Beim PDF wird Text echt entfernt, versteckter Inhalt bereinigt und das Ergebnis danach
+kontrolliert.</p>
 <h3>„Gründlich“ ist ausgegraut.</h3>
 <p>Das zusätzliche Modell ist auf diesem Rechner nicht installiert. Das Programm arbeitet dann automatisch im
 Modus „Schnell“ (findet weniger Namen und Orte – besonders sorgfältig prüfen). Bitte an die IT wenden.</p>

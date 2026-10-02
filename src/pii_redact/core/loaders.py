@@ -17,6 +17,12 @@ import pymupdf as fitz  # PyMuPDF
 OCR_WARNING_PREFIX = "Per Texterkennung (OCR)"
 
 SUPPORTED_SUFFIXES = {".txt": "txt", ".text": "txt", ".log": "txt", ".md": "md", ".markdown": "md", ".pdf": "pdf"}
+#: Office-Formate werden bewusst nicht unterstützt (ein Format – PDF – dafür gründlich); Hinweis auf den Umweg.
+OFFICE_SUFFIXES = {".doc", ".docx", ".docm", ".dot", ".dotx", ".rtf", ".odt",
+                   ".xls", ".xlsx", ".xlsm", ".ods",
+                   ".ppt", ".pptx", ".pptm", ".odp"}
+OFFICE_HINT = ("Word-, Excel- und PowerPoint-Dateien bitte zuerst im jeweiligen Programm als PDF speichern "
+               "(Datei → Speichern unter → PDF) und die PDF-Datei öffnen.")
 
 
 class Level:
@@ -113,9 +119,10 @@ def load_document(path: str | Path, *, ocr: bool = True,
     path = Path(path)
     kind = SUPPORTED_SUFFIXES.get(path.suffix.lower())
     if kind is None:
-        raise UnsupportedFileError(
-            f"Dateityp {path.suffix or '(ohne Endung)'} wird nicht unterstützt. Erlaubt: PDF, TXT, Markdown."
-        )
+        msg = f"Dateityp {path.suffix or '(ohne Endung)'} wird nicht unterstützt. Erlaubt: PDF, TXT, Markdown."
+        if path.suffix.lower() in OFFICE_SUFFIXES:
+            msg += " " + OFFICE_HINT
+        raise UnsupportedFileError(msg)
     if kind == "pdf":
         return _load_pdf(path, ocr=ocr, progress=progress)
     return _load_text(path, kind)
