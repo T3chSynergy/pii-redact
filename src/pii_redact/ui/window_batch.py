@@ -190,9 +190,7 @@ class BatchMixin:
         if not self.batch or batch_id != self.batch_id or rel not in self.batch.entries:
             return
         findings = result["findings"]
-        self.batch.set_analysis(rel, sha256=result["sha256"], size=result["size"], mtime_ns=result["mtime_ns"],
-                                findings=findings, warnings=result["warnings"], mode=result["mode"],
-                                text_sha=result.get("text_sha", ""), ocr_pages=result.get("ocr_pages"))
+        self.batch.set_analysis_result(rel, result)
         if rel == self._awaiting_rel and rel == self.batch_rel and self.session is not None:
             self._batch_loading = True
             try:
