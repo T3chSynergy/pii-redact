@@ -88,6 +88,18 @@ def test_load_cp1252_text(tmp_path):
     assert doc.encoding == "cp1252"
 
 
+@pytest.mark.parametrize("name, office", [("brief.docx", True), ("liste.XLSX", True), ("bild.png", False)])
+def test_unsupported_file_hint(tmp_path, name, office):
+    from pii_redact.core import UnsupportedFileError
+
+    p = tmp_path / name
+    p.write_bytes(b"x")
+    with pytest.raises(UnsupportedFileError) as exc:
+        load_document(p)
+    assert "wird nicht unterstützt" in str(exc.value)
+    assert ("als PDF speichern" in str(exc.value)) is office
+
+
 def test_pdf_char_mapping_matches_text():
     doc = load_document(SAMPLES / "beispiel.pdf")
     assert doc.is_pdf and doc.page_count == 1

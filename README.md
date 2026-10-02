@@ -244,7 +244,14 @@ pytest            # Kernlogik, ONNX-Aggregation, Oberflächen-Rauchtest (offscre
 `samples/make_extras_pdf.py` (kommentare.pdf, formular.pdf), `samples/make_scan_pdf.py` (scan.pdf,
 mail_mit_scan.pdf – ohne Textebene, für die Texterkennung).
 
-## Grenzen (Stand 0.3)
+## Grenzen
+
+- **Nur PDF, TXT und Markdown – bewusst.** Word-, Excel- und PowerPoint-Dateien vorher im jeweiligen Programm
+  als PDF speichern (in Word ohne „Markup“, sonst landen Kommentare und Änderungen im PDF). Grund: Office-Dateien
+  enthalten viele versteckte Stellen mit zusätzlichen Kopien der Daten (Änderungsverfolgung, Kommentare,
+  ausgeblendeter Text, Diagramm- und Pivot-Caches, Dateieigenschaften). Statt mehrere Formate nur halb sicher zu
+  bearbeiten, konzentriert sich pii-redact auf PDF – mit echter Entfernung, Bereinigung und anschließender
+  Kontrolle. Jedes weitere Format bräuchte eigene Bereinigung, eigene Kontrolle und eigene Tests.
 
 - **Gescannte Seiten**: Texterkennung nur als Rückfallebene (Dokumente sollten vorher durch die zentrale OCR
   laufen). Deutlich höhere Fehlerquote – Seiten werden gekennzeichnet, der Export verlangt eine Bestätigung,
@@ -256,7 +263,8 @@ mail_mit_scan.pdf – ohne Textebene, für die Texterkennung).
 
 ## Ideen für später
 
-DOCX-Unterstützung · Pseudonymisierungs-Schlüssel (reversibel, verschlüsselt)
+Pseudonymisierungs-Schlüssel (reversibel, verschlüsselt). Office-Formate (DOCX/XLSX) sind bewusst nicht
+geplant – siehe „Grenzen“.
 
 ## Lizenz
 
