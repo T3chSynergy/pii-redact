@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht
 
+- Releases: Das Programm-ZIP (`pii-redact-<version>.zip` mit `.sha256`) baut GitHub jetzt automatisch beim
+  Veröffentlichen eines Releases; bei öffentlichem Repository mit Herkunftsnachweis. `build.bat` versteht
+  dafür `PII_REDACT_PYTHON` (fester Python-Aufruf).
 - Beim Öffnen von Word-, Excel- oder PowerPoint-Dateien nennt die Fehlermeldung jetzt den Weg über
   *Speichern als PDF*. Neuer Abschnitt in der Hilfe (Häufige Fragen) und in der README, warum pii-redact sich
   bewusst auf PDF konzentriert.
