@@ -1,0 +1,93 @@
+# Automatische Prüfung bei jedem Pull Request und jedem Push auf dev/main.
+# Tests laufen auf Windows (Zielplattform) mit den festen Paketversionen aus der Lock-Datei.
+name: Tests
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Ältere Läufe desselben PRs/Branches abbrechen, wenn neue Commits kommen
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (Windows, Python 3.14)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: packaging/requirements-lock.txt
+
+      - name: Pakete installieren (Lock-Datei)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r packaging/requirements-lock.txt
+          pip install pytest ruff
+          pip install --no-deps -e .
+
+      # Transformer-Modell für den Modus „Gründlich“ vom neuesten Release – zwischengespeichert,
+      # Schlüssel ist die Prüfsummendatei. Fehlt es, werden die „Gründlich“-Tests übersprungen.
+      - name: Transformer-Modell aus dem Cache
+        id: model-cache
+        uses: actions/cache@v5
+        with:
+          path: models/ner/davlan-xlmr-ner
+          key: model-${{ hashFiles('packaging/modell.sha256') }}
+
+      - name: Transformer-Modell vom Release laden
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          try {
+            gh release download --repo "${{ github.repository }}" --pattern davlan-xlmr-ner.zip --dir "$env:RUNNER_TEMP"
+            Expand-Archive "$env:RUNNER_TEMP\davlan-xlmr-ner.zip" -DestinationPath models\ner\
+            Get-Content packaging\modell.sha256 | Where-Object { $_ -and -not $_.StartsWith("#") } | ForEach-Object {
+              $hash, $name = $_ -split '\s+', 2
+              $actual = (Get-FileHash "models\ner\davlan-xlmr-ner\$name" -Algorithm SHA256).Hash.ToLower()
+              if ($actual -ne $hash) { throw "Prüfsumme falsch: $name" }
+            }
+            Write-Host "Modell geladen und geprüft."
+          } catch {
+            # nichts Halbes im Cache ablegen – die „Gründlich“-Tests werden dann übersprungen
+            Remove-Item -Recurse -Force models\ner\davlan-xlmr-ner -ErrorAction SilentlyContinue
+            throw
+          }
+
+      - name: Lint (ruff)
+        run: ruff check src tests tools samples --select F,E9
+
+      - name: Tests (pytest)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q -rs
+
+  audit:
+    name: Sicherheitslücken (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: pip-audit gegen die Lock-Datei
+        run: |
+          pip install pip-audit
+          grep -v " @ " packaging/requirements-lock.txt > lock-ohne-modell.txt
+          pip-audit -r lock-ohne-modell.txt --no-deps --disable-pip --progress-spinner off
