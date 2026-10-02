@@ -343,7 +343,6 @@ def test_keyboard_selection_and_detail(window):
     """Barrierefreiheit: Textcursor per Tastatur auf einem Platzhalter wählt den Fund; die Angaben stehen
     dauerhaft unter der Fundliste (nicht nur im Tooltip); Leertaste-Funktion schaltet an/aus."""
     from PySide6.QtCore import Qt
-    from PySide6.QtGui import QTextCursor
     from PySide6.QtTest import QTest
 
     _open(window, SAMPLES / "beispiel.txt")
