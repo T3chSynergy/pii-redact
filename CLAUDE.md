@@ -17,7 +17,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests (Stand 30.09.2026). `setup.
   wird. Weicht die `CLAUDE.md` in `dev` von der in `main` ab (`git diff origin/main origin/dev -- CLAUDE.md`),
   danach die `CLAUDE.md` aus `dev` erneut lesen – sie ist der aktuelle Stand.
   Pull Requests immer gegen **`dev`** (nicht `main`); Änderungen an der `CLAUDE.md` ebenso.
-  Release: Version in `__init__.py` + `CHANGELOG.md` (PR gegen `dev`), dann PR `dev → main` mergen.
+  Release: Version in `__init__.py` + `CHANGELOG.md` + Tabelle in `SECURITY.md` (PR gegen `dev`), dann PR `dev → main` mergen.
   Danach `dev` wiederherstellen (GitHub löscht ihn beim Merge automatisch, „Automatically delete head
   branches“ ist an): `git push origin <Merge-Commit von main>:refs/heads/dev` – so stehen `dev` und `main`
   gleich. **Tag und GitHub-Release legt der Nutzer an** (Claude kann in der Cloud keine Tags pushen – 403 –
@@ -62,6 +62,9 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 78 Tests (Stand 30.09.2026). `setup.
 - Transformer-Modell nicht im Repo, sondern `davlan-xlmr-ner.zip` (≈ 234 MB, mit AFL-Text) am GitHub-Release;
   Prüfsummen `packaging/modell.sha256`.
 - Version nur in `src/pii_redact/__init__.py`; jede Version im `CHANGELOG.md` eintragen.
+- **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
+  eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
+  Release die Versionstabelle anpassen (`0.x.x`).
 
 ## Build
 - `build.bat [/neu] [/ohne-zip] [/ohne-gruendlich]`; baut die Umgebung `.venv-build` neu, wenn sich

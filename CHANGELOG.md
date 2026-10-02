@@ -1,5 +1,9 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- Neu: `SECURITY.md` – wie Sicherheitslücken (z. B. Reste im geschwärzten PDF) vertraulich gemeldet werden.
+
 ## 0.7.0 – 30.09.2026
 
 **Geändert – Python 3.14**
