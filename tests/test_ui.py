@@ -113,7 +113,7 @@ def test_batch_review_flow(window, tmp_path, monkeypatch):
     import shutil
 
     from pii_redact.core.batch import Status, Workspace
-    import pii_redact.ui.main_window as mw
+    import pii_redact.ui.window_batch as wb
 
     src = tmp_path / "akten"
     (src / "sub").mkdir(parents=True)
@@ -122,7 +122,7 @@ def test_batch_review_flow(window, tmp_path, monkeypatch):
     shutil.copy(SAMPLES / "beispiel.pdf", src / "sub" / "c.pdf")
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
-    monkeypatch.setattr(mw, "confirm_auto_export", lambda *a: True)
+    monkeypatch.setattr(wb, "confirm_auto_export", lambda *a: True)
 
     def idle():
         t = time.time()
@@ -269,3 +269,71 @@ def test_zoom_modes(window):
     window.zoom_box.setEditText("150")
     window._on_zoom_box_edited()
     assert window.settings.zoom_mode == "fest" and window.settings.zoom_percent == 150
+
+
+def _menu_texts(menu) -> list[str]:
+    from PySide6.QtWidgets import QMenu
+
+    texts = [a.text() for a in menu.actions()]
+    for sub in menu.findChildren(QMenu):
+        texts.append(sub.title())
+    return texts
+
+
+def test_finding_menu_and_lists(window):
+    """Kontextmenü zu einem Fund und zu einer Markierung; Ausnahme- und Sperrliste."""
+    _open(window, SAMPLES / "beispiel.txt")
+    s = window.session
+    f = next(x for x in s.findings if x.text == "Hamburg")
+    same = s.same_text_ids(f.id)
+
+    menu = window.build_finding_menu([f.id])
+    texts = _menu_texts(menu)
+    assert "Nicht schwärzen" in texts and "Typ ändern" in texts and "Fund löschen" in texts
+    next(a for a in menu.actions() if a.text() == "Nicht schwärzen").trigger()
+    assert not s.get(f.id).active
+    next(a for a in menu.actions() if a.text().startswith("Immer ignorieren")).trigger()
+    assert "Hamburg" in window.settings.allow_list
+    assert not any(s.get(i).active for i in same)
+
+    # Markierung ohne Fund: Schwärzen und Sperrliste werden angeboten
+    word = "Personalabteilung"
+    start = s.doc.text.index(word)
+    menu = window.build_finding_menu([], [(start, start + len(word))])
+    texts = _menu_texts(menu)
+    assert "Schwärzen als" in texts and "Kopieren" in texts
+    next(a for a in menu.actions() if a.text().startswith("Immer schwärzen")).trigger()
+    assert word in window.settings.deny_list
+    assert word not in s.redacted().text
+
+    assert window.build_finding_menu([]) is None                 # nichts anzubieten → kein Menü
+
+
+def test_sync_scroll(window):
+    """Gekoppeltes Scrollen der Seitenansicht und des Textes; abschaltbar."""
+    window.actions_["show_original"].setChecked(True)
+    window.resize(1000, 500)
+    _open(window, SAMPLES / "beispiel.pdf")
+    window.set_zoom_mode("fest", 200)
+    _wait(200)
+    left, right = window.left.pages.verticalScrollBar(), window.right.pages.verticalScrollBar()
+    assert left.maximum() > 0
+    left.setValue(left.maximum() // 2)
+    assert right.value() == left.value()
+
+    # Text: Position im Original → passende Stelle in der Vorschau
+    window.left.tabs.setCurrentWidget(window.left.text)
+    assert window.right.tabs.currentWidget() is window.right.text      # Reiter folgen
+    _wait(100)
+    tl = window.left.text.verticalScrollBar()
+    assert tl.maximum() > 0
+    tl.setValue(tl.maximum())
+    _wait(50)
+    assert window.right.text.verticalScrollBar().value() > 0
+
+    window.actions_["sync"].setChecked(False)
+    assert not window.settings.sync_scroll
+    left.setValue(0)
+    assert right.value() > 0                                          # bleibt stehen
+    window.actions_["sync"].setChecked(True)
+    window.actions_["show_original"].setChecked(False)

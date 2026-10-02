@@ -198,7 +198,9 @@ src/pii_redact/
 │   ├── entities.py       # Anzeigenamen, Platzhalter, Farben
 │   └── models.py         # Finding, Settings
 ├── ui/                   # PySide6
-│   ├── main_window.py    # Vergleichsansicht, Menüs, Export
+│   ├── main_window.py    # Hauptfenster: Aufbau, Menüs, Analyse, Anzeige, Einstellungen
+│   ├── window_*.py       # Teile des Hauptfensters: Export, Bearbeiten (edit), Zoom/Scrollen (view),
+│   │                     # KI-Nachprüfung (ki), Ordner-Bearbeitung (batch)
 │   ├── session.py        # Dokumentzustand, Nachbearbeitung, Undo/Redo
 │   ├── batch_panel.py    # Ordner-Dialog, Arbeitsliste, Prüf-Leiste
 │   ├── help_window.py    # Anwenderhilfe (F1)
