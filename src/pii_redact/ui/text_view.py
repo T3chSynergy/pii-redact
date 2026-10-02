@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QTextCharFormat, QTextCursor, QTextFormat
+from PySide6.QtGui import QColor, QContextMenuEvent, QFont, QFontDatabase, QTextCharFormat, QTextCursor, QTextFormat
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QToolTip
 
 from ..core.entities import info
@@ -47,7 +47,8 @@ class HighlightTextView(QPlainTextEdit):
     active)-Tupel in Python-Offsets übergeben."""
 
     clickedAt = Signal(int, QPoint)          # Python-Offset, globale Position (Linksklick)
-    contextAt = Signal(int, QPoint)          # Python-Offset, globale Position (Rechtsklick)
+    contextAt = Signal(int, QPoint)          # Python-Offset, globale Position (Rechtsklick/Menütaste)
+    caretAt = Signal(int)                    # Python-Offset, Textcursor per Tastatur bewegt
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -62,6 +63,9 @@ class HighlightTextView(QPlainTextEdit):
         self._selected: set[int] = set()
         #: optional: Funktion(offset) -> Tooltip-Text (z. B. Original hinter einem Platzhalter)
         self.tooltip_provider = None
+        # Tastaturbedienung: Cursor auf einem Fund wählt ihn aus (wie ein Mausklick)
+        self._key_move = False
+        self.cursorPositionChanged.connect(self._on_cursor_moved)
 
     # ------------------------------------------------------------------ Inhalt
     def set_text(self, text: str) -> None:
@@ -157,3 +161,33 @@ class HighlightTextView(QPlainTextEdit):
 
     def _on_context(self, pos: QPoint) -> None:
         self.contextAt.emit(self.offset_at(pos), self.viewport().mapToGlobal(pos))
+
+    # ------------------------------------------------------------------ Tastatur
+    def setReadOnly(self, ro: bool) -> None:
+        super().setReadOnly(ro)
+        if ro:
+            # schreibgeschützt trotzdem mit Textcursor: per Tastatur bewegen und markieren (Strg+R)
+            self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                         | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+
+    def caret_offset(self) -> int:
+        return self._map.from_qt(self.textCursor().position())
+
+    def event(self, event):
+        # Menütaste / Umschalt+F10: Kontextmenü an der Textcursor-Position statt an der Mausposition
+        if event.type() == QEvent.Type.ContextMenu and event.reason() == QContextMenuEvent.Reason.Keyboard:
+            pos = self.cursorRect().center()
+            self.contextAt.emit(self.caret_offset(), self.viewport().mapToGlobal(pos))
+            return True
+        return super().event(event)
+
+    def keyPressEvent(self, event):
+        self._key_move = True
+        try:
+            super().keyPressEvent(event)
+        finally:
+            self._key_move = False
+
+    def _on_cursor_moved(self) -> None:
+        if self._key_move and not self.textCursor().hasSelection():
+            self.caretAt.emit(self.caret_offset())

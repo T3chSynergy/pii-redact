@@ -1,5 +1,16 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Barrierefreiheit (erste Verbesserungen)**
+- Unter der Fundliste stehen jetzt dauerhaft alle Angaben zum gewählten Fund (Originaltext, Status,
+  Texterkennung, Quelle) – bisher nur im Tooltip beim Überfahren mit der Maus.
+- Tastatur: Textcursor auf einem Fund wählt ihn aus; Menütaste bzw. Umschalt+F10 öffnet das Kontextmenü an der
+  Cursorposition; Leertaste schaltet gewählte Funde an/aus, F2 ändert den Typ.
+- Hinweisleiste mit Knopf „Details …“ (vollständige Hinweise); Links in der Hinweisliste per Tastatur bedienbar.
+- Vorlesbare Namen und Beschreibungen für Bildschirmleser (Ansichten, Fundliste, Filter, Zoom, Hinweise).
+- Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
+
 ## 0.7.2 – 02.10.2026
 
 - Releases: Das Programm-ZIP (`pii-redact-<version>.zip` mit `.sha256`) baut GitHub jetzt automatisch beim

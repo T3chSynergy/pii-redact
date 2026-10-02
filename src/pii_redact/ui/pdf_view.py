@@ -210,6 +210,9 @@ class PdfPagesView(QScrollArea):
         self.setWidgetResizable(False)
         self.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.setBackgroundRole(self.palette().ColorRole.Dark)
+        self.setAccessibleName("PDF-Seitenansicht")
+        self.setAccessibleDescription("Grafische Ansicht der Seiten. Den Text mit allen Funden zeigt der Reiter "
+                                      "„Text“; dort lässt er sich auch per Tastatur und Bildschirmleser bearbeiten.")
         self._container = QWidget()
         self._layout = QVBoxLayout(self._container)
         self._layout.setSpacing(12)
