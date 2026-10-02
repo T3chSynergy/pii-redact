@@ -8,6 +8,9 @@
 - Neu: Vorlage für Pull Requests (`.github/pull_request_template.md`) – Ziel-Branch `dev`, Checkliste mit
   Datenschutz, Tests und Lizenz.
 - Neu: `CONTRIBUTING.md` – Entwicklungsumgebung, Tests, Ablauf (PR gegen `dev`) und Grundregeln des Projekts.
+- Geändert: Auch der PDF-Export einer einzelnen Datei (Oberfläche und `pii-redact-cli datei.pdf`) schreibt das
+  Ergebnis erst in eine `.tmp`-Datei und benennt sie danach um – wie schon die Ordner-Bearbeitung. Bricht der
+  Export ab, bleibt keine halbe PDF unter dem Zielnamen liegen.
 
 ## 0.7.0 – 30.09.2026
 

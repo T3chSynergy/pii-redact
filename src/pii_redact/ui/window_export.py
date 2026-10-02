@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
-from ..core import redact_pdf, verify_pdf
+from ..core import save_redacted_pdf
 
 
 class ExportMixin:
@@ -68,9 +68,7 @@ class ExportMixin:
         findings = self.session.findings
 
         def work(_progress):
-            data = redact_pdf(doc, findings, self.settings.replace_mode, self.settings.pdf_labels)
-            Path(path).write_bytes(data)
-            return verify_pdf(data, findings, doc.ocr_pages)
+            return save_redacted_pdf(doc, findings, self.settings, Path(path))
 
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:

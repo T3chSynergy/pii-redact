@@ -162,6 +162,30 @@ def test_pdf_deactivated_finding_stays(analyzer):
     assert verify_pdf(data, findings) == []
 
 
+
+def test_save_redacted_pdf_writes_safely(tmp_path, monkeypatch):
+    """Ergebnis erst als .tmp, dann umbenannt; bei einem Fehler bleibt keine (halbe) Zieldatei liegen."""
+    from pii_redact.core import redactor, save_redacted_pdf
+
+    doc = load_document(SAMPLES / "beispiel.pdf")
+    start = doc.text.index("Personalabteilung")
+    findings = [Finding(start, start + 17, "CUSTOM", "Personalabteilung")]
+    target = tmp_path / "out.pdf"
+    assert save_redacted_pdf(doc, findings, Settings(), target) == []
+    assert target.is_file() and not (tmp_path / "out.pdf.tmp").exists()
+    with pymupdf.open(target) as pdf:
+        assert "Personalabteilung" not in pdf[0].get_text()
+
+    def broken(*_a, **_k):
+        raise RuntimeError("Kontrolle fehlgeschlagen")
+
+    monkeypatch.setattr(redactor, "verify_pdf", broken)
+    target2 = tmp_path / "out2.pdf"
+    with pytest.raises(RuntimeError):
+        save_redacted_pdf(doc, findings, Settings(), target2)
+    assert list(tmp_path.iterdir()) == [target]
+
+
 def _pdf_with_extras(path: Path) -> None:
     """PDF mit Kommentaren, Formularfeld, Lesezeichen, Metadaten und Anhang."""
     pdf = pymupdf.open()
