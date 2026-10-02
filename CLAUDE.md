@@ -71,6 +71,19 @@ IT-Anleitung: `packaging/README.md`.
 - Transformer-Modell nicht im Repo, sondern `davlan-xlmr-ner.zip` (≈ 234 MB, mit AFL-Text) am GitHub-Release;
   Prüfsummen `packaging/modell.sha256`.
 - Version nur in `src/pii_redact/__init__.py`; jede Version im `CHANGELOG.md` eintragen.
+- **Abhängigkeiten:** `pyproject.toml` = Bereiche (Entwicklung), `packaging/requirements-lock.txt` = exakte
+  Versionen (Build, reproduzierbar). Neue Versionen nie automatisch übernehmen.
+  - **Sicherheitslücken zeitnah** beheben (Dependabot-Warnungen sind eingeschaltet; Prüfung
+    auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
+  - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
+  - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
+    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf), huggingface-hub < 2 (über tokenizers).
+  - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
+    onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
+  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
+    Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - Stand 02.10.2026: keine bekannten Lücken; 9 kleine Updates offen (u. a. numpy 2.5, pydantic-core, regex)
+    → beim nächsten Release mitnehmen.
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
   eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
   Release die Versionstabelle anpassen (`0.x.x`).
