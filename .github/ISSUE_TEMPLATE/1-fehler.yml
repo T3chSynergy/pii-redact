@@ -1,0 +1,82 @@
+name: 🐞 Fehler melden
+description: Das Programm stürzt ab, zeigt eine Fehlermeldung oder verhält sich falsch.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Meldung!
+
+        > ⚠️ **Keine echten Dokumente oder personenbezogenen Daten anhängen** – auch nicht geschwärzt und auch
+        > nicht in Screenshots. Bitte den Fehler mit einem Beispiel mit erfundenen Daten nachstellen.
+
+        Geschwärzte Inhalte, die im Export noch lesbar sind, sind eine **Sicherheitslücke** – bitte
+        [vertraulich melden](https://github.com/T3chSynergy/pii-redact/security/advisories/new).
+        Wurde nur eine Angabe nicht erkannt, nimm die Vorlage „Erkennung“.
+  - type: input
+    id: version
+    attributes:
+      label: Version von pii-redact
+      description: Hilfe → Über pii-redact
+      placeholder: z. B. 0.7.0
+    validations:
+      required: true
+  - type: dropdown
+    id: art
+    attributes:
+      label: Wie wird pii-redact genutzt?
+      options:
+        - Programm aus dem ZIP / von der IT installiert
+        - Aus dem Quellcode (run.bat)
+        - Kommandozeile (pii-redact-cli)
+        - Build (build.bat / setup.bat)
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Windows-Version
+      placeholder: z. B. Windows 11 24H2
+  - type: dropdown
+    id: format
+    attributes:
+      label: Betroffenes Dateiformat
+      multiple: true
+      options:
+        - PDF (mit Textebene)
+        - PDF (gescannt / Texterkennung)
+        - TXT
+        - Markdown
+        - Ordner-Bearbeitung
+        - nicht dateibezogen
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Datei öffnen …
+        2. Auf … klicken …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was sollte passieren – und was passiert stattdessen?
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Fehlermeldung / Protokoll (optional)
+      description: |
+        Programmprotokoll: `%LOCALAPPDATA%\pii-redact\logs\pii-redact.log` (enthält keine Dokumentinhalte).
+        Bei Build-Problemen die Ausgabe von build.bat bzw. setup.bat.
+      render: text
+  - type: checkboxes
+    id: daten
+    attributes:
+      label: Datenschutz
+      options:
+        - label: Ich habe keine echten personenbezogenen Daten angehängt oder eingefügt.
+          required: true
