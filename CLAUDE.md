@@ -42,6 +42,12 @@ IT-Anleitung: `packaging/README.md`.
   `LICENSE-AFL-3.0.txt`; `tools/convert_model.py` legt ihn bei). Einordnung soll noch rechtlich bestätigt werden.
 - Erkennung: Presidio 2.2.364 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
   Davlan XLM-R als ONNX int8 – **ohne PyTorch**.
+- **Formate (Entscheidung 02.10.2026): nur PDF, TXT, Markdown – keine Office-Formate** (DOCX/XLSX/PPTX).
+  Grund: ein komplexes Format sicher bearbeiten statt mehrere halb. Office-Dateien haben viele versteckte
+  Datenkopien (Änderungsverfolgung, Kommentare, ausgeblendeter Text, Diagramm-/Pivot-Caches, Eigenschaften);
+  jedes Format bräuchte eigene Bereinigung, Kontrolle (wie `verify_pdf`) und Tests. Weg für Anwender: im
+  Office-Programm als PDF speichern (Word ohne Markup) – Hinweis in Fehlermeldung (`OFFICE_HINT`), Hilfe
+  (FAQ `#office`) und README. Nicht wieder vorschlagen, außer der Nutzer fragt danach.
 - **Grundsatz: schlankes, lokal skalierendes Programm** (jeder PC rechnet selbst). Keine schwer abgrenzbaren
   Erkennungen (Art.-9-Daten, Zugehörigkeiten wie „er ist im Betriebsrat“).
 - **KI-Nachprüfung** (optional, standardmäßig aus): LLM ist **nur Nachprüfer** des **geschwärzten** Ergebnisses
@@ -103,9 +109,8 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 
 ## Offene Schritte
-1. Repo öffentlich stellen; Release v0.7.1 anlegen (ZIP aus `build.bat` + `davlan-xlmr-ner.zip`);
-   `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
+1. Repo öffentlich stellen; `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.
 2. IT: Signierweg, erster signierter Build, Verteilung; KI-Zugang über LLM-Portal/-Proxy, Modell per
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
 3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
-4. Später bei Bedarf: DOCX, Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+4. Später bei Bedarf: Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.

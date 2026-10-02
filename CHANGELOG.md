@@ -1,5 +1,11 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- Beim Öffnen von Word-, Excel- oder PowerPoint-Dateien nennt die Fehlermeldung jetzt den Weg über
+  *Speichern als PDF*. Neuer Abschnitt in der Hilfe (Häufige Fragen) und in der README, warum pii-redact sich
+  bewusst auf PDF konzentriert.
+
 ## 0.7.1 – 02.10.2026
 
 - Neu: `SECURITY.md` – wie Sicherheitslücken (z. B. Reste im geschwärzten PDF) vertraulich gemeldet werden.
