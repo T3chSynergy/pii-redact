@@ -3,6 +3,8 @@
 ## Unveröffentlicht
 
 - Neu: `SECURITY.md` – wie Sicherheitslücken (z. B. Reste im geschwärzten PDF) vertraulich gemeldet werden.
+- Neu: Issue-Vorlagen (`.github/ISSUE_TEMPLATE/`) für Fehler, Erkennung und Verbesserungsvorschläge – mit
+  Hinweis, keine echten Daten anzuhängen; Sicherheitslücken verweisen auf die vertrauliche Meldung.
 
 ## 0.7.0 – 30.09.2026
 

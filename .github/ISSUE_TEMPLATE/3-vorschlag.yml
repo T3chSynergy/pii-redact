@@ -1,0 +1,28 @@
+name: 💡 Verbesserungsvorschlag
+description: Idee für eine neue Funktion oder eine Verbesserung der Bedienung.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hinweis: pii-redact soll **schlank und offline** bleiben. Erkennungen, die sich schwer abgrenzen lassen
+        (z. B. Gesundheitsdaten, Zugehörigkeiten wie „ist im Betriebsrat“), werden bewusst nicht automatisch
+        geschwärzt.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Worum geht es?
+      description: Welches Problem soll gelöst werden, in welcher Situation?
+    validations:
+      required: true
+  - type: textarea
+    id: vorschlag
+    attributes:
+      label: Vorschlag
+      description: Wie könnte die Lösung aussehen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternativen
+    attributes:
+      label: Bisherige Umwege oder Alternativen (optional)
