@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from .models import AnalysisMode, Finding, Settings
 from .recognizers_de import LANG, build_recognizers
@@ -58,7 +58,7 @@ class PiiAnalyzer:
         )
 
     @classmethod
-    def for_settings(cls, settings: Settings) -> "PiiAnalyzer":
+    def for_settings(cls, settings: Settings) -> PiiAnalyzer:
         return cls(settings.spacy_model, settings.analysis_mode, settings.ner_model)
 
     # ------------------------------------------------------------------ Engine
@@ -173,7 +173,7 @@ _NER_STOPWORDS = {
     "datum", "ort", "name", "vorname", "nachname", "iban", "bic", "straße", "strasse", "plz",
     "betreff", "anlage", "anlagen", "seite", "herr", "frau", "hallo", "liebe", "lieber",
     "sehr", "geehrte", "geehrter", "mit", "freundlichen", "grüßen", "grüße", "gruß", "viele",
-    "beste", "herzliche", "liebe", "steuer-id",
+    "beste", "herzliche", "steuer-id",
 }
 _NER_SPLIT = re.compile(r"[\n\[\]()<>|*_#=/\\@:;]+")
 
