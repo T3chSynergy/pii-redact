@@ -38,7 +38,7 @@ jobs:
           pip install pytest ruff
           pip install --no-deps -e .
 
-      # Transformer-Modell für den Modus „Gründlich“ vom neuesten Release – zwischengespeichert,
+      # Transformer-Modell für den Modus „Gründlich“ vom neuesten Release, das es enthält – zwischengespeichert,
       # Schlüssel ist die Prüfsummendatei. Fehlt es, werden die „Gründlich“-Tests übersprungen.
       - name: Transformer-Modell aus dem Cache
         id: model-cache
@@ -55,7 +55,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           try {
-            gh release download --repo "${{ github.repository }}" --pattern davlan-xlmr-ner.zip --dir "$env:RUNNER_TEMP"
+            $tag = gh api "repos/${{ github.repository }}/releases" --jq '[.[] | select(any(.assets[]; .name == "davlan-xlmr-ner.zip"))][0].tag_name'
+            if (-not $tag) { throw "Kein Release mit davlan-xlmr-ner.zip gefunden." }
+            gh release download $tag --repo "${{ github.repository }}" --pattern davlan-xlmr-ner.zip --dir "$env:RUNNER_TEMP"
             Expand-Archive "$env:RUNNER_TEMP\davlan-xlmr-ner.zip" -DestinationPath models\ner\
             Get-Content packaging\modell.sha256 | Where-Object { $_ -and -not $_.StartsWith("#") } | ForEach-Object {
               $hash, $name = $_ -split '\s+', 2

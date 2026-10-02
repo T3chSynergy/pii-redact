@@ -54,7 +54,9 @@ if defined SIGNTOOL_ARGS if not defined SIGNTOOL (
 if defined SIGNTOOL echo Code-Signierung mit: %SIGNTOOL%
 
 rem ---------------------------------------------------------------- [1/6] Python
+rem PII_REDACT_PYTHON legt den Python-Aufruf fest (z. B. im automatischen Build bei GitHub: "python")
 set "PY="
+if defined PII_REDACT_PYTHON set "PY=%PII_REDACT_PYTHON%"
 for %%V in (3.14 3.13 3.12) do (
     if not defined PY (
         py -%%V --version >nul 2>nul && set "PY=py -%%V"

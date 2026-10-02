@@ -2,6 +2,21 @@
 
 Diese Anleitung richtet sich an die IT. Anwender finden ihre Hilfe im Programm unter **Hilfe → Anwenderhilfe (F1)**.
 
+## Fertige Versionen herunterladen
+
+Jede Version gibt es fertig gebaut unter **[Releases](https://github.com/T3chSynergy/pii-redact/releases)**:
+`pii-redact-<version>.zip` (Programmordner), die zugehörige `.sha256`-Prüfsumme und `davlan-xlmr-ner.zip`
+(Transformer-Modell, ist im Programm-ZIP bereits enthalten). Das ZIP baut GitHub automatisch mit `build.bat`
+aus genau dem Quellcode des Releases (Workflow `.github/workflows/build.yml`). Bei öffentlichem Repository
+belegt ein Herkunftsnachweis, aus welchem Commit es stammt:
+
+```bat
+gh attestation verify pii-redact-<version>.zip --repo T3chSynergy/pii-redact
+```
+
+Die EXE-Dateien darin sind **nicht signiert**. Wer signieren will, baut selbst (siehe unten) oder signiert die
+entpackten EXE-Dateien vor dem Verpacken (Weg C).
+
 ## Ergebnis
 
 | Datei | Zweck |
@@ -70,6 +85,9 @@ Ablauf: eigene Build-Umgebung `.venv-build` → Pakete in festen Versionen → P
 | `/neu` | Build-Umgebung komplett neu anlegen (nach Änderung der Lock-Datei) |
 | `/ohne-zip` | nur `dist\pii-redact\` erzeugen (schneller, z. B. zum Testen) |
 | `/ohne-gruendlich` | ohne Transformer-Modell (kleiner, nur Modus „Schnell“); das ZIP heißt dann `pii-redact-<version>-schnell.zip` |
+
+`PII_REDACT_PYTHON` legt den Python-Aufruf fest, z. B. `set PII_REDACT_PYTHON=C:\Python314\python.exe` (sonst sucht
+`build.bat` über den py-Launcher 3.14, 3.13, 3.12).
 
 Gepackt wird mit dem `tar.exe` von Windows (ab Windows 10 1803), sonst mit PowerShell (`Compress-Archive`,
 deutlich langsamer). Die früheren Schalter `/ohne-msi` und `/nur-msi` gibt es nicht mehr; `build.bat` bricht

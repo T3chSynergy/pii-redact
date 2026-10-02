@@ -1,0 +1,28 @@
+# PRs gegen main sind nur als Release-Übernahme von dev vorgesehen. Alles andere bitte gegen dev stellen.
+name: Ziel-Branch
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  guard:
+    name: PR gegen main nur von dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Quelle des PRs prüfen
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REF" = "dev" ] && [ "$HEAD_REPO" = "$REPO" ]; then
+            echo "Release-Übernahme dev → main – in Ordnung."
+            exit 0
+          fi
+          echo "::error title=Falscher Ziel-Branch::Pull Requests bitte gegen den Branch „dev“ stellen, nicht gegen „main“ (oben „Edit“ → base: dev). main enthält nur veröffentlichte Versionen – siehe CONTRIBUTING.md."
+          exit 1

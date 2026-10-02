@@ -1,0 +1,121 @@
+# Baut den Programmordner mit build.bat (Windows) und das ZIP.
+# - Bei einem veröffentlichten Release: ZIP (+ SHA-256) und – falls noch nicht vorhanden – das
+#   Transformer-Modell automatisch an das Release hängen; Herkunftsnachweis (Attestation) für das ZIP.
+# - Bei PRs, die den Build betreffen, und auf Knopfdruck: nur bauen, ZIP als Download (Artefakt).
+name: Build
+
+on:
+  release:
+    types: [published]
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - build.bat
+      - packaging/**
+      - pyproject.toml
+      - .github/workflows/build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write        # Release-Anhänge hochladen
+      id-token: write        # Herkunftsnachweis (Attestation)
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Version prüfen
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path src\pii_redact\__init__.py -Pattern '__version__\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "pii-redact $v"
+          if ($env:RELEASE_TAG -and $env:RELEASE_TAG -ne "v$v") {
+            throw "Tag $env:RELEASE_TAG passt nicht zur Version $v in src/pii_redact/__init__.py."
+          }
+
+      # Modell vom (neuesten) Release, das es enthält – Prüfsummen aus packaging/modell.sha256
+      - name: Transformer-Modell laden
+        id: model
+        shell: pwsh
+        run: |
+          $tag = gh api "repos/$env:REPO/releases" --jq '[.[] | select(any(.assets[]; .name == "davlan-xlmr-ner.zip"))][0].tag_name'
+          if (-not $tag) { throw "Kein Release mit davlan-xlmr-ner.zip gefunden." }
+          Write-Host "Modell aus Release $tag"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          gh release download $tag --repo $env:REPO --pattern davlan-xlmr-ner.zip --dir "$env:RUNNER_TEMP"
+          Expand-Archive "$env:RUNNER_TEMP\davlan-xlmr-ner.zip" -DestinationPath models\ner\
+          Get-Content packaging\modell.sha256 | Where-Object { $_ -and -not $_.StartsWith("#") } | ForEach-Object {
+            $hash, $name = $_ -split '\s+', 2
+            $actual = (Get-FileHash "models\ner\davlan-xlmr-ner\$name" -Algorithm SHA256).Hash.ToLower()
+            if ($actual -ne $hash) { throw "Prüfsumme falsch: $name" }
+          }
+          Write-Host "Modell geprüft."
+
+      - name: build.bat
+        shell: cmd
+        env:
+          PII_REDACT_PYTHON: python
+          QT_QPA_PLATFORM: offscreen
+        run: build.bat
+
+      - name: Prüfsumme
+        id: zip
+        shell: pwsh
+        run: |
+          $zip = "dist\pii-redact-${{ steps.version.outputs.version }}.zip"
+          if (-not (Test-Path $zip)) { throw "$zip fehlt." }
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  pii-redact-${{ steps.version.outputs.version }}.zip" | Out-File -Encoding ascii "$zip.sha256"
+          "path=$zip" >> $env:GITHUB_OUTPUT
+          Write-Host "SHA-256: $hash"
+
+      - name: ZIP als Download (Artefakt)
+        uses: actions/upload-artifact@v7
+        with:
+          name: pii-redact-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.zip.outputs.path }}
+            ${{ steps.zip.outputs.path }}.sha256
+          retention-days: 14
+          compression-level: 0
+
+      # Herkunftsnachweis: belegt, dass das ZIP aus genau diesem Commit von GitHub gebaut wurde
+      # (nur bei öffentlichen Repositories ohne Zusatzkosten verfügbar).
+      - name: Herkunftsnachweis (Attestation)
+        if: github.event_name == 'release' && !github.event.repository.private
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.zip.outputs.path }}
+
+      - name: An das Release hängen
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          gh release upload $tag "${{ steps.zip.outputs.path }}" "${{ steps.zip.outputs.path }}.sha256" --repo $env:REPO --clobber
+          $assets = gh release view $tag --repo $env:REPO --json assets --jq '.assets[].name'
+          if ($assets -notcontains "davlan-xlmr-ner.zip") {
+            gh release upload $tag "$env:RUNNER_TEMP\davlan-xlmr-ner.zip" --repo $env:REPO
+            Write-Host "Transformer-Modell aus Release ${{ steps.model.outputs.tag }} übernommen."
+          }

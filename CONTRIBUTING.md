@@ -61,7 +61,8 @@ Den fertigen Programmordner baut `build.bat` (Windows); Details in [packaging/RE
 4. Bei sichtbaren Änderungen einen Eintrag im [CHANGELOG.md](CHANGELOG.md) unter „Unveröffentlicht“ ergänzen.
    Ändert sich die Bedienung, auch die Anwenderhilfe anpassen (`src/pii_redact/resources/hilfe.html`).
 5. **Pull Request gegen `dev`** stellen und die Vorlage ausfüllen. GitHub prüft den PR automatisch
-   (Tests auf Windows, Lint, bekannte Sicherheitslücken); gemergt wird nur mit grünem Haken.
+   (Tests auf Windows, Lint, bekannte Sicherheitslücken); gemergt wird nur mit grünem Haken. PRs gegen
+   `main` werden automatisch abgelehnt (roter Haken „Ziel-Branch“) – oben „Edit“ → base: `dev` wählen.
 
 ## Wo liegt was?
 
