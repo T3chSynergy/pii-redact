@@ -42,7 +42,7 @@ jobs:
       # Schlüssel ist die Prüfsummendatei. Fehlt es, werden die „Gründlich“-Tests übersprungen.
       - name: Transformer-Modell aus dem Cache
         id: model-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: models/ner/davlan-xlmr-ner
           key: model-${{ hashFiles('packaging/modell.sha256') }}
