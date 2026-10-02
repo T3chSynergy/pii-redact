@@ -20,7 +20,7 @@ from pathlib import Path
 from .entities import info
 from .loaders import OCR_WARNING_PREFIX, SUPPORTED_SUFFIXES, LoadedDocument
 from .models import Finding, Settings
-from .redactor import redact_pdf, redact_text, verify_pdf
+from .redactor import redact_text, save_redacted_pdf
 
 WORKSPACE_NAME = "pii-redact-arbeitsstand.json"
 PROTOCOL_NAME = "pii-redact-protokoll.csv"
@@ -169,16 +169,12 @@ def output_name(rel: str) -> str:
 def export_document(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path) -> list[str]:
     """Schreibt die bearbeitete Fassung. Rückgabe: im PDF noch lesbare Reste (leer = sauber)."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(target.name + ".tmp")
     if doc.is_pdf:
-        data = redact_pdf(doc, findings, settings.replace_mode, settings.pdf_labels)
-        tmp.write_bytes(data)
-        leftovers = verify_pdf(data, findings, doc.ocr_pages)
-    else:
-        tmp.write_text(redact_text(doc.text, findings, settings.replace_mode).text, encoding="utf-8")
-        leftovers = []
+        return save_redacted_pdf(doc, findings, settings, target)
+    tmp = target.with_name(target.name + ".tmp")
+    tmp.write_text(redact_text(doc.text, findings, settings.replace_mode).text, encoding="utf-8")
     os.replace(tmp, target)
-    return leftovers
+    return []
 
 
 # ---------------------------------------------------------------------- Arbeitsstand
@@ -270,7 +266,7 @@ class Workspace:
 
     # ------------------------------------------------------------------ Anlegen / Laden
     @classmethod
-    def create(cls, source: Path, target: Path, recursive: bool = True) -> "Workspace":
+    def create(cls, source: Path, target: Path, recursive: bool = True) -> Workspace:
         ws = cls(source, target, recursive)
         if not ws.source.is_dir():
             raise FileNotFoundError(f"Quellordner nicht gefunden: {ws.source}")
@@ -280,7 +276,7 @@ class Workspace:
         return ws
 
     @classmethod
-    def load(cls, target: Path) -> "Workspace":
+    def load(cls, target: Path) -> Workspace:
         path = Path(target) / WORKSPACE_NAME
         data = json.loads(path.read_text(encoding="utf-8"))
         if data.get("version", 0) > FORMAT_VERSION:
@@ -374,6 +370,12 @@ class Workspace:
         e.ki_review = {}  # neue Analyse → frühere KI-Bewertung passt nicht mehr
         if e.status in (Status.WAITING, Status.ERROR):
             e.status = Status.TO_REVIEW
+
+    def set_analysis_result(self, rel: str, result: dict) -> None:
+        """Ergebnis von :func:`analyze_file` übernehmen."""
+        self.set_analysis(rel, sha256=result["sha256"], size=result["size"], mtime_ns=result["mtime_ns"],
+                          findings=result["findings"], warnings=result["warnings"], mode=result["mode"],
+                          text_sha=result.get("text_sha", ""), ocr_pages=result.get("ocr_pages"))
 
     def restore_findings(self, rel: str, doc: LoadedDocument) -> list[Finding] | None:
         """Gespeicherte Funde für das geladene Dokument – oder None, wenn der erkannte Text nicht mehr

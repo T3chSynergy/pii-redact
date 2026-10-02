@@ -249,10 +249,7 @@ class FindingsPanel(QWidget):
         self.select_ids(keep, scroll=False)
 
     def selected_ids(self) -> list[int]:
-        ids = []
-        for idx in self.table.selectionModel().selectedRows():
-            ids.append(self.proxy.data(idx, ID_ROLE))
-        return ids
+        return [self.proxy.data(idx, ID_ROLE) for idx in self.table.selectionModel().selectedRows()]
 
     def select_ids(self, ids: list[int], scroll: bool = True) -> None:
         sel = self.table.selectionModel()

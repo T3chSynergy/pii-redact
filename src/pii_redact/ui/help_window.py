@@ -117,10 +117,8 @@ def load_help_html(dark: bool = False, for_browser: bool = False) -> str:
 
 def chapters(text: str) -> list[tuple[str, str]]:
     """(Anker, Titel) aller Kapitel – aus den <h2>-Überschriften."""
-    out = []
-    for m in re.finditer(r'<h2><a name="([^"]+)"></a>(.*?)</h2>', text, re.S):
-        out.append((m.group(1), html.unescape(re.sub(r"<[^>]+>", "", m.group(2))).strip()))
-    return out
+    return [(m.group(1), html.unescape(re.sub(r"<[^>]+>", "", m.group(2))).strip())
+            for m in re.finditer(r'<h2><a name="([^"]+)"></a>(.*?)</h2>', text, re.S)]
 
 
 class HelpWindow(QDialog):

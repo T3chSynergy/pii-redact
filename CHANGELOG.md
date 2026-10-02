@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.7.1 – 02.10.2026
 
 - Neu: `SECURITY.md` – wie Sicherheitslücken (z. B. Reste im geschwärzten PDF) vertraulich gemeldet werden.
 - Neu: Issue-Vorlagen (`.github/ISSUE_TEMPLATE/`) für Fehler, Erkennung und Verbesserungsvorschläge – mit
@@ -8,6 +8,11 @@
 - Neu: Vorlage für Pull Requests (`.github/pull_request_template.md`) – Ziel-Branch `dev`, Checkliste mit
   Datenschutz, Tests und Lizenz.
 - Neu: `CONTRIBUTING.md` – Entwicklungsumgebung, Tests, Ablauf (PR gegen `dev`) und Grundregeln des Projekts.
+- Geändert: Auch der PDF-Export einer einzelnen Datei (Oberfläche und `pii-redact-cli datei.pdf`) schreibt das
+  Ergebnis erst in eine `.tmp`-Datei und benennt sie danach um – wie schon die Ordner-Bearbeitung. Bricht der
+  Export ab, bleibt keine halbe PDF unter dem Zielnamen liegen.
+- Intern: Hauptfenster in Teil-Module aufgeteilt (`ui/window_*.py`), PDF-Export an einer Stelle gebündelt,
+  Aufräumarbeiten; Tests geben Fenster und Modelle nach jedem Test frei (deutlich weniger Speicherbedarf).
 
 ## 0.7.0 – 30.09.2026
 

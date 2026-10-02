@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import bisect
+import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pymupdf as fitz  # PyMuPDF
 
 from .entities import info
 from .loaders import LoadedDocument, strip_pdf_extras
-from .models import Finding, ReplaceMode
+from .models import Finding, ReplaceMode, Settings
 
 BLACK_CHAR = "█"
 
@@ -402,3 +404,20 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
         if needle in content and f.text not in leftovers:
             leftovers.append(f.text)
     return problems + leftovers
+
+
+def save_redacted_pdf(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path) -> list[str]:
+    """PDF schwärzen, kontrollieren und speichern.
+
+    Geschrieben wird erst in ``<Ziel>.tmp``, das danach umbenannt wird – bricht etwas ab, bleibt keine
+    halbe Datei unter dem Zielnamen liegen. Rückgabe: im PDF noch lesbare Reste (leer = sauber)."""
+    data = redact_pdf(doc, findings, settings.replace_mode, settings.pdf_labels)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        tmp.write_bytes(data)
+        leftovers = verify_pdf(data, findings, doc.ocr_pages)
+        os.replace(tmp, target)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    return leftovers

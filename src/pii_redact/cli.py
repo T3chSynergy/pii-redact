@@ -29,9 +29,8 @@ from .core import (
     Settings,
     UnsupportedFileError,
     load_document,
-    redact_pdf,
     redact_text,
-    verify_pdf,
+    save_redacted_pdf,
 )
 from .core.entities import info
 from .settings_store import defaults_path, settings_path
@@ -108,9 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         if doc.is_pdf and not args.als_text:
             target = out_dir / f"{path.stem}_geschwaerzt.pdf"
-            data = redact_pdf(doc, findings, settings.replace_mode, settings.pdf_labels)
-            target.write_bytes(data)
-            rest = verify_pdf(data, findings, doc.ocr_pages)
+            rest = save_redacted_pdf(doc, findings, settings, target)
             if rest:
                 print(f"  ⚠ Im Ergebnis noch vorhanden: {'; '.join(rest)}", file=sys.stderr)
                 rc = 2
@@ -150,9 +147,7 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
         try:
             if not e.analyzed:
                 res = analyze_file(path, analyzer, settings)
-                ws.set_analysis(e.rel, sha256=res["sha256"], size=res["size"], mtime_ns=res["mtime_ns"],
-                                findings=res["findings"], warnings=res["warnings"], mode=res["mode"],
-                                text_sha=res["text_sha"], ocr_pages=res["ocr_pages"])
+                ws.set_analysis_result(e.rel, res)
             if args.nur_anzeigen:
                 print(f"  • {e.rel}: {e.active_count} Funde" + (" (Texterkennung)" if e.has_ocr else ""))
                 continue
@@ -167,9 +162,7 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
             findings = ws.restore_findings(e.rel, doc)
             if findings is None:
                 res = analyze_file(path, analyzer, settings)
-                ws.set_analysis(e.rel, sha256=res["sha256"], size=res["size"], mtime_ns=res["mtime_ns"],
-                                findings=res["findings"], warnings=res["warnings"], mode=res["mode"],
-                                text_sha=res["text_sha"], ocr_pages=res["ocr_pages"])
+                ws.set_analysis_result(e.rel, res)
                 findings = res["findings"]
             out = ws.out(e.rel)
             leftovers = export_document(doc, findings, settings, out)
