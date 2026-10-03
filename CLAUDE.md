@@ -4,9 +4,10 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.7.2 (Office-Hinweis, CI mit automatischem Release-Build; davor 0.7.1: Refactoring Hauptfenster,
+**Stand:** v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
+Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
 `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
-`build.bat` auf Windows mit 3.14 erfolgreich getestet (02.10.2026, nach dem Refactoring). v0.3.0 läuft auf dem Test-PC.
+`build.bat` auf Windows mit 3.14 erfolgreich getestet (03.10.2026, vor Release 0.8.0). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -148,7 +149,7 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
 - Barrierefreiheit (seit PR #32): Detailzeile unter der Fundliste, Tastaturbedienung (Leertaste, F2, Menütaste,
   Tab verlässt die Tabelle), Namen für Bildschirmleser. Grenze: freie Bereiche im PDF nur mit der Maus.
-  Test mit Windows-Sprachausgabe steht noch aus.
+  Mit Windows-Sprachausgabe vom Nutzer getestet (03.10.2026); Test mit NVDA bzw. durch geübte Nutzer steht aus.
 - Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
   freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 

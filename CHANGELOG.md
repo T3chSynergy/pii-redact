@@ -1,6 +1,9 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.0 – 03.10.2026
+
+> **Hinweis für Skripte mit `pii-redact-cli`:** Vorhandene Ergebnisdateien werden nicht mehr still ersetzt –
+> bei wiederholten Läufen `--ueberschreiben` angeben. Die Ausgabe enthält keinen Klartext mehr.
 
 **Barrierefreiheit (erste Verbesserungen)**
 - Unter der Fundliste stehen jetzt dauerhaft alle Angaben zum gewählten Fund (Originaltext, Status,
