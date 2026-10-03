@@ -166,10 +166,12 @@ def output_name(rel: str) -> str:
     return str(p.with_name(f"{p.stem}_anonymisiert{p.suffix}").as_posix())
 
 
-def export_document(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path) -> list[str]:
-    """Schreibt die bearbeitete Fassung. Rückgabe: im PDF noch lesbare Reste (leer = sauber)."""
+def export_document(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path,
+                    as_text: bool = False) -> list[str]:
+    """Schreibt die bearbeitete Fassung (PDF bleibt PDF, außer ``as_text``).
+    Rückgabe: im PDF noch lesbare Reste (leer = sauber)."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    if doc.is_pdf:
+    if doc.is_pdf and not as_text:
         return save_redacted_pdf(doc, findings, settings, target)
     tmp = target.with_name(target.name + ".tmp")
     tmp.write_text(redact_text(doc.text, findings, settings.replace_mode).text, encoding="utf-8")

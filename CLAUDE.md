@@ -5,7 +5,7 @@ schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Ände
 IT-Anleitung: `packaging/README.md`.
 
 **Stand:** v0.7.2 (Office-Hinweis, CI mit automatischem Release-Build; davor 0.7.1: Refactoring Hauptfenster,
-`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 91 Tests (Stand 03.10.2026). `run.bat` und
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
 `build.bat` auf Windows mit 3.14 erfolgreich getestet (02.10.2026, nach dem Refactoring). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -111,6 +111,9 @@ IT-Anleitung: `packaging/README.md`.
 - Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
   antlr4-python3-runtime 4.9.3; kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
+- **Kommandozeile** (`cli.py`, echte Konsole ohne Qt): Ausgabe ohne Klartext (nur Anzahl/Datenart; Klartext nur
+  `--nur-anzeigen`/`--details`), kein stilles Überschreiben (`--ueberschreiben`), Rückgabewert = schwerwiegendster
+  (2 Reste > 1 Fehler > 3 OCR > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
   (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
