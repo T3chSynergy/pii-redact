@@ -1,7 +1,7 @@
 Gesundheitskasse Mittelrhein · Postfach 10 20 30 · 56068 Koblenz
 
 Herrn
-Dieter Wallraff
+Dieter Wallmeier
 Kastanienweg 12
 56410 Montabaur
 
@@ -12,9 +12,9 @@ E-Mail: s.hartmann@gesundheitskasse.example
 
 Koblenz, 21. September 2026
 
-Antrag auf Kostenübernahme für Ihre Ehefrau Gisela Wallraff, geb. Brandt
+Antrag auf Kostenübernahme für Ihre Ehefrau Gisela Wallmeier, geb. Brandt
 
-Sehr geehrter Herr Wallraff,
+Sehr geehrter Herr Wallmeier,
 
 vielen Dank für Ihren Antrag vom 2. September 2026. Ihre Ehefrau ist seit 2011 bei uns familienversichert.
 Für die Entscheidung benötigen wir noch den Bericht der behandelnden Ärztin, Dr. Merve Aksoy

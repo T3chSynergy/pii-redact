@@ -32,7 +32,7 @@ TEXTE["brief_krankenkasse.txt"] = """\
 [[N:Gesundheitskasse Mittelrhein]] · [[N:Postfach 10 20 30]] · 56068 [[L:Koblenz]]
 
 Herrn
-[[P:Dieter Wallraff]]
+[[P:Dieter Wallmeier]]
 [[N:Kastanienweg 12]]
 56410 [[L:Montabaur]]
 
@@ -43,9 +43,9 @@ E-Mail: s.hartmann@gesundheitskasse.example
 
 [[L:Koblenz]], 21. September 2026
 
-Antrag auf Kostenübernahme für Ihre Ehefrau [[P:Gisela Wallraff]], geb. [[P:Brandt]]
+Antrag auf Kostenübernahme für Ihre Ehefrau [[P:Gisela Wallmeier]], geb. [[P:Brandt]]
 
-Sehr geehrter Herr [[P:Wallraff]],
+Sehr geehrter Herr [[P:Wallmeier]],
 
 vielen Dank für Ihren Antrag vom 2. September 2026. Ihre Ehefrau ist seit 2011 bei uns familienversichert.
 Für die Entscheidung benötigen wir noch den Bericht der behandelnden Ärztin, Dr. [[P:Merve Aksoy]]
@@ -164,7 +164,7 @@ Logo der Firma bleibt, wie er ist. Herr [[P:Bauer]] möchte wissen, ob der Bauer
 liefert.
 
 Frau [[P:Hecht]] und Herr [[P:Wolf]] stellen die neue Software „Adler 3“ vor. Der Adler im
-Konferenzraum ist nur Dekoration. [[P:Klaus Engel]] schreibt das Protokoll, [[P:Paula König]] leitet die Runde.
+Konferenzraum ist nur Dekoration. [[P:Konrad Engel]] schreibt das Protokoll, [[P:Paula König]] leitet die Runde.
 
 Freitag: Ausflug nach [[L:Kempten]], am Abend Essen im [[N:Gasthof Krone]] in [[L:Immenstadt]].
 Wer früher fährt, meldet sich bei [[P:Grace]].
