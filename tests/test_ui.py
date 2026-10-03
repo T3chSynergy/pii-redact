@@ -463,3 +463,19 @@ def test_notice_bar_details_accessible():
     bar.detailsRequested.connect(lambda: hits.append(1))
     bar.details_btn.click()
     assert hits == [1]
+
+
+def test_menu_mnemonics_unique(window):
+    """Barrierefreiheit: jeder Menüeintrag hat einen eigenen unterstrichenen Buchstaben (Alt, D, P …)."""
+    import re
+
+    def key(text):
+        m = re.search(r"&([^&])", text.replace("&&", ""))
+        return m.group(1).casefold() if m else None
+
+    menus = [a.menu() for a in window.menuBar().actions() if a.menu()]
+    assert [key(m.title()) for m in menus] == ["d", "b", "a", "h"]
+    for menu in menus:
+        keys = [key(a.text()) for a in menu.actions() if not a.isSeparator()]
+        assert None not in keys, (menu.title(), [a.text() for a in menu.actions()])
+        assert len(keys) == len(set(keys)), (menu.title(), keys)

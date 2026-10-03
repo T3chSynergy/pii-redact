@@ -12,6 +12,8 @@
 - Bildschirmleser sagen in der Fundliste zu jedem Fund, ob er geschwärzt wird, und kündigen nach der Leertaste
   den neuen Status an.
 - Tastaturfokus in der Fundliste landet auf der Spalte „Text“, sodass zuerst der Fund vorgelesen wird.
+- Alle Menübefehle haben unterstrichene Buchstaben (z. B. Alt, D, P für PDF-Export);
+  die Hilfe erklärt, wie Menü und Werkzeugleiste ohne Maus erreichbar sind.
 - Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
 
 **Intern**
