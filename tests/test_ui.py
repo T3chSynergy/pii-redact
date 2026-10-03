@@ -362,13 +362,52 @@ def test_keyboard_selection_and_detail(window):
 
     window.findings.toggle_selected()               # wie Leertaste in der Fundliste
     assert not s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: nicht geschwärzt"   # Ansage für Bildschirmleser
     _wait(50)
     assert "NICHT geschwärzt" in window.findings.detail.text()
     window.findings.toggle_selected()
     assert s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: wird geschwärzt"
+
+    # Bildschirmleser lesen die aktuelle Zelle: der Status steht in jeder Zelle der Zeile
+    from pii_redact.ui.findings_panel import COL_ON, COL_TEXT
+    proxy = window.findings.proxy
+    row = next(r for r in range(proxy.rowCount()) if proxy.index(r, COL_TEXT).data() == "Hamburg")
+    acc = Qt.ItemDataRole.AccessibleTextRole
+    assert proxy.index(row, COL_TEXT).data(acc) == "Hamburg, wird geschwärzt"
+    assert proxy.index(row, COL_ON).data(acc) == "wird geschwärzt"
+    assert proxy.headerData(COL_ON, Qt.Orientation.Horizontal, acc) == "Schwärzen"
 
     assert window.findings.table.accessibleName() == "Fundliste"
     assert window.left.pages.accessibleDescription()
+
+
+def test_findings_focus_lands_on_text_column(window):
+    """Barrierefreiheit: Fokus in der Fundliste landet auf der Spalte „Text“ (die liest der Bildschirmleser vor)."""
+    from PySide6.QtCore import Qt
+
+    from pii_redact.ui.findings_panel import COL_ON, COL_TEXT
+
+    _open(window, SAMPLES / "beispiel.txt")
+    table = window.findings.table
+    window.left.text.setFocus()
+    _wait(20)
+    table.setFocus(Qt.FocusReason.TabFocusReason)
+    _wait(20)
+    assert table.currentIndex().column() == COL_TEXT and table.currentIndex().row() == 0
+    assert window.findings.selected_ids()                     # Zeile ist gewählt → Detailzeile gefüllt
+
+    table.setCurrentIndex(table.model().index(2, COL_ON))      # z. B. nach Mausklick auf das Häkchen
+    window.left.text.setFocus()
+    _wait(20)
+    table.setFocus(Qt.FocusReason.BacktabFocusReason)
+    _wait(20)
+    assert (table.currentIndex().row(), table.currentIndex().column()) == (2, COL_TEXT)
+
+    # Auswahl aus dem Text heraus setzt die aktuelle Zelle ebenfalls auf „Text“
+    fid = table.model().index(1, COL_TEXT).data(Qt.ItemDataRole.UserRole + 1)
+    window.findings.select_ids([fid])
+    assert table.currentIndex().column() == COL_TEXT
 
 
 def test_tab_leaves_findings_table(window):
@@ -424,3 +463,19 @@ def test_notice_bar_details_accessible():
     bar.detailsRequested.connect(lambda: hits.append(1))
     bar.details_btn.click()
     assert hits == [1]
+
+
+def test_menu_mnemonics_unique(window):
+    """Barrierefreiheit: jeder Menüeintrag hat einen eigenen unterstrichenen Buchstaben (Alt, D, P …)."""
+    import re
+
+    def key(text):
+        m = re.search(r"&([^&])", text.replace("&&", ""))
+        return m.group(1).casefold() if m else None
+
+    menus = [a.menu() for a in window.menuBar().actions() if a.menu()]
+    assert [key(m.title()) for m in menus] == ["d", "b", "a", "h"]
+    for menu in menus:
+        keys = [key(a.text()) for a in menu.actions() if not a.isSeparator()]
+        assert None not in keys, (menu.title(), [a.text() for a in menu.actions()])
+        assert len(keys) == len(set(keys)), (menu.title(), keys)
