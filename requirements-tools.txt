@@ -9,3 +9,4 @@ sentencepiece
 protobuf
 psutil
 gliner>=0.2.10
+gliner2[local]>=2.0

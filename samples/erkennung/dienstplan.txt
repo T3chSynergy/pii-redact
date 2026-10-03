@@ -1,0 +1,20 @@
+Dienstplan Pflegestation 4 – Kalenderwoche 41
+
+Name               | Funktion        | Mo  | Di  | Mi  | Do  | Fr  | Wohnort
+Hoffmann, Birgit    | Stationsleitung | F   | F   | F   | –   | F   | Gießen
+Kaya, Emre          | Pflegefachkraft | S   | S   | –   | N   | N   | Wetzlar
+Lewandowska, Agata  | Pflegefachkraft | N   | N   | N   | –   | –   | Marburg
+Fischer, Tim        | Auszubildender  | F   | F   | S   | S   | –   | Gießen
+Mensah, Kofi        | Pflegehelfer    | –   | S   | S   | F   | F   | Butzbach
+Ritter, Johanna     | Pflegefachkraft | S   | –   | F   | F   | S   | Lich
+
+Vertretung bei Krankheit: B. Hoffmann → J. Ritter
+Rufbereitschaft: Kaya (Mo–Mi), Lewandowska (Do–Fr)
+
+Kürzel: F = Frühdienst, S = Spätdienst, N = Nachtdienst
+
+Telefonliste
+Birgit   0641 555-1201
+Emre     0641 555-1202
+Agata    0641 555-1203
+Kofi     0641 555-1205

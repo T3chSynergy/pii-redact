@@ -5,7 +5,7 @@ schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Ände
 IT-Anleitung: `packaging/README.md`.
 
 **Stand:** v0.7.2 (Office-Hinweis, CI mit automatischem Release-Build; davor 0.7.1: Refactoring Hauptfenster,
-`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 81 Tests (Stand 02.10.2026). `run.bat` und
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 91 Tests (Stand 03.10.2026). `run.bat` und
 `build.bat` auf Windows mit 3.14 erfolgreich getestet (02.10.2026, nach dem Refactoring). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -32,8 +32,8 @@ IT-Anleitung: `packaging/README.md`.
   mit Attestation).
 - Entwicklung unter Windows (`setup.bat`, `run.bat`, `build.bat`). In einer Claude-Cloud-Sitzung lassen sich
   Python-Kern und Tests prüfen (`pip install -e ".[dev]"`, `python -m spacy download de_core_news_md`,
-  `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud gesperrt → Modell-Download/-Umwandlung
-  nur auf dem Rechner des Nutzers.
+  `pytest`), aber keine Windows-Builds. Hugging Face ist aus der Cloud standardmäßig gesperrt → Modell-Download/-Umwandlung
+  auf dem Rechner des Nutzers (oder nach Freigabe, siehe „Wichtige Erkenntnisse“).
 - Das Repository ist **öffentlich** (seit 02.10.2026): keine persönlichen Daten, Pfade, Geheimnisse oder echten
   Namen/Adressen einchecken – nur erfundene Beispiele und `.example`-Adressen. Eingeschaltet: Dependabot-Warnungen,
   CodeQL, Secret Scanning mit Push-Schutz, Dependency Review (Anzeige im PR), Private vulnerability reporting.
@@ -47,6 +47,10 @@ IT-Anleitung: `packaging/README.md`.
   `LICENSE-AFL-3.0.txt`; `tools/convert_model.py` legt ihn bei). Einordnung soll noch rechtlich bestätigt werden.
 - Erkennung: Presidio 2.2.364 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
   Davlan XLM-R als ONNX int8 – **ohne PyTorch**.
+  - **Modellwahl (Vergleich 03.10.2026, `tools/modelle_testen.bat`, Cloud):** Davlan base bleibt. Davlan large
+    erkennt kaum mehr, ist aber ca. 3× langsamer/2× Speicher; GLiNER2-PII (fastino) und GLiNER multi PII sind
+    6–7× langsamer, mit mehr Fehlalarmen. Ergebnis der App „Gründlich“: Personen 99 %, Orte 96 %.
+    Neue Kandidaten: in `tools/benchmark_models.py` (`hf:`, `gliner:`, `gliner2:`) eintragen und vergleichen.
 - **Formate (Entscheidung 02.10.2026): nur PDF, TXT, Markdown – keine Office-Formate** (DOCX/XLSX/PPTX).
   Grund: ein komplexes Format sicher bearbeiten statt mehrere halb. Office-Dateien haben viele versteckte
   Datenkopien (Änderungsverfolgung, Kommentare, ausgeblendeter Text, Diagramm-/Pivot-Caches, Eigenschaften);
@@ -119,7 +123,9 @@ IT-Anleitung: `packaging/README.md`.
 
 ## Beispiele
 `samples/`: beispiel.pdf/.txt/.md, schwierig.txt, kommentare.pdf, formular.pdf, scan.pdf, mail_mit_scan.pdf,
-unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
+unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden. Testtexte zur Namenserkennung:
+`erkennung/*.txt` (6 Stück), markiert in `make_erkennung.py`, das auch `soll_funde.json` (≈ 150 Soll-Funde)
+aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich).
 
 ## Wichtige Erkenntnisse
 - Presidio importiert torch/transformers automatisch, wenn installiert → Build-Umgebung ohne torch.
@@ -137,6 +143,11 @@ unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden.
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in
   `sys.modules` eintragen.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.
+- Barrierefreiheit (seit PR #32): Detailzeile unter der Fundliste, Tastaturbedienung (Leertaste, F2, Menütaste,
+  Tab verlässt die Tabelle), Namen für Bildschirmleser. Grenze: freie Bereiche im PDF nur mit der Maus.
+  Test mit Windows-Sprachausgabe steht noch aus.
+- Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
+  freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 
 ## Offene Schritte
 1. `tools\ki_vergleich.bat` mit den Kandidatenmodellen laufen lassen.

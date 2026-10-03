@@ -81,6 +81,9 @@ Mehr zum Aufbau: Abschnitt „Aufbau“ in der [README](README.md).
 **Neuer Erkenner?** Bitte mit Tests für Treffer *und* für typische Fehlalarme (z. B. Rechnungsnummern, Datumsangaben,
 Beträge) – ein Erkenner, der zu viel schwärzt, macht Dokumente unbrauchbar.
 
+**Testtexte für die Namenserkennung** stehen markiert in `samples/make_erkennung.py`; nach einer Änderung das Skript
+ausführen. `tests/test_erkennung.py` prüft die Erkennungsquote, `tools/modelle_testen.bat` vergleicht Modelle.
+
 ## Lizenz
 
 pii-redact steht unter der **GNU AGPL-3.0-or-later** (siehe [LICENSE](LICENSE)). Mit einem Pull Request

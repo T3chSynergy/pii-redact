@@ -11,6 +11,12 @@
 - Vorlesbare Namen und Beschreibungen für Bildschirmleser (Ansichten, Fundliste, Filter, Zoom, Hinweise).
 - Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
 
+**Intern**
+- Sechs neue erfundene Testtexte (Brief, Protokoll, Dienstplan, E-Mail-Verlauf, doppeldeutige Namen,
+  Namensvielfalt) mit rund 120 erwarteten Namen und Orten; ein Test prüft die Erkennungsquote, damit
+  Paket-Updates die Erkennung nicht unbemerkt verschlechtern.
+- Modellvergleich (`tools/modelle_testen.bat`) zusätzlich mit Davlan large und GLiNER2-PII.
+
 ## 0.7.2 – 02.10.2026
 
 - Releases: Das Programm-ZIP (`pii-redact-<version>.zip` mit `.sha256`) baut GitHub jetzt automatisch beim
