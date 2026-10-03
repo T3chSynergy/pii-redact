@@ -362,10 +362,21 @@ def test_keyboard_selection_and_detail(window):
 
     window.findings.toggle_selected()               # wie Leertaste in der Fundliste
     assert not s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: nicht geschwärzt"   # Ansage für Bildschirmleser
     _wait(50)
     assert "NICHT geschwärzt" in window.findings.detail.text()
     window.findings.toggle_selected()
     assert s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: wird geschwärzt"
+
+    # Bildschirmleser lesen die aktuelle Zelle: der Status steht in jeder Zelle der Zeile
+    from pii_redact.ui.findings_panel import COL_ON, COL_TEXT
+    proxy = window.findings.proxy
+    row = next(r for r in range(proxy.rowCount()) if proxy.index(r, COL_TEXT).data() == "Hamburg")
+    acc = Qt.ItemDataRole.AccessibleTextRole
+    assert proxy.index(row, COL_TEXT).data(acc) == "Hamburg, wird geschwärzt"
+    assert proxy.index(row, COL_ON).data(acc) == "wird geschwärzt"
+    assert proxy.headerData(COL_ON, Qt.Orientation.Horizontal, acc) == "Schwärzen"
 
     assert window.findings.table.accessibleName() == "Fundliste"
     assert window.left.pages.accessibleDescription()

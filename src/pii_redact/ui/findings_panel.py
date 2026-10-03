@@ -10,7 +10,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent, QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -32,6 +32,10 @@ COL_ON, COL_TYPE, COL_TEXT, COL_WHERE, COL_SCORE, COL_SOURCE = range(6)
 HEADERS = ["", "Typ", "Text", "Stelle", "Score", "Quelle"]
 ID_ROLE = Qt.ItemDataRole.UserRole + 1
 AREA_ROLE = Qt.ItemDataRole.UserRole + 2
+
+
+def status_text(active: bool) -> str:
+    return "wird geschwärzt" if active else "nicht geschwärzt"
 
 
 class FindingsModel(QAbstractTableModel):
@@ -58,6 +62,8 @@ class FindingsModel(QAbstractTableModel):
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return HEADERS[section]
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.AccessibleTextRole:
+            return HEADERS[section] or "Schwärzen"
         return None
 
     def _where(self, f) -> str:
@@ -80,6 +86,11 @@ class FindingsModel(QAbstractTableModel):
             return f.is_area
         if role == Qt.ItemDataRole.CheckStateRole and col == COL_ON:
             return Qt.CheckState.Checked if f.active else Qt.CheckState.Unchecked
+        if role == Qt.ItemDataRole.AccessibleTextRole:
+            # Bildschirmleser lesen nur die aktuelle Zelle vor – der Status gehört deshalb in jede Zelle
+            if col == COL_ON:
+                return status_text(f.active)
+            return f"{self.data(index)}, {status_text(f.active)}"
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
             if col == COL_TYPE:
                 return info(f.entity_type).label
@@ -246,6 +257,7 @@ class FindingsPanel(QWidget):
         self.detail.hide()
         #: Funktion(ids) -> Beschreibung der Funde (setzt das Hauptfenster)
         self.detail_provider = None
+        self.last_announcement = ""
 
         self.btn_on = QPushButton("Sichtbare an")
         self.btn_off = QPushButton("Sichtbare aus")
@@ -286,7 +298,20 @@ class FindingsPanel(QWidget):
         if not s or not ids:
             return
         findings = [f for f in (s.get(i) for i in ids) if f]
-        s.set_active(ids, not all(f.active for f in findings))
+        active = not all(f.active for f in findings)
+        s.set_active(ids, active)
+        if len(findings) == 1:
+            f = findings[0]
+            what = area_description(f) if f.is_area else f.text
+            self.announce(f"{what}: {status_text(active)}")
+        else:
+            self.announce(f"{len(findings)} Funde: {status_text(active)}")
+
+    def announce(self, message: str) -> None:
+        """Teilt Bildschirmlesern eine Statusänderung mit (z. B. nach der Leertaste)."""
+        self.last_announcement = message
+        if QAccessible.isActive():
+            QAccessible.updateAccessibility(QAccessibleAnnouncementEvent(self.table, message))
 
     def selected_ids(self) -> list[int]:
         return [self.proxy.data(idx, ID_ROLE) for idx in self.table.selectionModel().selectedRows()]
