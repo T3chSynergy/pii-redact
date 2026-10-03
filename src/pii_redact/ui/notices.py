@@ -36,9 +36,11 @@ def page_marks(notices: list[Notice]) -> dict[int, list[PageMark]]:
 
 
 class NoticeBar(QFrame):
-    """Einzeilige Leiste für kritische Hinweise. Der volle Text steht im Tooltip."""
+    """Einzeilige Leiste für kritische Hinweise. Der volle Text steht im Tooltip, in der Beschreibung für
+    Bildschirmleser und – per Knopf „Details …“ – in der Liste aller Hinweise."""
 
     helpRequested = Signal(str)
+    detailsRequested = Signal()
     closed = Signal()
 
     def __init__(self, parent=None):
@@ -57,7 +59,14 @@ class NoticeBar(QFrame):
         # darf schmaler werden als der Text (wird abgeschnitten, nie umbrochen → immer genau eine Zeile)
         self.label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.label.linkActivated.connect(self.helpRequested.emit)
+        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse
+                                           | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
+        self.details_btn = QToolButton(text="Details …", autoRaise=True)
+        self.details_btn.setToolTip("Alle Hinweise vollständig anzeigen")
+        self.details_btn.setAccessibleName("Hinweise vollständig anzeigen")
+        self.details_btn.clicked.connect(self.detailsRequested.emit)
         self.close_btn = QToolButton(text="✕", autoRaise=True)
+        self.close_btn.setAccessibleName("Hinweis ausblenden")
         self.close_btn.setToolTip("Für dieses Dokument ausblenden – der Hinweis bleibt in der Statusleiste "
                                   "und an der Seite sichtbar")
         self.close_btn.clicked.connect(self._close)
@@ -65,7 +74,9 @@ class NoticeBar(QFrame):
         lay.setContentsMargins(8, 2, 2, 2)
         lay.setSpacing(6)
         lay.addWidget(self.label, 1)
+        lay.addWidget(self.details_btn)
         lay.addWidget(self.close_btn)
+        self.setAccessibleName("Wichtiger Hinweis zum Dokument")
         self.notices: list[Notice] = []
         self.hide()
 
@@ -78,7 +89,11 @@ class NoticeBar(QFrame):
         parts = [f"<b>{html.escape(n.short)}</b>" for n in self.notices]
         anchor = help_anchor(self.notices[0])
         self.label.setText(f"⚠ {'  ·  '.join(parts)}  <a href='{anchor}' style='color:#a33a00'>Mehr …</a>")
-        self.setToolTip("\n\n".join(n.detail for n in self.notices))
+        full = "\n\n".join(n.detail for n in self.notices)
+        self.setToolTip(full)
+        self.setAccessibleDescription(full)
+        self.label.setAccessibleName(" · ".join(n.short for n in self.notices))
+        self.label.setAccessibleDescription(full)
         self.show()
 
     def _close(self) -> None:
@@ -112,12 +127,20 @@ class NoticePopup(QFrame):
                 f"<span style='font-size:small'>{' · '.join(links)}</span>"
             )
             row.setTextFormat(Qt.TextFormat.RichText)
+            row.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)  # Links per Tab + Enter
+            row.setAccessibleName(n.short)
+            row.setAccessibleDescription(n.detail)
             row.setWordWrap(True)
             row.setMinimumWidth(420)
             row.setMaximumWidth(520)
             row.linkActivated.connect(self._link)
             lay.addWidget(row)
         self.rows = self.findChildren(QLabel)[1:]
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.rows:                       # Tastatur: direkt in der Liste weiterarbeiten (Esc schließt)
+            self.rows[0].setFocus()
 
     def _link(self, link: str) -> None:
         self.linkActivated.emit(link)
@@ -134,6 +157,7 @@ class NoticeButton(QToolButton):
         super().__init__(parent)
         self.setAutoRaise(True)
         self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.clicked.connect(self.show_popup)
         self.notices: list[Notice] = []
         self.popup: NoticePopup | None = None
@@ -150,6 +174,8 @@ class NoticeButton(QToolButton):
         self.setStyleSheet(f"color:{ORANGE}; font-weight:bold;" if critical else "")
         self.setToolTip("\n".join(("⚠ " if x.critical else "ⓘ ") + x.short for x in self.notices)
                         + "\n\nKlicken für Details")
+        self.setAccessibleName(f"{n} {'Hinweis' if n == 1 else 'Hinweise'} zum Dokument")
+        self.setAccessibleDescription("; ".join(x.short for x in self.notices))
         self.show()
 
     def show_popup(self) -> None:

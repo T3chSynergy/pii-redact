@@ -6,8 +6,12 @@ Beispiel:
     pii-redact-cli dokument.pdf --als-text      → dokument_anonymisiert.txt
     pii-redact-cli C:\\Akten -o C:\\Akten_geschwaerzt   → ganzer Ordner (automatisch, NICHT geprüft)
 
-Rückgabewerte: 0 = OK, 1 = Fehler, 2 = Kontrolle fand Reste im Ergebnis,
-               3 = Dateien mit Texterkennung (OCR) wurden nicht automatisch exportiert (Ordner)
+Die Ausgabe nennt nur Anzahl und Datenart der Funde – den gefundenen Klartext zeigen nur --nur-anzeigen
+und --details (Vorsicht beim Umleiten in Log-Dateien).
+
+Rückgabewerte: 0 = OK, 1 = Fehler (auch falsche Aufrufparameter), 2 = Kontrolle fand Reste im Ergebnis,
+               3 = Dateien mit Texterkennung (OCR) wurden nicht automatisch exportiert (Ordner).
+Bei mehreren Dateien gilt der schwerwiegendste Wert: 2 vor 1 vor 3 vor 0.
 """
 
 from __future__ import annotations
@@ -29,15 +33,39 @@ from .core import (
     Settings,
     UnsupportedFileError,
     load_document,
-    redact_text,
-    save_redacted_pdf,
 )
+from . import __version__
+from .core.batch import export_document
 from .core.entities import info
 from .settings_store import defaults_path, settings_path
 
+OK, ERROR, LEFTOVERS, OCR_SKIPPED = 0, 1, 2, 3
+_SEVERITY = {OK: 0, OCR_SKIPPED: 1, ERROR: 2, LEFTOVERS: 3}
+
+
+def worst(*codes: int) -> int:
+    """Schwerwiegendster Rückgabewert: Reste im Ergebnis vor Fehler vor nicht exportierter OCR-Datei."""
+    return max(codes, key=_SEVERITY.__getitem__)
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):  # Rückgabewert 2 ist für „Reste im Ergebnis“ reserviert
+        self.print_usage(sys.stderr)
+        self.exit(ERROR, f"{self.prog}: Fehler: {message}\n")
+
+
+def summary(findings) -> str:
+    """„3 Funde (Person 2, IBAN 1)“ – ohne Klartext."""
+    counts: dict[str, int] = {}
+    for f in findings:
+        label = info(f.entity_type).label
+        counts[label] = counts.get(label, 0) + 1
+    parts = ", ".join(f"{k} {v}" for k, v in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+    return f"{len(findings)} Funde" + (f" ({parts})" if parts else "")
+
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="pii-redact-cli", description="Personenbezogene Daten erkennen und entfernen.")
+    p = _Parser(prog="pii-redact-cli", description="Personenbezogene Daten erkennen und entfernen.")
     p.add_argument("dateien", nargs="*", type=Path, help="PDF-, TXT- oder Markdown-Dateien oder Ordner")
     p.add_argument("--ohne-unterordner", action="store_true", help="bei Ordnern nur die oberste Ebene")
     p.add_argument("-o", "--ausgabe", type=Path, help="Ausgabeordner (Standard: neben der Quelldatei)")
@@ -47,7 +75,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--selftest", action="store_true", help="Beispieldokument analysieren und Installation prüfen")
     p.add_argument("--schwelle", type=float, help="Mindest-Score 0–1 (Standard aus Einstellungen)")
     p.add_argument("--als-text", action="store_true", help="PDFs als anonymisierten Text statt als PDF ausgeben")
-    p.add_argument("--nur-anzeigen", action="store_true", help="Funde nur auflisten, nichts schreiben")
+    p.add_argument("--nur-anzeigen", action="store_true",
+                   help="Funde mit Klartext nur auflisten, nichts schreiben")
+    p.add_argument("--details", action="store_true",
+                   help="Funde mit Klartext auflisten (Vorsicht: nicht in Log-Dateien umleiten)")
+    p.add_argument("--ueberschreiben", action="store_true", help="vorhandene Ergebnisdateien ersetzen")
+    p.add_argument("--einstellungen", type=Path, metavar="DATEI",
+                   help="diese Einstellungsdatei statt der persönlichen verwenden (z. B. für Dienstkonten); "
+                        "zentrale Vorgaben aus defaults.json gelten weiterhin")
+    p.add_argument("--version", action="version", version=f"pii-redact {__version__}")
     p.add_argument("--ohne-ocr", action="store_true", help="gescannte PDF-Seiten nicht per Texterkennung lesen")
     args = p.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
@@ -56,7 +92,9 @@ def main(argv: list[str] | None = None) -> int:
         except (AttributeError, ValueError):
             pass
 
-    settings = Settings.load(settings_path(), defaults_path())
+    if args.einstellungen is not None and not args.einstellungen.is_file():
+        p.error(f"Einstellungsdatei nicht gefunden: {args.einstellungen}")
+    settings = Settings.load(args.einstellungen or settings_path(), defaults_path())
     if args.ohne_ocr:
         settings.ocr = False
     if args.gruendlich:
@@ -80,49 +118,62 @@ def main(argv: list[str] | None = None) -> int:
         settings.threshold = args.schwelle
 
     analyzer = PiiAnalyzer.for_settings(settings)
-    rc = 0
+    rc = OK
     for path in args.dateien:
         if path.is_dir():
-            rc = process_folder(path, args, settings, analyzer) or rc
-            continue
-        try:
-            doc = load_document(path, ocr=settings.ocr)
-            findings = analyzer.analyze(doc.text, settings)
-        except (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError) as exc:
-            print(f"✗ {path}: {exc}", file=sys.stderr)
-            rc = 1
-            continue
+            rc = worst(rc, process_folder(path, args, settings, analyzer))
+        else:
+            rc = worst(rc, process_file(path, args, settings, analyzer))
+    return rc
 
-        for w in doc.warnings:
-            print(f"  ⚠ {w}")
-        print(f"{path}: {len(findings)} Funde")
+
+def target_for(path: Path, doc, args) -> Path:
+    out_dir = args.ausgabe or path.parent
+    if doc.is_pdf and not args.als_text:
+        return out_dir / f"{path.stem}_geschwaerzt.pdf"
+    return out_dir / f"{path.stem}_anonymisiert{'.txt' if doc.is_pdf else path.suffix}"
+
+
+def process_file(path: Path, args, settings: Settings, analyzer) -> int:
+    try:
+        doc = load_document(path, ocr=settings.ocr)
+        findings = analyzer.analyze(doc.text, settings)
+    except (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError) as exc:
+        print(f"✗ {path}: {exc}", file=sys.stderr)
+        return ERROR
+
+    for w in doc.warnings:
+        print(f"  ⚠ {path.name}: {w}", file=sys.stderr)
+    print(f"{path}: {summary(findings)}")
+    if args.nur_anzeigen or args.details:
         for f in findings:
             page = doc.page_of(f.start)
             where = f"S. {page + 1}" if page is not None else f"Z. {doc.text.count(chr(10), 0, f.start) + 1}"
             print(f"  {where:>7}  {info(f.entity_type).label:<22} {f.score:.2f}  {f.text!r}")
-        if args.nur_anzeigen:
-            continue
+    if args.nur_anzeigen:
+        return OK
 
-        out_dir = args.ausgabe or path.parent
-        out_dir.mkdir(parents=True, exist_ok=True)
-        if doc.is_pdf and not args.als_text:
-            target = out_dir / f"{path.stem}_geschwaerzt.pdf"
-            rest = save_redacted_pdf(doc, findings, settings, target)
-            if rest:
-                print(f"  ⚠ Im Ergebnis noch vorhanden: {'; '.join(rest)}", file=sys.stderr)
-                rc = 2
-        else:
-            suffix = ".txt" if doc.is_pdf else path.suffix
-            target = out_dir / f"{path.stem}_anonymisiert{suffix}"
-            target.write_text(redact_text(doc.text, findings, settings.replace_mode).text, encoding="utf-8")
-        print(f"  → {target}")
-    return rc
+    target = target_for(path, doc, args)
+    if target.exists() and not args.ueberschreiben:
+        print(f"✗ {path}: {target} ist schon vorhanden – nichts geschrieben (ersetzen mit --ueberschreiben)",
+              file=sys.stderr)
+        return ERROR
+    try:
+        rest = export_document(doc, findings, settings, target, as_text=args.als_text)
+    except OSError as exc:
+        print(f"✗ {path}: {exc}", file=sys.stderr)
+        return ERROR
+    print(f"  → {target}")
+    if rest:
+        print(f"  ⚠ Im Ergebnis noch vorhanden: {'; '.join(rest)}", file=sys.stderr)
+        return LEFTOVERS
+    return OK
 
 
 def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
     """Ordner vollautomatisch bearbeiten. Bereits in der Oberfläche geprüfte Dateien bleiben
     unangetastet; alle anderen werden als „automatisch (nicht geprüft)“ protokolliert."""
-    from .core.batch import Status, Workspace, analyze_file, export_document
+    from .core.batch import Status, Workspace, analyze_file
 
     target = args.ausgabe or source.with_name(source.name + "_geschwaerzt")
     try:
@@ -130,15 +181,15 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
             ws = Workspace.load(target)
             if ws.source != source.resolve():
                 print(f"✗ {target} enthält einen Arbeitsstand für {ws.source}", file=sys.stderr)
-                return 1
+                return ERROR
         else:
             ws = Workspace.create(source, target, recursive=not args.ohne_unterordner)
         ws.sync_with_disk()
     except (OSError, ValueError) as exc:
         print(f"✗ {source}: {exc}", file=sys.stderr)
-        return 1
+        return ERROR
     print(f"Ordner {ws.source} → {ws.target} ({len(ws.entries)} Dateien)")
-    rc = 0
+    rc = OK
     for e in ws.ordered():
         if e.status in (*Status.DONE, Status.MISSING):
             print(f"  = {e.rel}: {Status.LABELS[e.status]}")
@@ -155,7 +206,7 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
                 e.note = "Texterkennung (OCR) – nicht automatisch exportiert, bitte in der Oberfläche prüfen"
                 print(f"  ! {e.rel}: Texterkennung (OCR, Seiten {', '.join(map(str, e.ocr_pages))}) – "
                       "nicht automatisch exportiert, bitte in der Oberfläche prüfen")
-                rc = rc or 3
+                rc = worst(rc, OCR_SKIPPED)
                 ws.save()
                 continue
             doc = load_document(path, ocr=settings.ocr)
@@ -169,11 +220,11 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
             ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)
             print(f"  → {e.rel}: {e.active_count} Stellen geschwärzt" + (" ⚠ Reste im PDF" if leftovers else ""))
             if leftovers:
-                rc = 2
+                rc = worst(rc, LEFTOVERS)
         except (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError) as exc:
             ws.set_error(e.rel, str(exc))
             print(f"  ✗ {e.rel}: {exc}", file=sys.stderr)
-            rc = 1
+            rc = worst(rc, ERROR)
         ws.save()
     ws.save()
     print(f"Protokoll: {ws.protocol_path}")

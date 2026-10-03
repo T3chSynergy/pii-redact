@@ -17,6 +17,9 @@ Alles läuft **offline auf dem eigenen Rechner** – es werden keine Dokumentinh
 | PDF | **echte Schwärzung** (Text bzw. Bildpunkte werden physisch entfernt, nicht nur überdeckt), zusätzlich Kommentare, Lesezeichen, Metadaten, Links, Anhänge, JavaScript und unsichtbarer Text gelöscht, Formularfelder in festen Inhalt umgewandelt; anschließende Kontrolle auf Reste (bei OCR-Seiten erneut per OCR) |
 | Ordner | ganze Ordnerstrukturen mit Arbeitsliste, „Geprüft & weiter“, Fortsetzen über mehrere Tage, CSV-Protokoll ohne Klartext |
 | Nachbearbeitung | Fund an/aus, Typ ändern, Text markieren → schwärzen, alle Vorkommen, Bereich im PDF aufziehen, **freie Bereiche schwärzen** (Unterschrift, Foto, Handschrift – auch ohne Text), Ausnahme- und Sperrliste, Rückgängig/Wiederholen, freie Textbearbeitung |
+| Bedienung | Maus oder **Tastatur** (Leertaste, F2, Menütaste, Zugriffsbuchstaben in allen Menüs); vorlesbar für **Bildschirmleser** (Namen, Status jedes Funds, Ansagen). Nur das Aufziehen freier Bereiche geht ausschließlich mit der Maus |
+| Kommandozeile | `pii-redact-cli` für Einzeldateien und ganze Ordner, Ausgabe ohne Klartext, Rückgabewerte für Skripte |
+| KI-Nachprüfung | optional: Sprachmodell bewertet das **geschwärzte** Ergebnis (Restrisiko, Hinweise) – siehe unten |
 
 \* Datumsangaben werden nur mit Kontext („geboren“, „geb.“, „Geburtsdatum“ …) geschwärzt, damit nicht jedes Rechnungsdatum verschwindet.
 
@@ -92,9 +95,9 @@ pii-redact-cli C:\Akten -o C:\Akten_geschwaerzt [--gruendlich] [--ohne-unterordn
 | | Gründlich (Standard) | Schnell |
 |---|---|---|
 | Erkennung | spaCy + Muster, zusätzlich Transformer-Modell (Davlan XLM-R, ONNX int8) für Personen/Orte/Organisationen | spaCy + Muster |
-| Personen / Orte gefunden (Benchmark, kleine Testmenge) | 100 % / 100 % | 80 % / 67 % |
-| Tempo | ca. 113 ms / 1000 Zeichen (≈ 0,3–1 s pro Seite) | ca. 34 ms / 1000 Zeichen |
-| Arbeitsspeicher (zusätzlich) | ca. 1 GB | ca. 0,4 GB |
+| Personen / Orte gefunden (Benchmark: neun Testtexte, ≈ 150 Namen und Orte) | 99 % / 96 % | 80 % / 79 % |
+| Tempo | ca. 100 ms / 1000 Zeichen (≈ 0,3–1 s pro Seite) | ca. 30 ms / 1000 Zeichen |
+| Arbeitsspeicher (zusätzlich) | ca. 1,1 GB | ca. 0,4 GB |
 | Voraussetzung | Modellordner unter `models/ner/<name>` | – |
 
 Umschalten in der Werkzeugleiste (*Analyse*) oder in den Einstellungen; zentral per `defaults.json`
@@ -108,10 +111,11 @@ ist „Gründlich“ ausgegraut und das Programm verwendet automatisch „Schnel
 tools\modelle_testen.bat
 ```
 
-Legt eine separate Werkzeug-Umgebung `.venv-tools` an (PyTorch CPU, transformers, GLiNER – ca. 3–4 GB),
-wandelt `Davlan/xlm-roberta-base-ner-hrl` und `fhswf/bert_de_ner` nach ONNX (8-Bit) um und vergleicht
-spaCy, die Originalmodelle, GLiNER und die ONNX-Fassungen. Ergebnis: `benchmark_ergebnis.md`
-(Tempo, Arbeitsspeicher, Trefferquote gegen `samples/soll_funde.json`).
+Legt eine separate Werkzeug-Umgebung `.venv-tools` an (PyTorch CPU, transformers, GLiNER, GLiNER2 – ca. 4–5 GB),
+wandelt `Davlan/xlm-roberta-base-ner-hrl` nach ONNX (8-Bit) um und vergleicht spaCy, die Originalmodelle
+(Davlan base und large), GLiNER, GLiNER2 und die ONNX-Fassung. Ergebnis: `benchmark_ergebnis.md`
+(Tempo, Arbeitsspeicher, Trefferquote gegen `samples/soll_funde.json` – neun erfundene Testtexte mit rund
+150 erwarteten Namen und Orten, davon sechs unter `samples/erkennung/`).
 
 Einzeln:
 
@@ -152,11 +156,13 @@ Bericht: `ki_vergleich_<Datum>.md` (nicht im Repository). Eigene Testfälle im s
 
 1. **Öffnen** (Strg+O) oder Datei ins Fenster ziehen → Analyse startet automatisch im Hintergrund.
 2. Angezeigt wird die **bearbeitete Fassung** (Platzhalter bzw. Schwärzungsbalken). Mit der Maus über einem
-   Platzhalter zeigt ein Tooltip, was dahinter steht; abgewählte Funde bleiben grau gestrichelt erkennbar.
+   Platzhalter zeigt ein Tooltip, was dahinter steht (dauerhaft auch unter der Fundliste); abgewählte Funde
+   bleiben grau gestrichelt erkennbar.
    **Original anzeigen** (Werkzeugleiste, Strg+Umschalt+V) blendet das Originaldokument links daneben ein –
    standardmäßig aus, die Einstellung wird gemerkt. Bei PDFs gibt es die Reiter *Seiten* und *Text*.
 3. **Nachbearbeiten**
    - Fundliste rechts: Häkchen = wird geschwärzt; Doppelklick auf *Typ* zum Ändern; Filter nach Text/Typ.
+     Per Tastatur: Leertaste = an/aus, F2 = Typ ändern, Menütaste/Umschalt+F10 = Kontextmenü.
    - Klick auf eine Markierung springt zum Fund in der Liste und umgekehrt.
    - Rechtsklick auf einen Fund: *Nicht schwärzen*, *Typ ändern*, *Alle Vorkommen …*, *Immer ignorieren*.
    - Text markieren (in der bearbeiteten Fassung oder im Original) → Rechtsklick oder **Strg+R** *Schwärzen als …*
@@ -169,18 +175,31 @@ Bericht: `ki_vergleich_<Datum>.md` (nicht im Repository). Eigene Testfälle im s
 
 **Anwenderhilfe:** *Hilfe → Anwenderhilfe* (F1) – ausführliche Anleitung für Nutzer mit Inhaltsverzeichnis und Suche; über „Im Browser öffnen“ auch druckbar. Quelle: `src/pii_redact/resources/hilfe.html` (die Tabelle der Datenarten wird aus dem Programm eingesetzt).
 
-Einstellungen (Strg+,): Mindest-Score, Modellgröße, gesuchte Datenarten, Ausnahmeliste (nie schwärzen),
-Sperrliste (immer schwärzen). Gespeichert unter `%APPDATA%\pii-redact\settings.json`.
+Einstellungen (Strg+,): Mindest-Score, spaCy-Modell, Analyse-Modus, Ersetzung, Texterkennung, kompakte
+Hinweise, gesuchte Datenarten, Ausnahmeliste (nie schwärzen), Sperrliste (immer schwärzen), KI-Nachprüfung.
+Gespeichert unter `%APPDATA%\pii-redact\settings.json`.
 
 ### Kommandozeile
 
 ```bash
 pii-redact-cli brief.pdf                     # → brief_geschwaerzt.pdf
 pii-redact-cli notizen.md --modus nummeriert # → notizen_anonymisiert.md
-pii-redact-cli *.txt --nur-anzeigen          # nur Funde auflisten
+pii-redact-cli *.txt --nur-anzeigen          # nur Funde auflisten (mit Klartext, schreibt nichts)
 pii-redact-cli brief.pdf --gruendlich        # mit Transformer-Modell
+pii-redact-cli brief.pdf --ueberschreiben    # vorhandenes Ergebnis ersetzen
 pii-redact-cli --selftest                    # Installation prüfen (Modelle, beide Modi)
+pii-redact-cli --version
 ```
+
+- Die Ausgabe nennt nur **Anzahl und Datenart** der Funde, z. B. `brief.pdf: 5 Funde (Person 3, IBAN 1, E-Mail 1)`.
+  Den gefundenen Klartext zeigen nur `--nur-anzeigen` und `--details` – solche Ausgaben nicht in Log-Dateien
+  umleiten.
+- Vorhandene Ergebnisdateien werden **nicht überschrieben** (Fehler, Rückgabewert 1), außer mit `--ueberschreiben`.
+- `--einstellungen DATEI` verwendet eine eigene Einstellungsdatei statt `%APPDATA%\pii-redact\settings.json`,
+  z. B. für geplante Aufgaben unter einem Dienstkonto; zentrale Vorgaben (`defaults.json`) gelten weiterhin.
+- Rückgabewerte: `0` OK · `1` Fehler (auch falscher Aufruf) · `2` Kontrolle fand Reste im Ergebnis ·
+  `3` Datei mit Texterkennung nicht automatisch exportiert (Ordner). Bei mehreren Dateien gilt der
+  schwerwiegendste Wert (2 vor 1 vor 3 vor 0). Warnungen und Fehler stehen in der Fehlerausgabe (stderr).
 
 ## Aufbau
 
@@ -204,13 +223,18 @@ src/pii_redact/
 │   ├── session.py        # Dokumentzustand, Nachbearbeitung, Undo/Redo
 │   ├── batch_panel.py    # Ordner-Dialog, Arbeitsliste, Prüf-Leiste
 │   ├── help_window.py    # Anwenderhilfe (F1)
-│   ├── findings_panel.py # Fundliste
+│   ├── findings_panel.py # Fundliste (inkl. Detailzeile und Bildschirmleser-Texte)
+│   ├── notices.py        # Hinweise zum Dokument (Leiste, Zähler, Liste)
+│   ├── ki_panel.py       # Reiter „KI-Bewertung“
+│   ├── about_dialog.py   # Über pii-redact
 │   ├── text_view.py      # Textansicht mit Hervorhebungen
 │   ├── pdf_view.py       # PDF-Seiten (lazy gerendert) mit Overlays
 │   ├── settings_dialog.py
 │   └── worker.py         # Analyse-Warteschlange im Hintergrund (interaktiv vorrangig)
 ├── resources/hilfe.html  # Text der Anwenderhilfe
 ├── paths.py              # Modell-/Konfigurationspfade (Quellcode und EXE)
+├── settings_store.py     # Speicherorte von settings.json / defaults.json
+├── about.py              # Lizenz, Quellcode-Link, verwendete Komponenten
 ├── cli.py
 └── app.py
 tools/                    # nur Entwicklung: Modell-Umwandlung, Vergleich, Test-Mini-Modell
@@ -236,13 +260,15 @@ zentrale Vorgaben: **[packaging/README.md](packaging/README.md)**.
 ## Tests
 
 ```bash
-pytest            # Kernlogik, ONNX-Aggregation, Oberflächen-Rauchtest (offscreen)
+pytest            # Kernlogik, PDF-Schwärzung, Erkennungsquote, Kommandozeile, Oberfläche (offscreen)
                   # mit .venv-tools zusätzlich: komplette ONNX-Kette mit Zufalls-Mini-Modell
 ```
 
 `samples/` enthält fiktive Beispieldokumente. Neu erzeugen: `samples/make_sample_pdf.py` (beispiel.pdf),
 `samples/make_extras_pdf.py` (kommentare.pdf, formular.pdf), `samples/make_scan_pdf.py` (scan.pdf,
-mail_mit_scan.pdf – ohne Textebene, für die Texterkennung).
+mail_mit_scan.pdf – ohne Textebene, für die Texterkennung), `samples/make_erkennung.py` (Testtexte
+`samples/erkennung/*.txt` samt Soll-Funden in `soll_funde.json`; `tests/test_erkennung.py` prüft damit die
+Erkennungsquote).
 
 ## Grenzen
 

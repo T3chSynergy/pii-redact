@@ -10,7 +10,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent, QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -32,6 +32,10 @@ COL_ON, COL_TYPE, COL_TEXT, COL_WHERE, COL_SCORE, COL_SOURCE = range(6)
 HEADERS = ["", "Typ", "Text", "Stelle", "Score", "Quelle"]
 ID_ROLE = Qt.ItemDataRole.UserRole + 1
 AREA_ROLE = Qt.ItemDataRole.UserRole + 2
+
+
+def status_text(active: bool) -> str:
+    return "wird geschwärzt" if active else "nicht geschwärzt"
 
 
 class FindingsModel(QAbstractTableModel):
@@ -58,6 +62,8 @@ class FindingsModel(QAbstractTableModel):
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return HEADERS[section]
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.AccessibleTextRole:
+            return HEADERS[section] or "Schwärzen"
         return None
 
     def _where(self, f) -> str:
@@ -80,6 +86,11 @@ class FindingsModel(QAbstractTableModel):
             return f.is_area
         if role == Qt.ItemDataRole.CheckStateRole and col == COL_ON:
             return Qt.CheckState.Checked if f.active else Qt.CheckState.Unchecked
+        if role == Qt.ItemDataRole.AccessibleTextRole:
+            # Bildschirmleser lesen nur die aktuelle Zelle vor – der Status gehört deshalb in jede Zelle
+            if col == COL_ON:
+                return status_text(f.active)
+            return f"{self.data(index)}, {status_text(f.active)}"
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
             if col == COL_TYPE:
                 return info(f.entity_type).label
@@ -174,6 +185,21 @@ class _FilterProxy(QSortFilterProxyModel):
         return True
 
 
+class _FindingsTable(QTableView):
+    """Tabelle, deren Tastaturfokus auf der Spalte „Text“ landet – Bildschirmleser lesen dann zuerst den Fund."""
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        cur = self.currentIndex()
+        if self.model() is None or self.model().rowCount() == 0 or (cur.isValid() and cur.column() == COL_TEXT):
+            return
+        row = cur.row() if cur.isValid() else 0
+        sel = self.selectionModel()
+        flags = (sel.SelectionFlag.NoUpdate if sel.isRowSelected(row, QModelIndex())
+                 else sel.SelectionFlag.ClearAndSelect | sel.SelectionFlag.Rows)
+        sel.setCurrentIndex(self.model().index(row, COL_TEXT), flags)
+
+
 class FindingsPanel(QWidget):
     findingActivated = Signal(int)        # Klick in Liste → zur Stelle springen
     contextRequested = Signal(list, QPoint)
@@ -185,20 +211,31 @@ class FindingsPanel(QWidget):
         self.proxy.setSourceModel(self.model)
 
         self.summary = QLabel("Kein Dokument geladen")
+        self.summary.setAccessibleName("Zusammenfassung der Funde")
         self.search = QLineEdit(placeholderText="Filtern …", clearButtonEnabled=True)
+        self.search.setAccessibleName("Funde nach Text filtern")
         self.search.textChanged.connect(self._apply_filter)
         self.type_box = QComboBox()
         self.type_box.addItem("Alle Typen", "")
         for key in all_keys(include_areas=True):
             self.type_box.addItem(info(key).label, key)
         self.type_box.currentIndexChanged.connect(self._apply_filter)
+        self.type_box.setAccessibleName("Funde nach Datenart filtern")
 
-        self.table = QTableView()
+        self.table = _FindingsTable()
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.sortByColumn(COL_WHERE, Qt.SortOrder.AscendingOrder)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.SelectedClicked)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked
+                                   | QAbstractItemView.EditTrigger.SelectedClicked
+                                   | QAbstractItemView.EditTrigger.EditKeyPressed)   # F2: Typ ändern
+        # Tab verlässt die Tabelle (statt von Zelle zu Zelle zu springen) – Auswahl mit den Pfeiltasten
+        self.table.setTabKeyNavigation(False)
+        self.table.setAccessibleName("Fundliste")
+        self.table.setAccessibleDescription(
+            "Pfeiltasten: Fund wählen · Leertaste: schwärzen an/aus · F2 in der Spalte Typ: Typ ändern · "
+            "Menütaste oder Umschalt+F10: weitere Möglichkeiten")
         self.table.setItemDelegateForColumn(COL_TYPE, _TypeDelegate(self.table))
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
@@ -216,7 +253,26 @@ class FindingsPanel(QWidget):
             lambda pos: self.contextRequested.emit(self.selected_ids(), self.table.viewport().mapToGlobal(pos))
         )
         self.table.selectionModel().currentRowChanged.connect(self._on_current)
+        self.table.selectionModel().selectionChanged.connect(lambda *_: self._update_detail())
         self.table.clicked.connect(lambda idx: self._on_current(idx, None))
+        # Leertaste schaltet die gewählten Funde an/aus (auch wenn nicht die Häkchen-Spalte aktiv ist)
+        toggle = QShortcut(QKeySequence(Qt.Key.Key_Space), self.table)
+        toggle.setContext(Qt.ShortcutContext.WidgetShortcut)
+        toggle.activated.connect(self.toggle_selected)
+
+        # Dauerhaft sichtbare Angaben zum gewählten Fund – was sonst nur im Tooltip steht
+        # (Originaltext, Status, Texterkennung, Quelle); per Tastatur und Bildschirmleser erreichbar.
+        self.detail = QLabel()
+        self.detail.setTextFormat(Qt.TextFormat.PlainText)
+        self.detail.setWordWrap(True)
+        self.detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
+                                            | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.detail.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.detail.setAccessibleName("Gewählter Fund")
+        self.detail.hide()
+        #: Funktion(ids) -> Beschreibung der Funde (setzt das Hauptfenster)
+        self.detail_provider = None
+        self.last_announcement = ""
 
         self.btn_on = QPushButton("Sichtbare an")
         self.btn_off = QPushButton("Sichtbare aus")
@@ -235,18 +291,42 @@ class FindingsPanel(QWidget):
         lay.addWidget(self.summary)
         lay.addLayout(top)
         lay.addWidget(self.table, 1)
+        lay.addWidget(self.detail)
         lay.addLayout(bottom)
 
     # ------------------------------------------------------------------ API
     def set_session(self, session: DocumentSession | None) -> None:
         self.model.set_session(session)
         self._update_summary()
+        self._update_detail()
 
     def reload(self) -> None:
         keep = self.selected_ids()
         self.model.reload()
         self._update_summary()
         self.select_ids(keep, scroll=False)
+
+    def toggle_selected(self) -> None:
+        """Gewählte Funde an/aus: sind alle an, werden sie abgeschaltet, sonst eingeschaltet."""
+        s = self.model.session
+        ids = self.selected_ids()
+        if not s or not ids:
+            return
+        findings = [f for f in (s.get(i) for i in ids) if f]
+        active = not all(f.active for f in findings)
+        s.set_active(ids, active)
+        if len(findings) == 1:
+            f = findings[0]
+            what = area_description(f) if f.is_area else f.text
+            self.announce(f"{what}: {status_text(active)}")
+        else:
+            self.announce(f"{len(findings)} Funde: {status_text(active)}")
+
+    def announce(self, message: str) -> None:
+        """Teilt Bildschirmlesern eine Statusänderung mit (z. B. nach der Leertaste)."""
+        self.last_announcement = message
+        if QAccessible.isActive():
+            QAccessible.updateAccessibility(QAccessibleAnnouncementEvent(self.table, message))
 
     def selected_ids(self) -> list[int]:
         return [self.proxy.data(idx, ID_ROLE) for idx in self.table.selectionModel().selectedRows()]
@@ -257,13 +337,15 @@ class FindingsPanel(QWidget):
         self.table.clearSelection()
         first = None
         for row in range(self.proxy.rowCount()):
-            idx = self.proxy.index(row, 0)
+            idx = self.proxy.index(row, COL_TEXT)
             if self.proxy.data(idx, ID_ROLE) in ids:
                 sel.select(idx, sel.SelectionFlag.Select | sel.SelectionFlag.Rows)
                 if first is None:
                     first = idx
                     sel.setCurrentIndex(idx, sel.SelectionFlag.NoUpdate)
         sel.blockSignals(False)
+        self.table.viewport().update()
+        self._update_detail()
         if first is not None and scroll:
             self.table.scrollTo(first, QAbstractItemView.ScrollHint.PositionAtCenter)
 
@@ -279,6 +361,12 @@ class FindingsPanel(QWidget):
             n = sum(1 for f in s.findings if s.doc.is_ocr(f.start, f.end))
             text += f" · <span style='color:#e8590c'><b>{n}</b> aus Texterkennung</span>"
         self.summary.setText(text)
+
+    def _update_detail(self) -> None:
+        ids = self.selected_ids() if self.model.session else []
+        text = self.detail_provider(ids) if (ids and self.detail_provider) else ""
+        self.detail.setText(text)
+        self.detail.setVisible(bool(text))
 
     def _apply_filter(self) -> None:
         self.proxy.text_filter = self.search.text().strip().casefold()

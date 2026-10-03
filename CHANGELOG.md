@@ -1,5 +1,44 @@
 # Änderungen
 
+## 0.8.0 – 03.10.2026
+
+> **Hinweis für Skripte mit `pii-redact-cli`:** Vorhandene Ergebnisdateien werden nicht mehr still ersetzt –
+> bei wiederholten Läufen `--ueberschreiben` angeben. Die Ausgabe enthält keinen Klartext mehr.
+
+**Barrierefreiheit (erste Verbesserungen)**
+- Unter der Fundliste stehen jetzt dauerhaft alle Angaben zum gewählten Fund (Originaltext, Status,
+  Texterkennung, Quelle) – bisher nur im Tooltip beim Überfahren mit der Maus.
+- Tastatur: Textcursor auf einem Fund wählt ihn aus; Menütaste bzw. Umschalt+F10 öffnet das Kontextmenü an der
+  Cursorposition; Leertaste schaltet gewählte Funde an/aus, F2 ändert den Typ.
+- Hinweisleiste mit Knopf „Details …“ (vollständige Hinweise); Links in der Hinweisliste per Tastatur bedienbar.
+- Vorlesbare Namen und Beschreibungen für Bildschirmleser (Ansichten, Fundliste, Filter, Zoom, Hinweise).
+- Bildschirmleser sagen in der Fundliste zu jedem Fund, ob er geschwärzt wird, und kündigen nach der Leertaste
+  den neuen Status an.
+- Tastaturfokus in der Fundliste landet auf der Spalte „Text“, sodass zuerst der Fund vorgelesen wird.
+- Alle Menübefehle haben unterstrichene Buchstaben (z. B. Alt, D, P für PDF-Export);
+  die Hilfe erklärt, wie Menü und Werkzeugleiste ohne Maus erreichbar sind.
+- Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
+
+**Kommandozeile (`pii-redact-cli`)**
+- Gibt nur noch Anzahl und Datenart der Funde aus – kein Klartext mehr in Ausgaben, die in Log-Dateien landen
+  können. Klartext nur mit `--nur-anzeigen` oder dem neuen `--details`.
+- Überschreibt vorhandene Ergebnisdateien nicht mehr still (neu: `--ueberschreiben`); Textdateien werden wie in der
+  Oberfläche erst vollständig geschrieben und dann umbenannt.
+- Rückgabewert: Bei mehreren Dateien gilt der schwerwiegendste Wert (Reste im Ergebnis vor Fehler); falsche
+  Aufrufparameter liefern 1 statt 2 (2 bedeutet „Reste im Ergebnis“).
+- Neu: `--version`, `--einstellungen DATEI` (z. B. für Dienstkonten); Warnungen in der Fehlerausgabe.
+
+**Hilfe und README**
+- Messwerte zu „Schnell“/„Gründlich“ aktualisiert (neue Testtexte), Kommandozeile mit allen Optionen und
+  Rückgabewerten, Fundliste per Tastatur, Einstellung „spaCy-Modell“ beschrieben.
+
+**Intern**
+- Sechs neue erfundene Testtexte (Brief, Protokoll, Dienstplan, E-Mail-Verlauf, doppeldeutige Namen,
+  Namensvielfalt) mit rund 120 erwarteten Namen und Orten; ein Test prüft die Erkennungsquote, damit
+  Paket-Updates die Erkennung nicht unbemerkt verschlechtern.
+- Modellvergleich (`tools/modelle_testen.bat`) zusätzlich mit Davlan large und GLiNER2-PII.
+- PDF-Laden aufgeteilt (Textebene, Texterkennung, Hinweise in eigenen Funktionen) – Ergebnis unverändert.
+
 ## 0.7.2 – 02.10.2026
 
 - Releases: Das Programm-ZIP (`pii-redact-<version>.zip` mit `.sha256`) baut GitHub jetzt automatisch beim

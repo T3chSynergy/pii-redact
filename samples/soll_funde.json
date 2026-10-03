@@ -72,5 +72,183 @@
       "in der «Bauer-Halle» am",
       "An: «Team Einkauf»"
     ]
+  },
+  "erkennung/brief_krankenkasse.txt": {
+    "PERSON": [
+      "«Dieter Wallmeier»",
+      "«Hartmann»",
+      "«Gisela Wallmeier»",
+      "«Brandt»",
+      " «Wallmeier»,\n",
+      "«Merve Aksoy»",
+      "«Claudia»",
+      "«Okafor»",
+      "«Sandra Hartmann»"
+    ],
+    "LOCATION": [
+      "«Koblenz»",
+      "«Montabaur»",
+      "«Koblenz»,",
+      "«Bad Ems»",
+      "«Lahnstein»"
+    ],
+    "_neutral": [
+      "«Gesundheitskasse Mittelrhein»",
+      "«Postfach 10 20 30»",
+      "«Kastanienweg 12»",
+      "«Ha»",
+      "«Praxis am Markt»",
+      "«Pflegedienstes Sonnenschein»"
+    ]
+  },
+  "erkennung/protokoll.txt": {
+    "PERSON": [
+      "«Engel»",
+      "«Petrović»",
+      "«Lindqvist»",
+      "«Brückner»",
+      "«Haas»",
+      "«Albrecht»",
+      "«Nowak-Riedel»",
+      "«Schmid»",
+      "«Petrović» ",
+      "«Lindqvist»\n",
+      "«Brückner» ",
+      " «Schmid» s",
+      " «Haas» w",
+      "«Jonas»",
+      "«Haas»\n"
+    ],
+    "LOCATION": [
+      "«Fulda»",
+      "«Hünfeld»",
+      "«Petersberg»",
+      "«Künzell»",
+      "«Kassel»"
+    ],
+    "_neutral": [
+      "«Grundschule am Lindenhof»",
+      "«Leipziger Straße»",
+      "«E.»"
+    ]
+  },
+  "erkennung/dienstplan.txt": {
+    "PERSON": [
+      "«Hoffmann, Birgit»",
+      "«Kaya, Emre»",
+      "«Lewandowska, Agata»",
+      "«Fischer, Tim»",
+      "«Mensah, Kofi»",
+      "«Ritter, Johanna»",
+      "«B. Hoffmann»",
+      "«J. Ritter»",
+      "«Kaya» ",
+      "«Lewandowska» ",
+      "\n«Birgit» ",
+      "\n«Emre» ",
+      "\n«Agata» ",
+      "\n«Kofi» "
+    ],
+    "LOCATION": [
+      "«Gießen»",
+      "«Wetzlar»",
+      "«Marburg»",
+      " «Gießen»\nM",
+      "«Butzbach»",
+      "«Lich»"
+    ]
+  },
+  "erkennung/mailverlauf.txt": {
+    "PERSON": [
+      "«Lukas Brenner»",
+      "«Marie Okonkwo»",
+      "«Henrik Larsen»",
+      "«Marie»,",
+      "«Strobel»",
+      " «Henrik» B",
+      "«Lukas»\n",
+      "«Lukas Brenner»\n",
+      "«Marie Okonkwo»\n",
+      " «Lukas Brenner»\n",
+      "«Lukas»,",
+      " «Strobel» a",
+      "«Strobel»\n",
+      "«Okan»",
+      "«H. Larsen»",
+      "«Marie»\n"
+    ],
+    "LOCATION": [
+      "«Paderborn»",
+      "«Bielefeld»",
+      "8 «Paderborn»\n\n",
+      "ch «Paderborn»\n\nHi",
+      "«Salzkotten»",
+      "«Delbrück»"
+    ],
+    "_neutral": [
+      "«Stadtwerke Beispiel GmbH»",
+      "«Am Hafen 5»"
+    ]
+  },
+  "erkennung/doppeldeutig.txt": {
+    "PERSON": [
+      "«Thomas Winter»",
+      "«Sommer»",
+      " «Koch» a",
+      "«Rosa Fuchs»",
+      "«Bauer»",
+      "«Hecht»",
+      "«Wolf»",
+      "«Konrad Engel»",
+      "«Paula König»",
+      "«Grace»"
+    ],
+    "LOCATION": [
+      "«Kempten»",
+      "«Immenstadt»"
+    ],
+    "_neutral": [
+      "«Allgäu»",
+      "«Gasthof Krone»"
+    ]
+  },
+  "erkennung/namensvielfalt.txt": {
+    "PERSON": [
+      "«Zeynep Arslan-Becker»",
+      "«Mohammed Al-Rashid»",
+      "«Tran Van Minh»",
+      "«Olena Kovalenko»",
+      "«Jean-Pierre Dubois»",
+      "«Aleksandra Wiśniewska»",
+      "«Chidi Eze»",
+      "«María José García López»",
+      "«Siobhán O'Connell»",
+      "«Friederike von Hagen»",
+      "«Ömer Çelik»",
+      "«Arslan-Becker» ",
+      "«Al-Rashid» ",
+      "«Çelik».",
+      "«Minh» ",
+      " «Olena» f",
+      "«Taras»",
+      "«Dubois» "
+    ],
+    "LOCATION": [
+      "«Duisburg»",
+      "«Duisburg»-",
+      "«Marxloh»",
+      "«Oberhausen»",
+      "«Mülheim an der Ruhr»",
+      " «Duisburg»\n5",
+      "«Moers»",
+      "«Dinslaken»",
+      "«Essen»",
+      "«Krefeld»",
+      ", «Duisburg»\n\n",
+      "«Lyon»"
+    ],
+    "_neutral": [
+      "«Deutschland»"
+    ]
   }
 }

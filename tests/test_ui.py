@@ -10,8 +10,8 @@ import spacy
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 pytest.importorskip("PySide6")
-from PySide6.QtCore import QEventLoop, QTimer  # noqa: E402
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
+from PySide6.QtCore import QEventLoop, QTimer
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
 pytestmark = pytest.mark.skipif(not spacy.util.is_package("de_core_news_md"), reason="spaCy-Modell fehlt")
@@ -337,3 +337,145 @@ def test_sync_scroll(window):
     assert right.value() > 0                                          # bleibt stehen
     window.actions_["sync"].setChecked(True)
     window.actions_["show_original"].setChecked(False)
+
+
+def test_keyboard_selection_and_detail(window):
+    """Barrierefreiheit: Textcursor per Tastatur auf einem Platzhalter wählt den Fund; die Angaben stehen
+    dauerhaft unter der Fundliste (nicht nur im Tooltip); Leertaste-Funktion schaltet an/aus."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    _open(window, SAMPLES / "beispiel.txt")
+    s = window.session
+    f = next(x for x in s.findings if x.text == "Hamburg")
+    view = window.right.text
+    r = s.redacted().to_redacted(f.start)
+    cur = view.textCursor()
+    cur.setPosition(view._map.to_qt(r))
+    view.setTextCursor(cur)
+    assert window.findings.detail.text() == "" or f.id not in window.findings.selected_ids()
+    QTest.keyClick(view, Qt.Key.Key_Right)          # in den Platzhalter hinein
+    _wait(50)
+    assert f.id in window.findings.selected_ids()
+    detail = window.findings.detail
+    assert detail.isVisible() and "Hamburg" in detail.text() and "wird geschwärzt" in detail.text()
+
+    window.findings.toggle_selected()               # wie Leertaste in der Fundliste
+    assert not s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: nicht geschwärzt"   # Ansage für Bildschirmleser
+    _wait(50)
+    assert "NICHT geschwärzt" in window.findings.detail.text()
+    window.findings.toggle_selected()
+    assert s.get(f.id).active
+    assert window.findings.last_announcement == "Hamburg: wird geschwärzt"
+
+    # Bildschirmleser lesen die aktuelle Zelle: der Status steht in jeder Zelle der Zeile
+    from pii_redact.ui.findings_panel import COL_ON, COL_TEXT
+    proxy = window.findings.proxy
+    row = next(r for r in range(proxy.rowCount()) if proxy.index(r, COL_TEXT).data() == "Hamburg")
+    acc = Qt.ItemDataRole.AccessibleTextRole
+    assert proxy.index(row, COL_TEXT).data(acc) == "Hamburg, wird geschwärzt"
+    assert proxy.index(row, COL_ON).data(acc) == "wird geschwärzt"
+    assert proxy.headerData(COL_ON, Qt.Orientation.Horizontal, acc) == "Schwärzen"
+
+    assert window.findings.table.accessibleName() == "Fundliste"
+    assert window.left.pages.accessibleDescription()
+
+
+def test_findings_focus_lands_on_text_column(window):
+    """Barrierefreiheit: Fokus in der Fundliste landet auf der Spalte „Text“ (die liest der Bildschirmleser vor)."""
+    from PySide6.QtCore import Qt
+
+    from pii_redact.ui.findings_panel import COL_ON, COL_TEXT
+
+    _open(window, SAMPLES / "beispiel.txt")
+    table = window.findings.table
+    window.left.text.setFocus()
+    _wait(20)
+    table.setFocus(Qt.FocusReason.TabFocusReason)
+    _wait(20)
+    assert table.currentIndex().column() == COL_TEXT and table.currentIndex().row() == 0
+    assert window.findings.selected_ids()                     # Zeile ist gewählt → Detailzeile gefüllt
+
+    table.setCurrentIndex(table.model().index(2, COL_ON))      # z. B. nach Mausklick auf das Häkchen
+    window.left.text.setFocus()
+    _wait(20)
+    table.setFocus(Qt.FocusReason.BacktabFocusReason)
+    _wait(20)
+    assert (table.currentIndex().row(), table.currentIndex().column()) == (2, COL_TEXT)
+
+    # Auswahl aus dem Text heraus setzt die aktuelle Zelle ebenfalls auf „Text“
+    fid = table.model().index(1, COL_TEXT).data(Qt.ItemDataRole.UserRole + 1)
+    window.findings.select_ids([fid])
+    assert table.currentIndex().column() == COL_TEXT
+
+
+def test_tab_leaves_findings_table(window):
+    """Barrierefreiheit: Tab springt aus der Fundliste heraus, nicht von Zelle zu Zelle."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    _open(window, SAMPLES / "beispiel.txt")
+    table = window.findings.table
+    assert table.model().rowCount() > 0
+    table.setFocus()
+    table.setCurrentIndex(table.model().index(0, 0))
+    _wait(20)
+    QTest.keyClick(table, Qt.Key.Key_Tab)
+    _wait(20)
+    assert QApplication.focusWidget() is not table
+
+
+def test_keyboard_context_menu_at_cursor():
+    """Menütaste / Umschalt+F10 öffnet das Kontextmenü an der Textcursor-Position."""
+    from PySide6.QtCore import QPoint
+    from PySide6.QtGui import QContextMenuEvent
+    from PySide6.QtWidgets import QApplication
+
+    from pii_redact.ui.text_view import HighlightTextView
+
+    _app = QApplication.instance() or QApplication([])
+    view = HighlightTextView()
+    view.set_text("Hallo Welt, hier ist ein Test.")
+    cur = view.textCursor()
+    cur.setPosition(6)
+    view.setTextCursor(cur)
+    got = []
+    view.contextAt.connect(lambda off, pos: got.append(off))
+    QApplication.sendEvent(view, QContextMenuEvent(QContextMenuEvent.Reason.Keyboard, QPoint(0, 0), QPoint(0, 0)))
+    assert got == [6]
+
+
+def test_notice_bar_details_accessible():
+    """Hinweisleiste: voller Text als Beschreibung für Bildschirmleser, Knopf „Details …“."""
+    from PySide6.QtWidgets import QApplication
+
+    from pii_redact.core.loaders import Level, Notice
+    from pii_redact.ui.notices import NoticeBar
+
+    _app = QApplication.instance() or QApplication([])
+    bar = NoticeBar()
+    bar.set_notices([Notice("ocr", Level.CRITICAL, "Seite 2 per Texterkennung", "Ausführlicher Hinweis zur OCR.")])
+    assert "Ausführlicher Hinweis" in bar.accessibleDescription()
+    assert bar.close_btn.accessibleName() and bar.details_btn.accessibleName()
+    hits = []
+    bar.detailsRequested.connect(lambda: hits.append(1))
+    bar.details_btn.click()
+    assert hits == [1]
+
+
+def test_menu_mnemonics_unique(window):
+    """Barrierefreiheit: jeder Menüeintrag hat einen eigenen unterstrichenen Buchstaben (Alt, D, P …)."""
+    import re
+
+    def key(text):
+        m = re.search(r"&([^&])", text.replace("&&", ""))
+        return m.group(1).casefold() if m else None
+
+    menus = [a.menu() for a in window.menuBar().actions() if a.menu()]
+    assert [key(m.title()) for m in menus] == ["d", "b", "a", "h"]
+    for menu in menus:
+        keys = [key(a.text()) for a in menu.actions() if not a.isSeparator()]
+        assert None not in keys, (menu.title(), [a.text() for a in menu.actions()])
+        assert len(keys) == len(set(keys)), (menu.title(), keys)

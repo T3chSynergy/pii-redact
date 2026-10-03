@@ -25,6 +25,9 @@ def _release_main_windows():
     app = QApplication.instance()
     if app is None:
         return
+    # ausstehende Null-Timer (z. B. Layout-Anpassung) noch ausführen, solange die Fenster existieren –
+    # sonst feuern sie im nächsten Test auf bereits gelöschte Qt-Objekte
+    QCoreApplication.processEvents()
     for w in app.topLevelWidgets():
         if isinstance(w, MainWindow):
             w.runner.shutdown()

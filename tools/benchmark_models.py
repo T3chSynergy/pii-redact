@@ -11,6 +11,7 @@ Kandidaten-Schreibweise:
     spacy:<modell>          spaCy-NER allein
     hf:<hf-id>              Original-Transformer (PyTorch, transformers-Pipeline)
     gliner:<hf-id>          GLiNER-Modell (PyTorch)
+    gliner2:<hf-id>         GLiNER2-Modell (PyTorch), z. B. fastino/gliner2-privacy-filter-PII-multi
     onnx:<ordner>|all       umgewandelte Modelle aus models/ner (so wie im Client)
     app:schnell|gruendlich  komplette pii-redact-Analyse (Personen/Orte-Anteil);
                             „gruendlich“ läuft einmal je umgewandeltem Modell
@@ -37,8 +38,9 @@ TYPES = ("PERSON", "LOCATION")
 DEFAULT = [
     "spacy:de_core_news_md",
     "hf:Davlan/xlm-roberta-base-ner-hrl",
-    "hf:fhswf/bert_de_ner",
+    "hf:Davlan/xlm-roberta-large-ner-hrl",
     "gliner:urchade/gliner_multi_pii-v1",
+    "gliner2:fastino/gliner2-privacy-filter-PII-multi",
     "onnx:all",
     "app:schnell",
     "app:gruendlich",
@@ -155,6 +157,33 @@ def make_predictor(spec: str):
 
         return predict, size
 
+    if kind == "gliner2":
+        from gliner2 import AutoExtractor
+        from huggingface_hub import snapshot_download
+
+        model = AutoExtractor.from_pretrained(name)
+        try:
+            size = dir_size_mb(Path(snapshot_download(name, local_files_only=True)))
+        except Exception:  # noqa: BLE001
+            size = 0
+        labels = {"person": "PERSON", "location": "LOCATION", "organization": "ORGANIZATION"}
+
+        def predict(text):
+            out, pos = [], 0
+            for para in text.split("\n\n"):  # wie GLiNER: begrenztes Kontextfenster
+                start = text.index(para, pos) if para else pos
+                pos = start + len(para)
+                if not para.strip():
+                    continue
+                res = model.extract_entities(para, list(labels), threshold=0.5, include_spans=True)
+                for lab, spans in res.get("entities", res).items():
+                    for e in spans:
+                        if lab in labels and isinstance(e, dict) and "start" in e:
+                            out.append((start + e["start"], start + e["end"], labels[lab]))
+            return out
+
+        return predict, size
+
     if kind == "onnx":
         from pii_redact.core.transformer_ner import OnnxNerModel
 
@@ -192,7 +221,7 @@ def run_single(spec: str) -> dict:
     if spec.split(":")[0] in ("spacy", "onnx", "app"):
         # Wie im ausgelieferten Client: ohne PyTorch/transformers. Presidio würde sie sonst beim
         # Import mitladen, sobald sie installiert sind – das verfälscht die Speicherwerte.
-        for mod in ("torch", "transformers", "gliner"):
+        for mod in ("torch", "transformers", "gliner", "gliner2"):
             sys.modules[mod] = None
     docs, _gold, _neutral = load_gold()
     base = peak_rss_mb()

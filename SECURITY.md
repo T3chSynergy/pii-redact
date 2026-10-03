@@ -10,7 +10,7 @@ Sicherheitskorrekturen gibt es nur für die **jeweils neueste Version** (siehe
 
 | Version | Unterstützt |
 |---|---|
-| 0.7.x | ✅ |
+| 0.8.x | ✅ |
 | ältere | ❌ |
 
 ## Was gilt als Sicherheitslücke?

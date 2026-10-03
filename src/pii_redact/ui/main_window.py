@@ -60,6 +60,7 @@ class DocPanel(QWidget):
     def __init__(self, title: str, mode: str, parent=None):
         super().__init__(parent)
         self.title = QLabel(f"<b>{title}</b>")
+        self.setAccessibleName(title)
         self.header = QHBoxLayout()
         self.header.addWidget(self.title)
         self.header.addStretch(1)
@@ -67,6 +68,8 @@ class DocPanel(QWidget):
         self.tabs.setDocumentMode(True)
         self.pages = PdfPagesView(mode)
         self.text = HighlightTextView()
+        self.text.setAccessibleName(f"{title} – Text")
+        self.tabs.setAccessibleName(f"{title}: Ansicht wählen")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
         lay.addLayout(self.header)
@@ -152,6 +155,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         # Alle übrigen Hinweise stehen im Zähler der Statusleiste und als Symbol an der Seite.
         self.notice_bar = NoticeBar()
         self.notice_bar.helpRequested.connect(self.show_help)
+        self.notice_bar.detailsRequested.connect(lambda: self.notice_btn.show_popup())
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.left)
@@ -221,9 +225,11 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
 
         # Statusleiste
         self.status_label = QLabel("Bereit")
+        self.status_label.setAccessibleName("Status")
         self.status_label.linkActivated.connect(self._on_status_link)
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(220)
+        self.progress.setAccessibleName("Fortschritt der Analyse")
         self.progress.hide()
         self.mode_label = QLabel()
         self.notice_btn = NoticeButton()
@@ -242,6 +248,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.zoom_box.setMinimumContentsLength(11)
         for label, value in ZOOM_PRESETS:
             self.zoom_box.addItem(label, value)
+        self.zoom_out_btn.setAccessibleName("Seitenansicht verkleinern")
+        self.zoom_in_btn.setAccessibleName("Seitenansicht vergrößern")
+        self.zoom_box.setAccessibleName("Zoom der Seitenansicht")
         self.zoom_box.setToolTip("Zoom der Seitenansicht – Seitenbreite (Strg+0), Ganze Seite (Strg+2), "
                                  "100 % = Papiergröße (Strg+1), oder Wert eintippen")
         self.zoom_out_btn.clicked.connect(lambda: self.zoom_step(-1))
@@ -261,6 +270,10 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.left.text.contextAt.connect(self._on_left_text_context)
         self.right.text.clickedAt.connect(self._on_right_text_click)
         self.right.text.contextAt.connect(self._on_right_text_context)
+        # Tastatur: Textcursor auf einem Fund wählt ihn aus (wie ein Klick) → Angaben unter der Fundliste
+        self.left.text.caretAt.connect(lambda off: self._on_left_text_click(off, None))
+        self.right.text.caretAt.connect(lambda off: self._on_right_text_click(off, None))
+        self.findings.detail_provider = self._ids_tooltip
         self.right.text.textChanged.connect(self._on_free_text_changed)
         for panel in (self.left, self.right):
             panel.pages.overlayClicked.connect(lambda ids: ids and self.select(ids, reveal=True))
@@ -315,50 +328,50 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             return action
 
         SP = QStyle.StandardPixmap
-        act("open", "Öffnen …", self.open_dialog, QKeySequence.StandardKey.Open, SP.SP_DialogOpenButton)
-        act("open_folder", "Ordner bearbeiten …", lambda: self.open_folder_dialog(), "Ctrl+Shift+O",
+        act("open", "Ö&ffnen …", self.open_dialog, QKeySequence.StandardKey.Open, SP.SP_DialogOpenButton)
+        act("open_folder", "&Ordner bearbeiten …", lambda: self.open_folder_dialog(), "Ctrl+Shift+O",
             SP.SP_DirOpenIcon, "Alle Dateien eines Ordners analysieren, prüfen und exportieren")
-        act("resume_folder", "Ordner-Arbeit fortsetzen …", self.resume_folder_dialog)
-        act("close_folder", "Ordner-Arbeit schließen", self.close_batch)
-        act("confirm_next", "Geprüft && weiter", self.confirm_and_next, "Ctrl+Return")
-        act("prev_file", "Vorherige Datei", lambda: self._step_file(-1), "Alt+Left")
-        act("next_file", "Nächste Datei", lambda: self._step_file(+1), "Alt+Right")
-        act("reanalyze", "Neu analysieren", self.start_analysis, "F5", SP.SP_BrowserReload,
+        act("resume_folder", "Ordner-Arbeit fo&rtsetzen …", self.resume_folder_dialog)
+        act("close_folder", "Ordner-Arbeit &schließen", self.close_batch)
+        act("confirm_next", "&Geprüft && weiter", self.confirm_and_next, "Ctrl+Return")
+        act("prev_file", "&Vorherige Datei", lambda: self._step_file(-1), "Alt+Left")
+        act("next_file", "Nä&chste Datei", lambda: self._step_file(+1), "Alt+Right")
+        act("reanalyze", "&Neu analysieren", self.start_analysis, "F5", SP.SP_BrowserReload,
             "Dokument erneut prüfen (manuelle Änderungen bleiben erhalten)")
-        act("ki_review", "KI-Prüfung", self.start_ki_review, "Ctrl+K", SP.SP_MessageBoxQuestion,
+        act("ki_review", "KI-&Prüfung", self.start_ki_review, "Ctrl+K", SP.SP_MessageBoxQuestion,
             "Geschwärztes Ergebnis von einem Sprachmodell bewerten lassen: Sind Personen trotzdem erkennbar?")
-        act("export_text", "Als Text/Markdown exportieren …", self.export_text, "Ctrl+Shift+S")
-        act("export_pdf", "Als geschwärztes PDF exportieren …", self.export_pdf, QKeySequence.StandardKey.Save)
-        act("quit", "Beenden", self.close, QKeySequence.StandardKey.Quit)
-        act("undo", "Rückgängig", self.undo, QKeySequence.StandardKey.Undo, SP.SP_ArrowBack)
-        act("redo", "Wiederholen", self.redo, QKeySequence.StandardKey.Redo, SP.SP_ArrowForward)
-        act("mark", "Markierung schwärzen …", lambda: self._mark_selection(False), "Ctrl+R")
-        act("mark_all", "Alle Vorkommen der Markierung schwärzen …", lambda: self._mark_selection(True), "Ctrl+Shift+R")
-        act("all_on", "Alle Funde schwärzen", lambda: self._set_all(True))
-        act("all_off", "Keinen Fund schwärzen", lambda: self._set_all(False))
-        act("settings", "Einstellungen …", self.open_settings, "Ctrl+,", SP.SP_FileDialogDetailedView)
-        act("zoom_in", "Vergrößern", lambda: self.zoom_step(+1), QKeySequence.StandardKey.ZoomIn)
-        act("zoom_out", "Verkleinern", lambda: self.zoom_step(-1), QKeySequence.StandardKey.ZoomOut)
-        act("zoom_width", "Seitenbreite", lambda: self.set_zoom_mode("breite"), "Ctrl+0")
-        act("zoom_page", "Ganze Seite", lambda: self.set_zoom_mode("seite"), "Ctrl+2")
-        act("zoom_100", "Originalgröße (100 %)", lambda: self.set_zoom_mode("fest", 100), "Ctrl+1")
-        act("about", "Über pii-redact", self.about)
-        act("help", "Anwenderhilfe", lambda: self.show_help(), "F1", SP.SP_DialogHelpButton)
-        act("help_keys", "Tastenkürzel", lambda: self.show_help("tasten"))
-        act("help_folder", "Ordner bearbeiten – Anleitung", lambda: self.show_help("ordner"))
-        a["show_original"] = QAction(st.standardIcon(SP.SP_FileDialogContentsView), "Original anzeigen", self,
+        act("export_text", "Als &Text/Markdown exportieren …", self.export_text, "Ctrl+Shift+S")
+        act("export_pdf", "Als geschwärztes &PDF exportieren …", self.export_pdf, QKeySequence.StandardKey.Save)
+        act("quit", "&Beenden", self.close, QKeySequence.StandardKey.Quit)
+        act("undo", "&Rückgängig", self.undo, QKeySequence.StandardKey.Undo, SP.SP_ArrowBack)
+        act("redo", "&Wiederholen", self.redo, QKeySequence.StandardKey.Redo, SP.SP_ArrowForward)
+        act("mark", "&Markierung schwärzen …", lambda: self._mark_selection(False), "Ctrl+R")
+        act("mark_all", "Alle Vor&kommen der Markierung schwärzen …", lambda: self._mark_selection(True), "Ctrl+Shift+R")
+        act("all_on", "&Alle Funde schwärzen", lambda: self._set_all(True))
+        act("all_off", "Kei&nen Fund schwärzen", lambda: self._set_all(False))
+        act("settings", "&Einstellungen …", self.open_settings, "Ctrl+,", SP.SP_FileDialogDetailedView)
+        act("zoom_in", "&Vergrößern", lambda: self.zoom_step(+1), QKeySequence.StandardKey.ZoomIn)
+        act("zoom_out", "Ver&kleinern", lambda: self.zoom_step(-1), QKeySequence.StandardKey.ZoomOut)
+        act("zoom_width", "&Seitenbreite", lambda: self.set_zoom_mode("breite"), "Ctrl+0")
+        act("zoom_page", "&Ganze Seite", lambda: self.set_zoom_mode("seite"), "Ctrl+2")
+        act("zoom_100", "Originalgröße (&100 %)", lambda: self.set_zoom_mode("fest", 100), "Ctrl+1")
+        act("about", "Ü&ber pii-redact", self.about)
+        act("help", "&Anwenderhilfe", lambda: self.show_help(), "F1", SP.SP_DialogHelpButton)
+        act("help_keys", "&Tastenkürzel", lambda: self.show_help("tasten"))
+        act("help_folder", "&Ordner bearbeiten – Anleitung", lambda: self.show_help("ordner"))
+        a["show_original"] = QAction(st.standardIcon(SP.SP_FileDialogContentsView), "&Original anzeigen", self,
                                      checkable=True, checked=self.settings.show_original)
         a["show_original"].setShortcut(QKeySequence("Ctrl+Shift+V"))
         a["show_original"].setToolTip("Originaldokument neben der bearbeiteten Fassung einblenden (Strg+Umschalt+V)")
         a["show_original"].toggled.connect(self._set_show_original)
-        a["sync"] = QAction("Scrollen koppeln", self, checkable=True, checked=self.settings.sync_scroll)
+        a["sync"] = QAction("Scrollen ko&ppeln", self, checkable=True, checked=self.settings.sync_scroll)
         a["sync"].toggled.connect(self._set_sync)
 
         # Menüs
         mb = self.menuBar()
         m = mb.addMenu("&Datei")
         m.addActions([a["open"], a["open_folder"], a["resume_folder"]])
-        self.recent_menu = m.addMenu("Zuletzt bearbeitete Ordner")
+        self.recent_menu = m.addMenu("&Zuletzt bearbeitete Ordner")
         self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
         m.addAction(a["close_folder"])
         m.addSeparator()
@@ -408,6 +421,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             self.mode_box.addItem(label, key)
         self.mode_box.setCurrentIndex(max(0, self.mode_box.findData(self.settings.replace_mode)))
         self.mode_box.currentIndexChanged.connect(self._on_mode_changed)
+        self.mode_box.setAccessibleName("Ersetzung")
         tb.addWidget(self.mode_box)
         tb.addSeparator()
         tb.addWidget(QLabel(" Analyse: "))
@@ -417,11 +431,12 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.analysis_box.setItemData(0, "spaCy + Muster – Sekundenbruchteile pro Seite", Qt.ItemDataRole.ToolTipRole)
         self._refresh_analysis_box()
         self.analysis_box.currentIndexChanged.connect(self._on_analysis_mode_changed)
+        self.analysis_box.setAccessibleName("Analyse-Modus")
         tb.addWidget(self.analysis_box)
         tb.addSeparator()
         export_btn_menu = QMenu(self)
         export_btn_menu.addActions([a["export_pdf"], a["export_text"]])
-        self.export_action = QAction(st.standardIcon(SP.SP_DialogSaveButton), "Exportieren", self)
+        self.export_action = QAction(st.standardIcon(SP.SP_DialogSaveButton), "E&xportieren", self)
         self.export_action.setMenu(export_btn_menu)
         self.export_action.triggered.connect(self._export_default)
         tb.addAction(self.export_action)
@@ -527,7 +542,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             self.session.dirty = False
         else:
             self.session.apply_reanalysis(findings)
-        total, active = self.session.counts()
+        total, _active = self.session.counts()
         self.status_label.setText(f"Analyse fertig: {total} Funde.")
         self._update_actions()
         self._update_title()
