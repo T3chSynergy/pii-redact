@@ -108,10 +108,11 @@ ist „Gründlich“ ausgegraut und das Programm verwendet automatisch „Schnel
 tools\modelle_testen.bat
 ```
 
-Legt eine separate Werkzeug-Umgebung `.venv-tools` an (PyTorch CPU, transformers, GLiNER – ca. 3–4 GB),
-wandelt `Davlan/xlm-roberta-base-ner-hrl` und `fhswf/bert_de_ner` nach ONNX (8-Bit) um und vergleicht
-spaCy, die Originalmodelle, GLiNER und die ONNX-Fassungen. Ergebnis: `benchmark_ergebnis.md`
-(Tempo, Arbeitsspeicher, Trefferquote gegen `samples/soll_funde.json`).
+Legt eine separate Werkzeug-Umgebung `.venv-tools` an (PyTorch CPU, transformers, GLiNER, GLiNER2 – ca. 4–5 GB),
+wandelt `Davlan/xlm-roberta-base-ner-hrl` nach ONNX (8-Bit) um und vergleicht spaCy, die Originalmodelle
+(Davlan base und large), GLiNER, GLiNER2 und die ONNX-Fassung. Ergebnis: `benchmark_ergebnis.md`
+(Tempo, Arbeitsspeicher, Trefferquote gegen `samples/soll_funde.json` – neun erfundene Testtexte mit rund
+150 erwarteten Namen und Orten, davon sechs unter `samples/erkennung/`).
 
 Einzeln:
 
@@ -242,7 +243,9 @@ pytest            # Kernlogik, ONNX-Aggregation, Oberflächen-Rauchtest (offscre
 
 `samples/` enthält fiktive Beispieldokumente. Neu erzeugen: `samples/make_sample_pdf.py` (beispiel.pdf),
 `samples/make_extras_pdf.py` (kommentare.pdf, formular.pdf), `samples/make_scan_pdf.py` (scan.pdf,
-mail_mit_scan.pdf – ohne Textebene, für die Texterkennung).
+mail_mit_scan.pdf – ohne Textebene, für die Texterkennung), `samples/make_erkennung.py` (Testtexte
+`samples/erkennung/*.txt` samt Soll-Funden in `soll_funde.json`; `tests/test_erkennung.py` prüft damit die
+Erkennungsquote).
 
 ## Grenzen
 
