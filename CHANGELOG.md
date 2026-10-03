@@ -34,6 +34,7 @@
   Namensvielfalt) mit rund 120 erwarteten Namen und Orten; ein Test prüft die Erkennungsquote, damit
   Paket-Updates die Erkennung nicht unbemerkt verschlechtern.
 - Modellvergleich (`tools/modelle_testen.bat`) zusätzlich mit Davlan large und GLiNER2-PII.
+- PDF-Laden aufgeteilt (Textebene, Texterkennung, Hinweise in eigenen Funktionen) – Ergebnis unverändert.
 
 ## 0.7.2 – 02.10.2026
 

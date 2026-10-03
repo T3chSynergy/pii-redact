@@ -59,7 +59,7 @@ def _get_engine():
     if _engine is None:
         try:
             from rapidocr import RapidOCR
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise OcrUnavailableError(f"Texterkennung (RapidOCR) nicht verfügbar: {exc}") from exc
         _engine = RapidOCR(params={
             "Global.log_level": "error",

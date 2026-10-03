@@ -61,7 +61,7 @@ def main(argv=None) -> int:
     if args.no_quantize:
         args.quant = "none"
     try:
-        import torch.jit  # noqa: F401
+        import torch.jit
         from torch.jit import TracerWarning
 
         warnings.filterwarnings("ignore", category=TracerWarning)
