@@ -11,6 +11,7 @@
 - Vorlesbare Namen und Beschreibungen für Bildschirmleser (Ansichten, Fundliste, Filter, Zoom, Hinweise).
 - Bildschirmleser sagen in der Fundliste zu jedem Fund, ob er geschwärzt wird, und kündigen nach der Leertaste
   den neuen Status an.
+- Tastaturfokus in der Fundliste landet auf der Spalte „Text“, sodass zuerst der Fund vorgelesen wird.
 - Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
 
 **Intern**

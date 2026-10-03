@@ -185,6 +185,21 @@ class _FilterProxy(QSortFilterProxyModel):
         return True
 
 
+class _FindingsTable(QTableView):
+    """Tabelle, deren Tastaturfokus auf der Spalte „Text“ landet – Bildschirmleser lesen dann zuerst den Fund."""
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        cur = self.currentIndex()
+        if self.model() is None or self.model().rowCount() == 0 or (cur.isValid() and cur.column() == COL_TEXT):
+            return
+        row = cur.row() if cur.isValid() else 0
+        sel = self.selectionModel()
+        flags = (sel.SelectionFlag.NoUpdate if sel.isRowSelected(row, QModelIndex())
+                 else sel.SelectionFlag.ClearAndSelect | sel.SelectionFlag.Rows)
+        sel.setCurrentIndex(self.model().index(row, COL_TEXT), flags)
+
+
 class FindingsPanel(QWidget):
     findingActivated = Signal(int)        # Klick in Liste → zur Stelle springen
     contextRequested = Signal(list, QPoint)
@@ -207,7 +222,7 @@ class FindingsPanel(QWidget):
         self.type_box.currentIndexChanged.connect(self._apply_filter)
         self.type_box.setAccessibleName("Funde nach Datenart filtern")
 
-        self.table = QTableView()
+        self.table = _FindingsTable()
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.sortByColumn(COL_WHERE, Qt.SortOrder.AscendingOrder)
@@ -322,7 +337,7 @@ class FindingsPanel(QWidget):
         self.table.clearSelection()
         first = None
         for row in range(self.proxy.rowCount()):
-            idx = self.proxy.index(row, 0)
+            idx = self.proxy.index(row, COL_TEXT)
             if self.proxy.data(idx, ID_ROLE) in ids:
                 sel.select(idx, sel.SelectionFlag.Select | sel.SelectionFlag.Rows)
                 if first is None:
