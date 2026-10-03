@@ -25,6 +25,10 @@
   Aufrufparameter liefern 1 statt 2 (2 bedeutet „Reste im Ergebnis“).
 - Neu: `--version`, `--einstellungen DATEI` (z. B. für Dienstkonten); Warnungen in der Fehlerausgabe.
 
+**Hilfe und README**
+- Messwerte zu „Schnell“/„Gründlich“ aktualisiert (neue Testtexte), Kommandozeile mit allen Optionen und
+  Rückgabewerten, Fundliste per Tastatur, Einstellung „spaCy-Modell“ beschrieben.
+
 **Intern**
 - Sechs neue erfundene Testtexte (Brief, Protokoll, Dienstplan, E-Mail-Verlauf, doppeldeutige Namen,
   Namensvielfalt) mit rund 120 erwarteten Namen und Orten; ein Test prüft die Erkennungsquote, damit
