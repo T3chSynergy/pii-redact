@@ -178,10 +178,22 @@ Sperrliste (immer schwärzen). Gespeichert unter `%APPDATA%\pii-redact\settings.
 ```bash
 pii-redact-cli brief.pdf                     # → brief_geschwaerzt.pdf
 pii-redact-cli notizen.md --modus nummeriert # → notizen_anonymisiert.md
-pii-redact-cli *.txt --nur-anzeigen          # nur Funde auflisten
+pii-redact-cli *.txt --nur-anzeigen          # nur Funde auflisten (mit Klartext, schreibt nichts)
 pii-redact-cli brief.pdf --gruendlich        # mit Transformer-Modell
+pii-redact-cli brief.pdf --ueberschreiben    # vorhandenes Ergebnis ersetzen
 pii-redact-cli --selftest                    # Installation prüfen (Modelle, beide Modi)
+pii-redact-cli --version
 ```
+
+- Die Ausgabe nennt nur **Anzahl und Datenart** der Funde, z. B. `brief.pdf: 5 Funde (Person 3, IBAN 1, E-Mail 1)`.
+  Den gefundenen Klartext zeigen nur `--nur-anzeigen` und `--details` – solche Ausgaben nicht in Log-Dateien
+  umleiten.
+- Vorhandene Ergebnisdateien werden **nicht überschrieben** (Fehler, Rückgabewert 1), außer mit `--ueberschreiben`.
+- `--einstellungen DATEI` verwendet eine eigene Einstellungsdatei statt `%APPDATA%\pii-redact\settings.json`,
+  z. B. für geplante Aufgaben unter einem Dienstkonto; zentrale Vorgaben (`defaults.json`) gelten weiterhin.
+- Rückgabewerte: `0` OK · `1` Fehler (auch falscher Aufruf) · `2` Kontrolle fand Reste im Ergebnis ·
+  `3` Datei mit Texterkennung nicht automatisch exportiert (Ordner). Bei mehreren Dateien gilt der
+  schwerwiegendste Wert (2 vor 1 vor 3 vor 0). Warnungen und Fehler stehen in der Fehlerausgabe (stderr).
 
 ## Aufbau
 

@@ -16,6 +16,15 @@
   die Hilfe erklärt, wie Menü und Werkzeugleiste ohne Maus erreichbar sind.
 - Hilfe: neuer Abschnitt „Bedienung ohne Maus und mit Bildschirmleser“ (Kapitel 11).
 
+**Kommandozeile (`pii-redact-cli`)**
+- Gibt nur noch Anzahl und Datenart der Funde aus – kein Klartext mehr in Ausgaben, die in Log-Dateien landen
+  können. Klartext nur mit `--nur-anzeigen` oder dem neuen `--details`.
+- Überschreibt vorhandene Ergebnisdateien nicht mehr still (neu: `--ueberschreiben`); Textdateien werden wie in der
+  Oberfläche erst vollständig geschrieben und dann umbenannt.
+- Rückgabewert: Bei mehreren Dateien gilt der schwerwiegendste Wert (Reste im Ergebnis vor Fehler); falsche
+  Aufrufparameter liefern 1 statt 2 (2 bedeutet „Reste im Ergebnis“).
+- Neu: `--version`, `--einstellungen DATEI` (z. B. für Dienstkonten); Warnungen in der Fehlerausgabe.
+
 **Intern**
 - Sechs neue erfundene Testtexte (Brief, Protokoll, Dienstplan, E-Mail-Verlauf, doppeldeutige Namen,
   Namensvielfalt) mit rund 120 erwarteten Namen und Orten; ein Test prüft die Erkennungsquote, damit
