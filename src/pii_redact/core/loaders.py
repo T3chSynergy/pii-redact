@@ -144,6 +144,96 @@ def _load_text(path: Path, kind: str) -> LoadedDocument:
     return LoadedDocument(path=path, kind=kind, text=text, encoding=enc)
 
 
+class _TextBuilder:
+    """Baut den Dokumenttext Zeichen für Zeichen auf – zu jedem Zeichen seine Position auf der Seite."""
+
+    def __init__(self) -> None:
+        self.parts: list[str] = []
+        self.boxes: list[CharBox | None] = []
+        self.page_offsets: list[int] = []
+        self.line_no = 0
+
+    def add(self, c: str, box: CharBox | None) -> None:
+        self.parts.append(c)
+        self.boxes.append(box)
+
+    def end_line(self) -> None:
+        self.add("\n", None)
+        self.line_no += 1
+
+    def start_page(self) -> None:
+        self.page_offsets.append(len(self.parts))
+
+    def text(self) -> str:
+        text = "".join(self.parts)
+        assert len(text) == len(self.boxes), "Interner Fehler bei der PDF-Textzuordnung"
+        return text
+
+
+def _char_count(raw: dict) -> int:
+    return sum(len(ch["c"]) for b in raw.get("blocks", []) if b.get("type") == 0
+               for ln in b.get("lines", []) for sp in ln.get("spans", []) for ch in sp.get("chars", []))
+
+
+def _add_page_text(tb: _TextBuilder, pno: int, raw: dict, collect_rects: bool) -> tuple[int, list[fitz.Rect]]:
+    """Textebene einer Seite übernehmen. Rückgabe: Anzahl Zeichen und – für die Texterkennung – die
+    Flächen, auf denen schon echter Text steht."""
+    page_chars = 0
+    text_rects: list[fitz.Rect] = []
+    for block in raw.get("blocks", []):
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                for ch in span.get("chars", []):
+                    box = CharBox(pno, tb.line_no, tuple(ch["bbox"]))
+                    if collect_rects and ch["c"].strip():
+                        text_rects.append(fitz.Rect(ch["bbox"]))
+                    for c in ch["c"]:  # i. d. R. genau ein Zeichen
+                        tb.add(c, box)
+                        page_chars += 1
+            tb.end_line()
+        tb.add("\n", None)
+    return page_chars, text_rects
+
+
+def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key, text_rects: list[fitz.Rect],
+                  ocr_low: list[str]) -> tuple[int, str]:
+    """Texterkennung einer Seite anhängen (Wörter, die schon als echter Text vorliegen, nicht doppelt).
+    Rückgabe: Anzahl hinzugefügter Zeichen und ggf. eine Fehlermeldung."""
+    from . import ocr as ocr_mod
+
+    error = ""
+    try:
+        lines = ocr_mod.ocr_page(page, key)
+    except Exception as exc:  # noqa: BLE001 – OCR ist nur Rückfallebene
+        error = f"Texterkennung fehlgeschlagen: {exc}"
+        lines = []
+    added = 0
+    for words in lines:
+        # Wörter, die schon als echter Text vorliegen (z. B. Kopfzeile), nicht doppelt aufnehmen
+        words = [w for w in _split_glued(words) if not _covered(fitz.Rect(w.rect), text_rects)]
+        if not words:
+            continue
+        for i, w in enumerate(words):
+            if i:
+                prev = words[i - 1].rect
+                gap = (prev[2], min(prev[1], w.rect[1]), max(prev[2], w.rect[0]), max(prev[3], w.rect[3]))
+                tb.add(" ", CharBox(pno, tb.line_no, gap, ocr=True))
+            x0, y0, x1, y1 = w.rect
+            n = len(w.text)
+            for k, c in enumerate(w.text):
+                tb.add(c, CharBox(pno, tb.line_no, (x0 + (x1 - x0) * k / n, y0, x0 + (x1 - x0) * (k + 1) / n, y1),
+                                  ocr=True))
+                added += 1
+            if w.score < ocr_mod.LOW_CONFIDENCE:
+                ocr_low.append(w.text)
+        tb.end_line()
+    if added:
+        tb.add("\n", None)
+    return added, error
+
+
 def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     data = path.read_bytes()
     doc = fitz.open(stream=data, filetype="pdf")
@@ -158,106 +248,69 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
         doc.close()
         doc = fitz.open(stream=data, filetype="pdf")
 
-    parts: list[str] = []
-    boxes: list[CharBox | None] = []
-    page_offsets: list[int] = []
-    line_no = 0
-    offset = 0
+    # Welche Seiten brauchen OCR? (erst zählen, damit der Fortschritt stimmt)
+    flags = fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP
+    raws = [page.get_text("rawdict", flags=flags) for page in doc]
+    want_ocr: list[int] = []
+    ocr_error = ""
+    key = None
+    if ocr:
+        from . import ocr as ocr_mod
+
+        want_ocr = [pno for pno, page in enumerate(doc) if ocr_mod.needs_ocr(page, _char_count(raws[pno]))]
+        if want_ocr and not ocr_mod.is_available():
+            ocr_error = "Texterkennung (OCR) ist nicht installiert."
+            want_ocr = []
+        if want_ocr:
+            key = ocr_mod.doc_key(data)
+    content_images = _content_image_pages(doc)
+
+    tb = _TextBuilder()
     pages_without_text: list[int] = []
     pages_with_images: list[int] = []   # 1-basiert
     ocr_pages: list[int] = []
     ocr_low: list[str] = []
-    ocr_error = ""
-
-    def add(c: str, box: CharBox | None) -> None:
-        nonlocal offset
-        parts.append(c)
-        boxes.append(box)
-        offset += 1
-
-    # Welche Seiten brauchen OCR? (erst zählen, damit der Fortschritt stimmt)
-    flags = fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP
-    raws = [page.get_text("rawdict", flags=flags) for page in doc]
-    char_counts = [sum(len(ch["c"]) for b in r.get("blocks", []) if b.get("type") == 0
-                       for ln in b.get("lines", []) for sp in ln.get("spans", []) for ch in sp.get("chars", []))
-                   for r in raws]
-    want_ocr = []
-    if ocr:
-        from . import ocr as ocr_mod
-
-        want_ocr = [pno for pno, page in enumerate(doc) if ocr_mod.needs_ocr(page, char_counts[pno])]
-        if want_ocr and not ocr_mod.is_available():
-            ocr_error = "Texterkennung (OCR) ist nicht installiert."
-            want_ocr = []
-    key = None
-    if want_ocr:
-        key = ocr_mod.doc_key(data)
-    content_images = _content_image_pages(doc)
-
     for pno, page in enumerate(doc):
-        page_offsets.append(offset)
-        page_chars = 0
-        text_rects: list[fitz.Rect] = []
-        for block in raws[pno].get("blocks", []):
-            if block.get("type") != 0:
-                continue
-            for line in block.get("lines", []):
-                for span in line.get("spans", []):
-                    for ch in span.get("chars", []):
-                        box = CharBox(pno, line_no, tuple(ch["bbox"]))
-                        if want_ocr and pno in want_ocr and ch["c"].strip():
-                            text_rects.append(fitz.Rect(ch["bbox"]))
-                        for c in ch["c"]:  # i. d. R. genau ein Zeichen
-                            add(c, box)
-                            page_chars += 1
-                add("\n", None)
-                line_no += 1
-            add("\n", None)
-
-        if pno in want_ocr:
+        tb.start_page()
+        do_ocr = pno in want_ocr
+        page_chars, text_rects = _add_page_text(tb, pno, raws[pno], collect_rects=do_ocr)
+        if do_ocr:
             if progress:
                 progress(want_ocr.index(pno), len(want_ocr))
-            try:
-                lines = ocr_mod.ocr_page(page, key)
-            except Exception as exc:  # noqa: BLE001 – OCR ist nur Rückfallebene
-                ocr_error = f"Texterkennung fehlgeschlagen: {exc}"
-                lines = []
-            added = 0
-            for words in lines:
-                # Wörter, die schon als echter Text vorliegen (z. B. Kopfzeile), nicht doppelt aufnehmen
-                words = [w for w in _split_glued(words) if not _covered(fitz.Rect(w.rect), text_rects)]
-                if not words:
-                    continue
-                for i, w in enumerate(words):
-                    if i:
-                        prev = words[i - 1].rect
-                        gap = (prev[2], min(prev[1], w.rect[1]), max(prev[2], w.rect[0]), max(prev[3], w.rect[3]))
-                        add(" ", CharBox(pno, line_no, gap, ocr=True))
-                    x0, y0, x1, y1 = w.rect
-                    n = len(w.text)
-                    for k, c in enumerate(w.text):
-                        add(c, CharBox(pno, line_no, (x0 + (x1 - x0) * k / n, y0, x0 + (x1 - x0) * (k + 1) / n, y1),
-                                       ocr=True))
-                        added += 1
-                    if w.score < ocr_mod.LOW_CONFIDENCE:
-                        ocr_low.append(w.text)
-                add("\n", None)
-                line_no += 1
+            added, error = _add_ocr_text(tb, pno, page, key, text_rects, ocr_low)
+            ocr_error = error or ocr_error
             if added:
                 ocr_pages.append(pno)
                 page_chars += added
-                add("\n", None)
             if progress:
                 progress(want_ocr.index(pno) + 1, len(want_ocr))
-
         if page_chars == 0:
             pages_without_text.append(pno + 1)
         if pno not in ocr_pages and pno in content_images:
             pages_with_images.append(pno + 1)
 
-    text = "".join(parts)
-    assert len(text) == len(boxes), "Interner Fehler bei der PDF-Textzuordnung"
+    notices = _build_notices(extras, ocr, doc.page_count, ocr_pages, ocr_low, ocr_error,
+                             pages_without_text, pages_with_images)
+    result = LoadedDocument(
+        path=path,
+        kind="pdf",
+        text=tb.text(),
+        pdf_bytes=data,
+        char_boxes=tb.boxes,
+        page_count=doc.page_count,
+        page_offsets=tb.page_offsets,
+        warnings=[n.detail for n in notices],
+        notices=notices,
+        ocr_pages=ocr_pages,
+        ocr_uncertain=len(ocr_low),
+    )
+    doc.close()
+    return result
 
+
+def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int], ocr_low: list[str],
+                   ocr_error: str, pages_without_text: list[int], pages_with_images: list[int]) -> list[Notice]:
+    """Hinweise zum Dokument (Texterkennung, Seiten ohne Text, Bereinigung, Formulare, Bilder)."""
     notices: list[Notice] = []
     if ocr_pages:
         pages_txt = _fmt_pages([p + 1 for p in ocr_pages])
@@ -274,7 +327,7 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     if ocr_error:
         notices.append(Notice("ocr_error", Level.CRITICAL, ocr_error, ocr_error))
     if pages_without_text:
-        if len(pages_without_text) == doc.page_count:
+        if len(pages_without_text) == page_count:
             off = "" if ocr else " Die Texterkennung (OCR) ist in den Einstellungen ausgeschaltet."
             notices.append(Notice(
                 "no_text", Level.CRITICAL, "Kein lesbarer Text – es können keine Daten erkannt werden",
@@ -312,23 +365,7 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
             f"Seiten mit Bildern: {pages_txt} – Inhalte in Bildern (z. B. Unterschrift, Foto) "
             "werden nicht erkannt. Bei Bedarf in der Seitenansicht einen Rahmen darum ziehen.",
             [p - 1 for p in pages_with_images], "Bild"))
-    warnings = [n.detail for n in notices]
-
-    result = LoadedDocument(
-        path=path,
-        kind="pdf",
-        text=text,
-        pdf_bytes=data,
-        char_boxes=boxes,
-        page_count=doc.page_count,
-        page_offsets=page_offsets,
-        warnings=warnings,
-        notices=notices,
-        ocr_pages=ocr_pages,
-        ocr_uncertain=len(ocr_low),
-    )
-    doc.close()
-    return result
+    return notices
 
 
 def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:

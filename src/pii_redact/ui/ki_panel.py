@@ -101,7 +101,7 @@ class KiReviewPanel(QWidget):
                           + (f" · {res.chunks} Anfragen" if res.chunks > 1 else ""))
         self.summary.setText(res.summary or "(keine Begründung geliefert)")
         self.list.clear()
-        for hint, ids in zip(res.hints, ids_by_hint):
+        for hint, ids in zip(res.hints, ids_by_hint, strict=True):
             label = info(hint.entity_type).label
             text = f"„{hint.quote}“ – {label}"
             if hint.reason:

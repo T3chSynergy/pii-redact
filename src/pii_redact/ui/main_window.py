@@ -542,7 +542,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             self.session.dirty = False
         else:
             self.session.apply_reanalysis(findings)
-        total, active = self.session.counts()
+        total, _active = self.session.counts()
         self.status_label.setText(f"Analyse fertig: {total} Funde.")
         self._update_actions()
         self._update_title()
