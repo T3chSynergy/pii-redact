@@ -44,7 +44,8 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
       markierten Funden. Ein- und ausschalten über <i>Original anzeigen</i> (<kbd>Strg+Umschalt+V</kbd>).
       Das Programm merkt sich Ihre Wahl.</td></tr>
   <tr><td><b>Funde</b> (rechts)</td><td>Liste aller Treffer mit Datenart, Text, Fundstelle (Seite oder Zeile),
-      Sicherheit (Score) und Herkunft (<i>auto</i> oder <i>manuell</i>).</td></tr>
+      Sicherheit (Score) und Herkunft (<i>auto</i>, <i>manuell</i> oder <i>KI</i>). Darunter stehen alle
+      Angaben zum gewählten Fund – Originaltext, ob er geschwärzt wird, Texterkennung, Herkunft.</td></tr>
   <tr><td><b>Statusleiste</b> (unten)</td><td>Meldungen (z. B. „✓ gespeichert“ mit Link zum Ordner), der
       <b>Hinweis-Zähler</b>, Fortschritt der Analyse, der aktive Modus und rechts der <b>Zoom</b> der
       Seitenansicht.</td></tr>
@@ -83,7 +84,8 @@ immer.</p>
 <p>Ihre Wahl gilt für alle Dokumente und bleibt auch nach einem Neustart erhalten.</p>
 
 <p class="tipp"><b>Tipp:</b> Fahren Sie mit der Maus über einen Platzhalter oder Schwärzungsbalken – ein Hinweis
-zeigt, was dahinter steht und ob es geschwärzt wird. So können Sie auch ohne eingeblendetes Original prüfen.</p>
+zeigt, was dahinter steht und ob es geschwärzt wird. Dieselben Angaben stehen dauerhaft unter der Fundliste,
+sobald ein Fund gewählt ist. So können Sie auch ohne eingeblendetes Original prüfen.</p>
 
 <h2><a name="pruefen"></a>3. Ergebnis prüfen und korrigieren</h2>
 
@@ -143,6 +145,8 @@ erhalten.</p>
   <li><b>Sichtbare an / Sichtbare aus</b> schaltet alle gerade angezeigten Funde auf einmal –
       z. B. nach Filter „Datum“ alle Datumsangaben abwählen.</li>
   <li>Ein Klick auf einen Eintrag springt zur Fundstelle im Dokument.</li>
+  <li>Per Tastatur: Pfeiltasten wählen, <kbd>Leertaste</kbd> schaltet das Schwärzen an/aus, <kbd>F2</kbd> in der
+      Spalte <i>Typ</i> ändert die Datenart (siehe <a href="#tastatur">Bedienung ohne Maus</a>).</li>
 </ul>
 
 <h3>Rückgängig und neu analysieren</h3>
@@ -345,16 +349,16 @@ gleich. Der Unterschied betrifft vor allem <b>Namen, Orte und Organisationen</b>
 <h3>Unterschiede im Überblick</h3>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
   <tr><th width="30%"></th><th>Gründlich</th><th>Schnell</th></tr>
-  <tr><td><b>Personen gefunden</b>*</td><td>ca. 100 %</td><td>ca. 80 %</td></tr>
-  <tr><td><b>Orte gefunden</b>*</td><td>ca. 100 %</td><td>ca. 67 %</td></tr>
-  <tr><td><b>Fehlalarme</b>*</td><td>gering (ca. 6 % der Personen-Funde)</td><td>gering (ca. 8 %)</td></tr>
+  <tr><td><b>Personen gefunden</b>*</td><td>ca. 99 %</td><td>ca. 80 %</td></tr>
+  <tr><td><b>Orte gefunden</b>*</td><td>ca. 96 %</td><td>ca. 79 %</td></tr>
+  <tr><td><b>Fehlalarme</b>*</td><td>gering (ca. 3 % der Personen-Funde)</td><td>gering (ca. 4 %)</td></tr>
   <tr><td><b>Zeit pro Seite</b></td><td>ca. 0,3–1 Sekunde</td><td>unter 0,2 Sekunden</td></tr>
   <tr><td><b>Erste Analyse nach dem Start</b></td><td>einige Sekunden länger (Modell wird geladen)</td>
       <td>kurz</td></tr>
   <tr><td><b>Arbeitsspeicher</b></td><td>ca. 1 GB</td><td>ca. 0,4 GB</td></tr>
 </table>
-<p class="klein">* Gemessen an einer kleinen Sammlung von Testdokumenten – die Werte zeigen die Tendenz, keine
-Garantie. Auch „Gründlich“ findet nie alles; die Prüfung durch Sie bleibt nötig. Die Zeiten hängen vom Rechner
+<p class="klein">* Gemessen an neun erfundenen Testtexten (Briefe, Protokoll, Tabellen, E-Mails) mit rund
+150 Namen und Orten – die Werte zeigen die Tendenz, keine Garantie. Auch „Gründlich“ findet nie alles; die Prüfung durch Sie bleibt nötig. Die Zeiten hängen vom Rechner
 ab; bei der Ordner-Bearbeitung läuft die Analyse ohnehin im Hintergrund.</p>
 
 <h3>Wann „Schnell“?</h3>
@@ -388,6 +392,8 @@ davorsteht – damit nicht jedes Rechnungsdatum verschwindet. Andere Datumsangab
   <tr><th width="30%">Einstellung</th><th>Bedeutung</th></tr>
   <tr><td>Mindest-Score</td><td>Wie sicher sich die Erkennung sein muss (Standard 0,45). Niedriger = mehr Funde,
       aber auch mehr Fehlalarme.</td></tr>
+  <tr><td>spaCy-Modell</td><td>Das Sprachmodell für den Modus „Schnell“ (Standard <code>de_core_news_md</code>).
+      Nur auf Anweisung der IT ändern.</td></tr>
   <tr><td>Analyse-Modus / Transformer-Modell</td><td>Siehe <a href="#modi">Kapitel 7</a>.</td></tr>
   <tr><td>Ersetzung</td><td>Siehe <a href="#ersetzung">Kapitel 8</a>.</td></tr>
   <tr><td>Platzhalter im PDF-Balken</td><td>Schreibt z. B. „[PERSON]“ in den Schwärzungsbalken.</td></tr>
@@ -522,11 +528,19 @@ werden.</p>
   <tr><td><code>pii-redact-cli C:\Akten -o C:\Akten_geschwaerzt</code></td><td>Ganzen Ordner bearbeiten, mit Protokoll</td></tr>
   <tr><td><code>--schnell</code> / <code>--gruendlich</code></td><td>Modus wählen (Standard: wie in den
       Einstellungen, voreingestellt „Gründlich“)</td></tr>
-  <tr><td><code>--nur-anzeigen</code></td><td>Funde nur auflisten, nichts speichern</td></tr>
+  <tr><td><code>--nur-anzeigen</code></td><td>Funde mit dem gefundenen Text auflisten, nichts speichern</td></tr>
+  <tr><td><code>--details</code></td><td>Beim Speichern zusätzlich die Funde mit dem gefundenen Text auflisten</td></tr>
+  <tr><td><code>--ueberschreiben</code></td><td>Vorhandene Ergebnisdateien ersetzen (sonst Fehler)</td></tr>
+  <tr><td><code>--einstellungen DATEI</code></td><td>Eigene Einstellungsdatei, z. B. für geplante Aufgaben;
+      Vorgaben der IT gelten weiterhin</td></tr>
   <tr><td><code>--ohne-unterordner</code></td><td>Bei Ordnern nur die oberste Ebene</td></tr>
   <tr><td><code>--ohne-ocr</code></td><td>Gescannte Seiten nicht per Texterkennung lesen</td></tr>
-  <tr><td><code>--selftest</code></td><td>Installation prüfen</td></tr>
+  <tr><td><code>--selftest</code> / <code>--version</code></td><td>Installation prüfen / Version anzeigen</td></tr>
 </table>
+<p>Die normale Ausgabe nennt nur <b>Anzahl und Datenart</b> der Funde, nicht die Daten selbst. Leiten Sie
+Ausgaben von <code>--nur-anzeigen</code> und <code>--details</code> nicht in Protokolldateien um.</p>
+<p class="klein">Rückgabewerte: 0 = in Ordnung, 1 = Fehler, 2 = Reste im Ergebnis gefunden, 3 = Datei mit
+Texterkennung nicht exportiert. Bei mehreren Dateien gilt der schwerwiegendste Wert (2 vor 1 vor 3).</p>
 
 <h2><a name="komponenten"></a>15. Über pii-redact und verwendete Open-Source-Software</h2>
 <p>pii-redact {{VERSION}} ist <b>freie Software unter der GNU Affero General Public License, Version 3 oder
