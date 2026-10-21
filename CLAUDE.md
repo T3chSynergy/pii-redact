@@ -4,10 +4,11 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
+**Stand:** v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); davor
+v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
 Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
 `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
-`build.bat` auf Windows mit 3.14 erfolgreich getestet (03.10.2026, vor Release 0.8.0). v0.3.0 läuft auf dem Test-PC.
+`build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.

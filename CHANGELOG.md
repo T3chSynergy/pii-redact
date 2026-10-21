@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.1 – 21.10.2026
 
 **Sicherheit**
 - Pillow 12.3.0 → 13.0.0 (8 Sicherheitslücken beim Einlesen von TIFF, GIF, PPM, EPS und beim Anhängen an PDFs).
