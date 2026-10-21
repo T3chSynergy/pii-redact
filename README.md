@@ -6,6 +6,10 @@ jeden Fund prüfen, abwählen, umtypisieren oder eigene Stellen ergänzen und da
 
 Alles läuft **offline auf dem eigenen Rechner** – es werden keine Dokumentinhalte übertragen.
 
+> **Download für Windows:** [neueste Version](https://github.com/T3chSynergy/pii-redact/releases/latest) –
+> `pii-redact-<version>.zip` herunterladen, entpacken, `pii-redact.exe` starten. Python und alle Modelle sind
+> enthalten, eine Installation ist nicht nötig. Einzelheiten unter [Installation](#installation-windows).
+
 ## Funktionen
 
 | Bereich | Umfang |
@@ -25,7 +29,45 @@ Alles läuft **offline auf dem eigenen Rechner** – es werden keine Dokumentinh
 
 ## Installation (Windows)
 
-Voraussetzung: **Python 3.12–3.14** (empfohlen 3.14, [python.org](https://www.python.org/downloads/)).
+### Fertige Version herunterladen (empfohlen)
+
+1. Unter **[Releases](https://github.com/T3chSynergy/pii-redact/releases/latest)** bei der neuesten Version
+   die Datei `pii-redact-<version>.zip` herunterladen (ca. 500 MB).
+2. Das ZIP in einen Ordner deiner Wahl entpacken (Rechtsklick → *Alle extrahieren …*), z. B. in deinen
+   Benutzerordner. Es entsteht der Ordner `pii-redact`.
+3. Darin `pii-redact.exe` starten. Für den schnellen Zugriff eine Verknüpfung auf dem Desktop oder im Startmenü
+   anlegen.
+
+- **Alles enthalten:** Python, alle Bibliotheken, die Sprachmodelle für „Schnell“ und „Gründlich“, die
+  Texterkennung und die Anwenderhilfe. Kein Python, keine Installation und – beim Entpacken in den eigenen
+  Benutzerordner – keine Administratorrechte nötig. Voraussetzung: Windows 10/11 64 Bit, empfohlen 8 GB
+  Arbeitsspeicher; entpackt belegt das Programm ca. 750–950 MB.
+- **Welche Datei?** Nur `pii-redact-<version>.zip`. Die `.sha256`-Datei dient der (optionalen) Prüfung, siehe
+  unten. `davlan-xlmr-ner.zip` brauchst du nur, wenn du selbst aus dem Quellcode baust – im Programm-ZIP ist das
+  Modell bereits enthalten.
+- **Windows-Warnung beim ersten Start:** Die Programmdateien sind (noch) nicht digital signiert. Windows zeigt
+  deshalb vermutlich „Der Computer wurde durch Windows geschützt“ – über *Weitere Informationen → Trotzdem
+  ausführen* startet das Programm. Auch Virenscanner reagieren auf solche Programme manchmal übervorsichtig.
+  Auf verwalteten Firmen- oder Behördenrechnern kann der Start ganz gesperrt sein; dann ist die IT zuständig
+  (Anleitung für die IT: [packaging/README.md](packaging/README.md)).
+- **Update:** neue Version herunterladen, entpacken und den alten Ordner `pii-redact` ersetzen. Deine
+  Einstellungen (`%APPDATA%\pii-redact`) und die Arbeitsstände der Ordner-Bearbeitung (in den Zielordnern)
+  bleiben erhalten.
+- **Echtheit prüfen (optional):** `certutil -hashfile pii-redact-<version>.zip SHA256` muss denselben Wert
+  ergeben, der in `pii-redact-<version>.zip.sha256` steht. Mit der [GitHub-Kommandozeile](https://cli.github.com/)
+  belegt zusätzlich `gh attestation verify pii-redact-<version>.zip --repo T3chSynergy/pii-redact`, dass GitHub
+  das ZIP aus dem veröffentlichten Quellcode gebaut hat.
+
+### Für Organisationen
+
+Für die Verteilung auf viele Rechner – Installationspaket (z. B. MSI), Signieren, zentrale Vorgaben per
+`defaults.json` – gibt es eine eigene Anleitung für die IT: **[packaging/README.md](packaging/README.md)**.
+
+### Aus dem Quellcode (für Entwicklung)
+
+Nur nötig, wenn du am Programm mitarbeiten oder es selbst bauen willst (siehe auch
+[CONTRIBUTING.md](CONTRIBUTING.md)). Voraussetzung: **Python 3.12–3.14** (empfohlen 3.14,
+[python.org](https://www.python.org/downloads/)).
 
 Quellcode aus dem GitHub-Repository [github.com/T3chSynergy/pii-redact](https://github.com/T3chSynergy/pii-redact) holen – z. B. mit GitHub Desktop
 („Clone repository“) oder:
@@ -253,7 +295,8 @@ build.bat
 ```
 
 erzeugt `dist\pii-redact\` (Programmordner mit EXE-Dateien, ohne Python lauffähig) und denselben Ordner als
-`dist\pii-redact-<version>.zip`. Das ZIP geht an die IT, die daraus mit eigenen Werkzeugen das
+`dist\pii-redact-<version>.zip`. Für jedes Release baut GitHub dieses ZIP automatisch und hängt es an (siehe
+[Installation](#installation-windows)). Das ZIP geht an die IT, die daraus mit eigenen Werkzeugen das
 Installationspaket erstellt. Details für die IT – Voraussetzungen (Python 3.14), Optionen, Verteilung, Updates,
 zentrale Vorgaben: **[packaging/README.md](packaging/README.md)**.
 

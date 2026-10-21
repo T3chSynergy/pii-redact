@@ -4,10 +4,11 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
+**Stand:** v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); davor
+v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
 Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
 `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
-`build.bat` auf Windows mit 3.14 erfolgreich getestet (03.10.2026, vor Release 0.8.0). v0.3.0 läuft auf dem Test-PC.
+`build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -92,6 +93,8 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
   - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
     Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - 21.10.2026: Sicherheitsupdate pillow 12.3.0 → 13.0.0 (Hauptversion, 8 CVEs; kein 12.x-Fix) und certifi →
+    2026.10.19. Pillow nur über rapidocr; `ocr.py` übergibt ein ndarray, Pillows Datei-Decoder laufen nie.
   - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 7 kleine Updates
     – charset-normalizer, cloudpathlib, filelock, regex, smart-open, srsly, wrapt. Nicht möglich: numpy 2.5
     (Presidio 2.2.364 verlangt numpy < 2.5), pydantic-core 2.49 (gehört zu pydantic 2.14, nur Beta; pydantic
