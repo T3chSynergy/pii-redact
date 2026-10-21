@@ -1,5 +1,15 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Fehlerbehebung**
+- **Silbentrennung am Zeilenende:** Wurde ein Name getrennt („Bergen-⏎thaler“), blieb der Wortteil in der zweiten
+  Zeile ungeschwärzt – die Kontrolle nach dem Export bemerkte das nicht. Die Erkennung arbeitet jetzt auf dem
+  zusammengefügten Wort und schwärzt beide Teile. Davon profitieren auch Sperrliste, Ausnahmeliste, „Alle
+  Vorkommen“ und die nummerierte Ersetzung („Bergen-⏎thaler“ und „Bergenthaler“ erhalten dieselbe Nummer).
+  Echte Bindestriche vor einem Großbuchstaben (Doppelname „Schneider-⏎Kowalczyk“) bleiben unverändert.
+  Neues Beispiel `samples/trennung.pdf`.
+
 ## 0.8.1 – 21.10.2026
 
 **Sicherheit**

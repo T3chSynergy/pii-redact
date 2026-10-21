@@ -308,7 +308,8 @@ pytest            # Kernlogik, PDF-Schwärzung, Erkennungsquote, Kommandozeile, 
 ```
 
 `samples/` enthält fiktive Beispieldokumente. Neu erzeugen: `samples/make_sample_pdf.py` (beispiel.pdf),
-`samples/make_extras_pdf.py` (kommentare.pdf, formular.pdf), `samples/make_scan_pdf.py` (scan.pdf,
+`samples/make_extras_pdf.py` (kommentare.pdf, formular.pdf), `samples/make_trennung_pdf.py` (trennung.pdf,
+Namen mit Silbentrennung am Zeilenende), `samples/make_scan_pdf.py` (scan.pdf,
 mail_mit_scan.pdf – ohne Textebene, für die Texterkennung), `samples/make_erkennung.py` (Testtexte
 `samples/erkennung/*.txt` samt Soll-Funden in `soll_funde.json`; `tests/test_erkennung.py` prüft damit die
 Erkennungsquote).
@@ -326,7 +327,8 @@ Erkennungsquote).
   laufen). Deutlich höhere Fehlerquote – Seiten werden gekennzeichnet, der Export verlangt eine Bestätigung,
   automatischer Ordner-Export lässt solche Dateien aus. Handschrift, Unterschriften, Fotos: nicht erkannt.
 - Automatische Erkennung ist **nie vollständig**: Namen ohne Kontext, ungewöhnliche Schreibweisen oder
-  getrennte Wörter am Zeilenende können fehlen. Ergebnis immer prüfen.
+  Nummern, die über zwei Zeilen gehen (z. B. eine umbrochene IBAN), können fehlen. Ergebnis immer prüfen.
+  Silbentrennung am Zeilenende („Muster-⏎mann“) wird berücksichtigt – beide Wortteile werden geschwärzt.
 - Die PDF-Vorschau rechts ist ein Overlay; die echte Entfernung passiert beim Export (danach Kontrolle auf Reste).
 - Freie Textbearbeitung wirkt nur auf den Text-Export, nicht auf das PDF.
 

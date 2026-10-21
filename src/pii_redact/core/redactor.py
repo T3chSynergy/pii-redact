@@ -11,6 +11,7 @@ from pathlib import Path
 import pymupdf as fitz  # PyMuPDF
 
 from .entities import info
+from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
 from .models import Finding, ReplaceMode, Settings
 
@@ -75,7 +76,7 @@ class RedactedText:
 
 
 def _normalize(value: str) -> str:
-    return re.sub(r"\s+", " ", value).strip().casefold()
+    return re.sub(r"\s+", " ", join_hyphenated(value)).strip().casefold()
 
 
 def replacement_tokens(findings: list[Finding], mode: str) -> dict[int, str]:
