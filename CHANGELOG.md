@@ -1,5 +1,14 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Sicherheit**
+- Pillow 12.3.0 → 13.0.0 (8 Sicherheitslücken beim Einlesen von TIFF, GIF, PPM, EPS und beim Anhängen an PDFs).
+  pii-redact nutzt Pillow nur indirekt über die Texterkennung und übergibt dort fertige Bildpunkte, keine Dateien –
+  die Lücken waren daher praktisch nicht erreichbar. Pillow 12 erhält keine Korrekturen mehr.
+- certifi 2026.7.22 → 2026.10.19 (Zertifikatsliste ohne die kompromittierte Stelle „emSign ECC Root CA – G3“;
+  betrifft nur Verbindungen der optionalen KI-Nachprüfung).
+
 ## 0.8.0 – 03.10.2026
 
 > **Hinweis für Skripte mit `pii-redact-cli`:** Vorhandene Ergebnisdateien werden nicht mehr still ersetzt –
