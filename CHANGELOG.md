@@ -1,5 +1,20 @@
 # Änderungen
 
+## 0.8.2 – 21.10.2026
+
+**Fehlerbehebung**
+- **Silbentrennung am Zeilenende:** Wurde ein Name getrennt („Bergen-⏎thaler“), blieb der Wortteil in der zweiten
+  Zeile ungeschwärzt – die Kontrolle nach dem Export bemerkte das nicht. Die Erkennung arbeitet jetzt auf dem
+  zusammengefügten Wort und schwärzt beide Teile. Davon profitieren auch Sperrliste, Ausnahmeliste, „Alle
+  Vorkommen“ und die nummerierte Ersetzung („Bergen-⏎thaler“ und „Bergenthaler“ erhalten dieselbe Nummer).
+  Echte Bindestriche vor einem Großbuchstaben (Doppelname „Schneider-⏎Kowalczyk“) bleiben unverändert.
+  Neues Beispiel `samples/trennung.pdf`.
+- **Nummern über zwei Zeilen:** Eine am Zeilenende umbrochene IBAN („DE89 3704 0044⏎0532 0130 00“) wurde nicht
+  erkannt – die erste Hälfte blieb lesbar, die zweite galt als Telefonnummer. Wo eine Zeile mit einer Ziffer
+  endet und die nächste mit einer Ziffer beginnt, prüfen die Muster für IBAN, Telefon, Kreditkarte usw. jetzt
+  zusätzlich beide Zeilen zusammen. Übernommen wird nur, was über den Umbruch reicht und noch nicht erkannt war –
+  Adressblöcke (Straße⏎PLZ Ort) und Zahlen wie Aktenzeichen oder Seitenzahlen bleiben unverändert.
+
 ## 0.8.1 – 21.10.2026
 
 **Sicherheit**

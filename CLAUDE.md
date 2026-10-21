@@ -4,11 +4,11 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); davor
-v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
+**Stand:** v0.8.2 (Silbentrennung und Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung);
+davor v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
 Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
-`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
-`build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1). v0.3.0 läuft auf dem Test-PC.
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 117 Tests (Stand 21.10.2026). `run.bat` und
+`build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1; `run.bat` mit 0.8.2-Stand 21.10.2026). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -130,7 +130,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
 
 ## Beispiele
 `samples/`: beispiel.pdf/.txt/.md, schwierig.txt, kommentare.pdf, formular.pdf, scan.pdf, mail_mit_scan.pdf,
-unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden. Testtexte zur Namenserkennung:
+unterschrift.pdf, trennung.pdf (Silbentrennung, Nummern über zwei Zeilen; Generatoren `make_*.py`) – alles erfunden. Testtexte zur Namenserkennung:
 `erkennung/*.txt` (6 Stück), markiert in `make_erkennung.py`, das auch `soll_funde.json` (≈ 150 Soll-Funde)
 aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich).
 
@@ -153,6 +153,14 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - Barrierefreiheit (seit PR #32): Detailzeile unter der Fundliste, Tastaturbedienung (Leertaste, F2, Menütaste,
   Tab verlässt die Tabelle), Namen für Bildschirmleser. Grenze: freie Bereiche im PDF nur mit der Maus.
   Mit Windows-Sprachausgabe vom Nutzer getestet (03.10.2026); Test mit NVDA bzw. durch geübte Nutzer steht aus.
+- **Silbentrennung** (`core/hyphenation.py`, seit 21.10.2026): `analyze()` und `find_terms()` arbeiten auf dem Text
+  ohne „-⏎“ vor Kleinbuchstaben und rechnen Funde per `HyphenMap` zurück (Fund deckt beide Zeilen ab, `f.text` =
+  Original inkl. Umbruch). Vergleiche (Ausnahmeliste, nummeriert, „gleicher Text“) über `join_hyphenated`.
+- **Nummern über Zeilengrenzen** (`PiiAnalyzer._cross_line`, seit 21.10.2026): Zeilenpaare „Ziffer/Buchstabe⏎
+  Ziffer|+|Großbuchstabe+Ziffer“ werden als ein Prüftext (Umbruch → Leerzeichen, Paare durch Absatz getrennt)
+  zusätzlich analysiert; übernommen nur Muster-Treffer (keine NER), die über den Umbruch reichen und noch nicht
+  von einem Muster-Fund abgedeckte Zeichen enthalten (Adressblöcke bleiben zwei Funde). Nicht abgedeckt: Zahl ohne
+  Leerzeichen mitten umbrochen (Steuer-ID „86095⏎742719“) – kommt bei Fließtext praktisch nicht vor.
 - Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
   freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 

@@ -270,3 +270,105 @@ def test_to_original_end_expands_partial_placeholder():
     assert red.to_original_end(inside) == 20
     assert red.to_original(inside) == 6
     assert red.to_original_end(red.text.index(",")) == text.index(",")
+
+
+# ---------------------------------------------------------------- Silbentrennung am Zeilenende
+def test_dehyphenate_joins_soft_breaks_only():
+    from pii_redact.core.hyphenation import dehyphenate, join_hyphenated
+
+    assert join_hyphenated("Herr Bergen-\nthaler aus") == "Herr Bergenthaler aus"
+    assert join_hyphenated("Bergen­\nthaler") == "Bergenthaler"         # weiches Trennzeichen
+    assert join_hyphenated("Bergen-\n\nthaler") == "Bergenthaler"            # Zeile in eigenem Textblock
+    for keep in ("Schneider-\nKowalczyk", "E-\nMail", "Seite 12-\n13", "Absatz-\n\n\nneu"):
+        assert join_hyphenated(keep) == keep                                 # echte Bindestriche, Zahlen
+    text = "xx Bergen-\nthaler yy, Wester-\nmann zz"
+    joined, hmap = dehyphenate(text)
+    for word in ("Bergenthaler", "Westermann"):
+        s = joined.index(word)
+        a, b = hmap.span(s, s + len(word))
+        assert join_hyphenated(text[a:b]) == word and text[a:b].endswith(word[-4:])
+    assert hmap.span(joined.index("zz"), len(joined)) == (text.index("zz"), len(text))
+
+
+def test_find_terms_and_lists_across_hyphenation():
+    text = "Herr Bergen-\nthaler kommt; Bergenthaler bleibt."
+    hits = find_terms(text, ["Bergenthaler"])
+    assert [h.text for h in hits] == ["Bergen-\nthaler", "Bergenthaler"]
+    assert [h.text for h in find_terms(text, ["Bergen-\nthaler"])] == ["Bergen-\nthaler", "Bergenthaler"]
+    fs = [Finding(5, 19, "PERSON", "Bergen-\nthaler"), Finding(0, 4, "PERSON", "Herr")]
+    assert [f.text for f in apply_allow_list(fs, ["Bergenthaler"])] == ["Herr"]
+
+
+def test_numbered_same_number_across_hyphenation():
+    text = "Bergen-\nthaler und Bergenthaler"
+    fs = [Finding(0, 14, "PERSON", text[0:14]), Finding(19, 31, "PERSON", text[19:31])]
+    red = redact_text(text, fs, ReplaceMode.NUMBERED)
+    assert red.text == "[PERSON_1] und [PERSON_1]"
+
+
+@needs_model
+def test_hyphenated_names_fully_redacted_in_pdf(analyzer):
+    """Meldung eines Anwenders: Bei Silbentrennung blieb der Wortteil in der zweiten Zeile stehen."""
+    doc = load_document(SAMPLES / "trennung.pdf")
+    findings = analyzer.analyze(doc.text, Settings())
+    for name in ("Bergen-\nthaler", "Wester-\nmann", "Lichten-\nberger"):
+        start = doc.text.index(name)
+        assert any(f.start <= start and f.end >= start + len(name) for f in findings), name
+    data = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER, labels=True)
+    assert verify_pdf(data, findings) == []
+    with pymupdf.open(stream=data, filetype="pdf") as pdf:
+        words = {w[4].strip(".,;") for w in pdf[0].get_text("words")}
+    for rest in ("thaler", "mann", "berger", "Bergen-", "Wester-", "Lichten-", "Kowalczyk", "Bergenthaler"):
+        assert rest not in words, rest
+    assert {"Kostenerstattung", "Fachbereich", "Servicestelle"} <= words   # Nicht-PII bleibt erhalten
+
+
+# ---------------------------------------------------------------- Nummern über Zeilengrenzen
+@needs_model
+@pytest.mark.parametrize("text, typ", [
+    ("Zahlung an IBAN DE89 3704 0044\n0532 0130 00 bitte bis Monatsende.", "IBAN_CODE"),
+    ("Sie erreichen uns telefonisch unter 0171 23\n45678 bis 18 Uhr.", "PHONE_NUMBER"),
+    ("Bezahlt mit Kreditkarte 4111 1111\n1111 1111 am Schalter.", "CREDIT_CARD"),
+    ("Ihre Rentenversicherungsnummer 65 170839\nJ 00 3 liegt vor.", "DE_SOCIAL_SECURITY"),
+])
+def test_number_across_line_break_found(analyzer, text, typ):
+    nl = text.index("\n")
+    hits = [f for f in analyzer.analyze(text, Settings()) if f.start < nl < f.end]
+    assert hits and hits[0].entity_type == typ, [(f.entity_type, f.text) for f in analyzer.analyze(text, Settings())]
+    line1, line2 = text.split("\n")
+    assert hits[0].start <= text.index(line1.split()[-1]) and hits[0].end >= nl + 1 + len(line2.split()[0])
+
+
+@needs_model
+@pytest.mark.parametrize("text", [
+    "Bitte das Aktenzeichen 4711\n2026 angeben.",
+    "Kapitel 3.2\n4 Ergebnisse der Umfrage",
+    "Summe 1.240,50 EUR\n19 % Umsatzsteuer sind enthalten.",
+    "Stand: 21.10.2026\n2 Anlagen",
+    "Raum 204\nB 12 Flur links",
+    "Sitzung am 12.03.\n2026 im Rathaus",
+])
+def test_numbers_across_line_break_no_false_alarm(analyzer, text):
+    assert [f.text for f in analyzer.analyze(text, Settings()) if "\n" in f.text] == []
+
+
+@needs_model
+def test_address_block_stays_two_findings(analyzer):
+    text = "Herrn\nDieter Wallmeier\nKastanienweg 12\n56410 Montabaur\n"
+    found = analyzer.analyze(text, Settings())
+    nl = text.index("12\n56410") + 2
+    assert not [f for f in found if f.start < nl < f.end]                   # kein Fund über den Umbruch
+    assert any("Kastanienweg 12" in f.text for f in found) and any("56410" in f.text for f in found)
+
+
+@needs_model
+def test_numbers_across_lines_redacted_in_pdf(analyzer):
+    doc = load_document(SAMPLES / "trennung.pdf")
+    findings = analyzer.analyze(doc.text, Settings())
+    data = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER, labels=True)
+    assert verify_pdf(data, findings) == []
+    with pymupdf.open(stream=data, filetype="pdf") as pdf:
+        words = {w[4].strip(".,;") for w in pdf[0].get_text("words")}
+    for rest in ("DE89", "3704", "0044", "0532", "0130", "040", "55512345", "170839", "J"):
+        assert rest not in words, rest
+    assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
