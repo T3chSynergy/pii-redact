@@ -92,6 +92,8 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
   - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
     Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - 21.10.2026: Sicherheitsupdate pillow 12.3.0 → 13.0.0 (Hauptversion, 8 CVEs; kein 12.x-Fix) und certifi →
+    2026.10.19. Pillow nur über rapidocr; `ocr.py` übergibt ein ndarray, Pillows Datei-Decoder laufen nie.
   - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 7 kleine Updates
     – charset-normalizer, cloudpathlib, filelock, regex, smart-open, srsly, wrapt. Nicht möglich: numpy 2.5
     (Presidio 2.2.364 verlangt numpy < 2.5), pydantic-core 2.49 (gehört zu pydantic 2.14, nur Beta; pydantic
