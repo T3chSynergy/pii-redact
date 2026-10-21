@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import logging
 import re
 from collections.abc import Callable, Iterable
@@ -125,6 +126,20 @@ class PiiAnalyzer:
         original = text
         text, hmap = dehyphenate(original)
         entities = [e for e in settings.entities if e != "CUSTOM"]
+        raw = self._run(text, entities, settings.threshold, progress)
+        raw = clean_ner(raw, text)
+        raw.extend(find_terms(text, settings.all_deny))
+        raw.extend(self._cross_line(text, entities, settings.threshold, raw))
+        findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
+        if hmap:
+            for f in findings:
+                f.start, f.end = hmap.span(f.start, f.end)
+                f.text = original[f.start:f.end]
+        return findings
+
+    def _run(self, text: str, entities: list[str], threshold: float,
+             progress: ProgressFn | None = None) -> list[Finding]:
+        """Presidio-Analyse in Blöcken; Positionen bezogen auf ``text``."""
         raw: list[Finding] = []
         size = CHUNK_SIZE if self.mode == AnalysisMode.FAST else CHUNK_SIZE_THOROUGH
         chunks = list(_chunks(text, size))
@@ -134,30 +149,76 @@ class PiiAnalyzer:
             chunk = text[c_start:c_end]
             if not chunk.strip() or not entities:
                 continue
-            results = self._engine.analyze(
-                text=chunk,
-                language=LANG,
-                entities=entities,
-                score_threshold=settings.threshold,
-            )
+            results = self._engine.analyze(text=chunk, language=LANG, entities=entities, score_threshold=threshold)
             for r in results:
                 s, e = r.start + c_start, r.end + c_start
                 rec = (r.recognition_metadata or {}).get("recognizer_name", "")
                 raw.append(Finding(s, e, r.entity_type, text[s:e], round(r.score, 2), recognizer=rec))
         if progress:
             progress(len(chunks), len(chunks))
+        return raw
 
-        raw = clean_ner(raw, text)
-        raw.extend(find_terms(text, settings.all_deny))
-        findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
-        if hmap:
-            for f in findings:
-                f.start, f.end = hmap.span(f.start, f.end)
-                f.text = original[f.start:f.end]
-        return findings
+    def _cross_line(self, text: str, entities: list[str], threshold: float, found: list[Finding]) -> list[Finding]:
+        """Nummern über eine Zeilengrenze hinweg (IBAN, Telefon …, z. B. „DE89 3704 0044⏎0532 0130 00“).
+
+        Wo eine Zeile mit einer Ziffer bzw. einem Buchstaben endet und die nächste mit einer Ziffer beginnt,
+        werden beide Zeilen zusätzlich mit Leerzeichen statt Umbruch geprüft. Übernommen werden nur Treffer der
+        Muster-Erkenner (nicht der Namenserkennung), die über den Umbruch reichen und Zeichen abdecken, die
+        noch kein Muster-Fund enthält – so bleiben z. B. Adressblöcke (Straße⏎PLZ Ort) wie bisher zwei Funde.
+        Treffer der Namenserkennung zählen dabei nicht („IBAN DE89 …“ hält spaCy mitunter für einen Ort)."""
+        ranges = _number_break_ranges(text)
+        if not ranges:
+            return []
+        # alle Zeilenpaare in einen Prüftext; Absatz als Trenner, damit nichts über Paare hinweg passt
+        parts, starts, pos = [], [], 0
+        for a, b, joints in ranges:
+            seg = list(text[a:b])
+            for j in joints:
+                seg[j - a] = " "
+            starts.append(pos)
+            parts.append("".join(seg))
+            pos += b - a + 2
+        probe = "\n\n".join(parts)
+        covered = bytearray(len(text))
+        for f in found:
+            if f.recognizer not in NER_RECOGNIZERS:
+                covered[f.start:f.end] = b"\x01" * (f.end - f.start)
+        out = []
+        for f in self._run(probe, entities, threshold):
+            if f.recognizer in NER_RECOGNIZERS:
+                continue
+            k = bisect.bisect_right(starts, f.start) - 1
+            a, b, joints = ranges[k]
+            off = a - starts[k]
+            s, e = f.start + off, f.end + off
+            if e > b or not any(s <= j < e for j in joints):
+                continue
+            if all(covered[i] or text[i].isspace() for i in range(s, e)):
+                continue
+            out.append(Finding(s, e, f.entity_type, text[s:e], f.score, recognizer=f.recognizer))
+        return out
 
 
 # ---------------------------------------------------------------------- Helfer
+# Zeilenende mit Ziffer/Buchstabe, nächste Zeile (im selben Absatz) beginnt mit einer Ziffer, „+“ (Vorwahl)
+# oder einem einzelnen Großbuchstaben vor einer Ziffer (Rentenversicherungsnummer „65 170839⏎J 00 3“)
+_NUMBER_BREAK = re.compile(r"(?<=[0-9A-Za-z])[ \t]*\n(?=[ \t]*(?:[0-9+]|[A-Z][ \t]?\d))")
+
+
+def _number_break_ranges(text: str) -> list[tuple[int, int, list[int]]]:
+    """Bereiche (Anfang der ersten bis Ende der letzten Zeile) um Zeilenumbrüche, über die eine Nummer
+    laufen könnte, samt Positionen dieser Umbrüche. Aufeinanderfolgende Paare werden zusammengefasst."""
+    out: list[tuple[int, int, list[int]]] = []
+    for m in _NUMBER_BREAK.finditer(text):
+        nl = m.end() - 1
+        a = text.rfind("\n", 0, nl) + 1
+        b = text.find("\n", nl + 1)
+        b = len(text) if b == -1 else b
+        if out and a < out[-1][1]:
+            out[-1] = (out[-1][0], b, out[-1][2] + [nl])
+        else:
+            out.append((a, b, [nl]))
+    return out
 def _chunks(text: str, size: int) -> Iterable[tuple[int, int]]:
     """Zerlegt Text an Absatz-/Zeilengrenzen in Blöcke von höchstens ``size`` Zeichen."""
     n = len(text)

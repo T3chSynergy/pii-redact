@@ -1,8 +1,12 @@
-"""Erzeugt samples/trennung.pdf – Namen mit Silbentrennung am Zeilenende (fiktive Daten).
+"""Erzeugt samples/trennung.pdf – Angaben, die am Zeilenende umbrechen (fiktive Daten).
 
-Die Zeilen werden einzeln gesetzt, damit die Trennungen genau so im PDF stehen, wie ein
-Textprogramm sie beim Blocksatz erzeugt („Bergen-⏎thaler“). Enthalten sind auch echte Bindestriche
-am Zeilenende (Doppelname „Schneider-⏎Kowalczyk“), die nicht zusammengezogen werden dürfen.
+Die Zeilen werden einzeln gesetzt, damit die Umbrüche genau so im PDF stehen, wie ein Textprogramm
+sie beim Blocksatz erzeugt:
+
+* Namen mit Silbentrennung („Bergen-⏎thaler“), dazu echte Bindestriche am Zeilenende (Doppelname
+  „Schneider-⏎Kowalczyk“), die nicht zusammengezogen werden dürfen;
+* Nummern über zwei Zeilen (IBAN, Telefon, Rentenversicherungsnummer) – und Zahlen über zwei Zeilen,
+  die keine personenbezogenen Daten sind (Aktenzeichen, Jahr, Seitenzahl).
 
 Aufruf:  .venv\\Scripts\\python samples\\make_trennung_pdf.py
 """
@@ -23,6 +27,13 @@ LINES = [
     "Kowalczyk aus Leipzig. Die Erstattung an Herrn Bergenthaler erfolgt in den nächsten",
     "Wochen; Rückfragen beantwortet Herr Jonas Lichten-",
     "berger.",
+    "",
+    "Die Erstattung überweisen wir auf das Konto mit der IBAN DE89 3704 0044",
+    "0532 0130 00. Für Rückfragen erreichen Sie uns telefonisch unter 040",
+    "55512345. Ihre Rentenversicherungsnummer 65 170839",
+    "J 00 3 haben wir vermerkt. Bitte geben Sie bei Schreiben das Aktenzeichen 4711",
+    "2026 an; die Anlage umfasst Seite 3",
+    "4 und 5 des Antrags.",
     "",
     "Mit freundlichen Grüßen",
     "Ihre Servicestelle",
