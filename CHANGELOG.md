@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.2 – 21.10.2026
 
 **Fehlerbehebung**
 - **Silbentrennung am Zeilenende:** Wurde ein Name getrennt („Bergen-⏎thaler“), blieb der Wortteil in der zweiten
