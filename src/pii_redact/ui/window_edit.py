@@ -10,6 +10,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMenu, QMessageBox
 
 from ..core.entities import AREA_KEYS, all_keys, info
+from ..core.hyphenation import join_hyphenated
 
 QUICK_TYPES = ["PERSON", "LOCATION", "DE_ADDRESS", "ORGANIZATION", "EMAIL_ADDRESS", "PHONE_NUMBER",
                "DATE_TIME", "IBAN_CODE", "CUSTOM"]
@@ -244,7 +245,7 @@ class EditMixin:
         return None if menu.isEmpty() else menu
 
     def _to_allow_list(self, value: str, ids: list[int]) -> None:
-        value = value.strip()
+        value = join_hyphenated(value.strip())
         if value and value.casefold() not in {v.casefold() for v in self.settings.allow_list}:
             self.settings.allow_list.append(value)
             self._save_settings()
@@ -252,6 +253,7 @@ class EditMixin:
         self.status_label.setText(f"„{value}“ wird künftig nie geschwärzt (Einstellungen → Ausnahmen).")
 
     def _to_deny_list(self, value: str) -> None:
+        value = join_hyphenated(value.strip())
         if value and value.casefold() not in {v.casefold() for v in self.settings.deny_list}:
             self.settings.deny_list.append(value)
             self._save_settings()

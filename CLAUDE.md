@@ -7,7 +7,7 @@ IT-Anleitung: `packaging/README.md`.
 **Stand:** v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); davor
 v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
 Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
-`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 101 Tests (Stand 03.10.2026). `run.bat` und
+`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 105 Tests (Stand 21.10.2026). `run.bat` und
 `build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -130,7 +130,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
 
 ## Beispiele
 `samples/`: beispiel.pdf/.txt/.md, schwierig.txt, kommentare.pdf, formular.pdf, scan.pdf, mail_mit_scan.pdf,
-unterschrift.pdf (Generatoren `make_*.py`) – alles erfunden. Testtexte zur Namenserkennung:
+unterschrift.pdf, trennung.pdf (Silbentrennung; Generatoren `make_*.py`) – alles erfunden. Testtexte zur Namenserkennung:
 `erkennung/*.txt` (6 Stück), markiert in `make_erkennung.py`, das auch `soll_funde.json` (≈ 150 Soll-Funde)
 aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich).
 
@@ -153,6 +153,10 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - Barrierefreiheit (seit PR #32): Detailzeile unter der Fundliste, Tastaturbedienung (Leertaste, F2, Menütaste,
   Tab verlässt die Tabelle), Namen für Bildschirmleser. Grenze: freie Bereiche im PDF nur mit der Maus.
   Mit Windows-Sprachausgabe vom Nutzer getestet (03.10.2026); Test mit NVDA bzw. durch geübte Nutzer steht aus.
+- **Silbentrennung** (`core/hyphenation.py`, seit 21.10.2026): `analyze()` und `find_terms()` arbeiten auf dem Text
+  ohne „-⏎“ vor Kleinbuchstaben und rechnen Funde per `HyphenMap` zurück (Fund deckt beide Zeilen ab, `f.text` =
+  Original inkl. Umbruch). Vergleiche (Ausnahmeliste, nummeriert, „gleicher Text“) über `join_hyphenated`.
+  Offen: Nummern über Zeilengrenzen (IBAN umbrochen → erste Hälfte bleibt stehen) – geplant als eigener PR.
 - Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
   freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 

@@ -13,6 +13,7 @@ from PySide6.QtCore import QObject, Signal
 
 from ..core import Finding, LoadedDocument, RedactedText, Settings, redact_text
 from ..core.analyzer import find_terms
+from ..core.hyphenation import join_hyphenated
 
 UNDO_LIMIT = 100
 
@@ -231,4 +232,4 @@ class DocumentSession(QObject):
 
 
 def _norm(value: str) -> str:
-    return re.sub(r"\s+", " ", value).strip().casefold()
+    return re.sub(r"\s+", " ", join_hyphenated(value)).strip().casefold()

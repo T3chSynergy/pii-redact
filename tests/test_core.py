@@ -270,3 +270,54 @@ def test_to_original_end_expands_partial_placeholder():
     assert red.to_original_end(inside) == 20
     assert red.to_original(inside) == 6
     assert red.to_original_end(red.text.index(",")) == text.index(",")
+
+
+# ---------------------------------------------------------------- Silbentrennung am Zeilenende
+def test_dehyphenate_joins_soft_breaks_only():
+    from pii_redact.core.hyphenation import dehyphenate, join_hyphenated
+
+    assert join_hyphenated("Herr Bergen-\nthaler aus") == "Herr Bergenthaler aus"
+    assert join_hyphenated("Bergen­\nthaler") == "Bergenthaler"         # weiches Trennzeichen
+    assert join_hyphenated("Bergen-\n\nthaler") == "Bergenthaler"            # Zeile in eigenem Textblock
+    for keep in ("Schneider-\nKowalczyk", "E-\nMail", "Seite 12-\n13", "Absatz-\n\n\nneu"):
+        assert join_hyphenated(keep) == keep                                 # echte Bindestriche, Zahlen
+    text = "xx Bergen-\nthaler yy, Wester-\nmann zz"
+    joined, hmap = dehyphenate(text)
+    for word in ("Bergenthaler", "Westermann"):
+        s = joined.index(word)
+        a, b = hmap.span(s, s + len(word))
+        assert join_hyphenated(text[a:b]) == word and text[a:b].endswith(word[-4:])
+    assert hmap.span(joined.index("zz"), len(joined)) == (text.index("zz"), len(text))
+
+
+def test_find_terms_and_lists_across_hyphenation():
+    text = "Herr Bergen-\nthaler kommt; Bergenthaler bleibt."
+    hits = find_terms(text, ["Bergenthaler"])
+    assert [h.text for h in hits] == ["Bergen-\nthaler", "Bergenthaler"]
+    assert [h.text for h in find_terms(text, ["Bergen-\nthaler"])] == ["Bergen-\nthaler", "Bergenthaler"]
+    fs = [Finding(5, 19, "PERSON", "Bergen-\nthaler"), Finding(0, 4, "PERSON", "Herr")]
+    assert [f.text for f in apply_allow_list(fs, ["Bergenthaler"])] == ["Herr"]
+
+
+def test_numbered_same_number_across_hyphenation():
+    text = "Bergen-\nthaler und Bergenthaler"
+    fs = [Finding(0, 14, "PERSON", text[0:14]), Finding(19, 31, "PERSON", text[19:31])]
+    red = redact_text(text, fs, ReplaceMode.NUMBERED)
+    assert red.text == "[PERSON_1] und [PERSON_1]"
+
+
+@needs_model
+def test_hyphenated_names_fully_redacted_in_pdf(analyzer):
+    """Meldung eines Anwenders: Bei Silbentrennung blieb der Wortteil in der zweiten Zeile stehen."""
+    doc = load_document(SAMPLES / "trennung.pdf")
+    findings = analyzer.analyze(doc.text, Settings())
+    for name in ("Bergen-\nthaler", "Wester-\nmann", "Lichten-\nberger"):
+        start = doc.text.index(name)
+        assert any(f.start <= start and f.end >= start + len(name) for f in findings), name
+    data = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER, labels=True)
+    assert verify_pdf(data, findings) == []
+    with pymupdf.open(stream=data, filetype="pdf") as pdf:
+        words = {w[4].strip(".,;") for w in pdf[0].get_text("words")}
+    for rest in ("thaler", "mann", "berger", "Bergen-", "Wester-", "Lichten-", "Kowalczyk", "Bergenthaler"):
+        assert rest not in words, rest
+    assert {"Kostenerstattung", "Fachbereich", "Servicestelle"} <= words   # Nicht-PII bleibt erhalten

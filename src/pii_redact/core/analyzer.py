@@ -6,6 +6,7 @@ import logging
 import re
 from collections.abc import Callable, Iterable
 
+from .hyphenation import dehyphenate, join_hyphenated
 from .models import AnalysisMode, Finding, Settings
 from .recognizers_de import LANG, build_recognizers
 
@@ -119,6 +120,10 @@ class PiiAnalyzer:
         progress: ProgressFn | None = None,
     ) -> list[Finding]:
         self.load()
+        # Silbentrennung am Zeilenende aufheben („Bergen-⏎thaler“): Erkennung auf dem zusammengefügten Text,
+        # die Funde werden am Ende auf den Originaltext zurückgerechnet und decken dann beide Zeilen ab.
+        original = text
+        text, hmap = dehyphenate(original)
         entities = [e for e in settings.entities if e != "CUSTOM"]
         raw: list[Finding] = []
         size = CHUNK_SIZE if self.mode == AnalysisMode.FAST else CHUNK_SIZE_THOROUGH
@@ -144,8 +149,12 @@ class PiiAnalyzer:
 
         raw = clean_ner(raw, text)
         raw.extend(find_terms(text, settings.all_deny))
-        findings = merge_overlaps(trim(raw, text), text)
-        return apply_allow_list(findings, settings.all_allow)
+        findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
+        if hmap:
+            for f in findings:
+                f.start, f.end = hmap.span(f.start, f.end)
+                f.text = original[f.start:f.end]
+        return findings
 
 
 # ---------------------------------------------------------------------- Helfer
@@ -258,20 +267,23 @@ def merge_overlaps(findings: list[Finding], text: str) -> list[Finding]:
 
 
 def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> list[Finding]:
-    """Alle Vorkommen der Begriffe (ohne Groß-/Kleinschreibung, ganze Wörter)."""
+    """Alle Vorkommen der Begriffe (ohne Groß-/Kleinschreibung, ganze Wörter) – auch über eine
+    Silbentrennung am Zeilenende hinweg („Bergen-⏎thaler“ für „Bergenthaler“)."""
+    joined, hmap = dehyphenate(text)
     out = []
     for term in terms:
-        term = term.strip()
+        term = join_hyphenated(term.strip())
         if not term:
             continue
         pattern = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
-        for m in pattern.finditer(text):
-            out.append(Finding(m.start(), m.end(), entity_type, m.group(0), 1.0, recognizer="Sperrliste"))
+        for m in pattern.finditer(joined):
+            s, e = hmap.span(m.start(), m.end()) if hmap else (m.start(), m.end())
+            out.append(Finding(s, e, entity_type, text[s:e], 1.0, recognizer="Sperrliste"))
     return out
 
 
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
-    allowed = {a.strip().casefold() for a in allow_list if a.strip()}
+    allowed = {join_hyphenated(a.strip()).casefold() for a in allow_list if a.strip()}
     if not allowed:
         return findings
-    return [f for f in findings if f.text.strip().casefold() not in allowed]
+    return [f for f in findings if join_hyphenated(f.text.strip()).casefold() not in allowed]
