@@ -9,6 +9,11 @@
 - certifi 2026.7.22 → 2026.10.19 (Zertifikatsliste ohne die kompromittierte Stelle „emSign ECC Root CA – G3“;
   betrifft nur Verbindungen der optionalen KI-Nachprüfung).
 
+**Dokumentation**
+- README: Für Windows steht jetzt zuerst der Download der fertigen Version aus dem Release (Python und alle
+  Modelle enthalten) – mit Hinweisen zur Windows-Warnung, zu Updates und zur Prüfsumme; die Installation aus dem
+  Quellcode folgt danach als Weg für die Entwicklung.
+
 ## 0.8.0 – 03.10.2026
 
 > **Hinweis für Skripte mit `pii-redact-cli`:** Vorhandene Ergebnisdateien werden nicht mehr still ersetzt –
