@@ -36,6 +36,15 @@ Das Installationspaket (z. B. MSI) erstellt die IT mit eigenen Werkzeugen aus di
 Auf den Zielrechnern ist **kein Python** nötig. Das Programm arbeitet **vollständig offline** und
 baut keine Netzwerkverbindungen auf – Firewall-Regeln sind nicht erforderlich.
 
+**Telemetrie von onnxruntime:** Die Bibliothek für den Modus „Gründlich“ und die Texterkennung (onnxruntime von
+Microsoft) protokolliert unter Windows Nutzungsereignisse über die Ereignisablaufverfolgung (ETW), z. B. den
+Dateinamen des Modells, Hardwaredaten und Fehlermeldungen. Windows kann sie – abhängig von den
+Diagnosedaten-Einstellungen – an Microsoft übermitteln. pii-redact schaltet diese Ereignisse ab Version 0.8.3 vor
+dem ersten Modell ab. Übrig bleibt ein Ereignis beim Laden der Bibliothek (Version, Prozessor, Arbeitsspeicher,
+keine Dokumentdaten). Wer auch das ausschließen will, steuert die Diagnosedaten von Windows zentral
+über die Richtlinie *Computerkonfiguration → Administrative Vorlagen → Windows-Komponenten → Datensammlung und
+Vorabversionen → Diagnosedaten zulassen*.
+
 Größe (inkl. Texterkennung): ca. 750–950 MB entpackt, ZIP ca. 500 MB. Empfohlen: Windows 10/11 64 Bit, 8 GB RAM.
 
 ## Build-Rechner einrichten (einmalig)

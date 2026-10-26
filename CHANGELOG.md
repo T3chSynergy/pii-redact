@@ -2,6 +2,14 @@
 
 ## Unveröffentlicht
 
+**Datenschutz**
+- **Telemetrie von onnxruntime abgeschaltet:** Die Bibliothek für den Modus „Gründlich“ und die Texterkennung
+  (onnxruntime von Microsoft) protokollierte unter Windows Nutzungsereignisse, u. a. den Dateinamen des Modells,
+  Hardwaredaten und Fehlermeldungen (keine Dokumentinhalte). Windows kann sie je nach Diagnosedaten-Einstellung an
+  Microsoft übermitteln. pii-redact schaltet sie jetzt vor dem ersten Modell ab; unter Linux/macOS ist zusätzlich
+  der eigene Sende-Client von onnxruntime aus (keine Geräte-ID, kein Versand). Hinweise für die IT in
+  `packaging/README.md`.
+
 **Sicherheit**
 - `filelock` 4.0.3 → 4.2.4: behebt drei Lücken in den Sperrdateien (CVE-2026-112907, CVE-2026-112913,
   CVE-2026-112940). pii-redact nutzt `filelock` nicht selbst; es kommt indirekt über `tldextract` und
