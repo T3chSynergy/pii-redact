@@ -88,7 +88,12 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
   - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
   - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
-    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf), huggingface-hub < 2 (über tokenizers).
+    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf 2.3; omegaconf 2.4 braucht antlr4 nicht mehr).
+  - **Obergrenzen in `pyproject.toml`/`requirements.txt`** (seit 26.10.2026, Gründe als Kommentar dort), weil
+    `setup.bat` nach diesen Bereichen installiert, nicht nach der Lock-Datei: PyMuPDF `< 2` (Hauptversion, neue
+    Pakete pymupdf-layout/pymupdf4llm), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
+    (wechselt auf opencv-python-headless – dort greift `< 5` nicht, beide cv2-Pakete zusammen vertragen sich
+    nicht), huggingface-hub `< 2` (tokenizers erlaubt 2.x seit 0.23.3). Aufheben nur bewusst, je eigener PR.
   - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
   - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
@@ -104,11 +109,13 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     Stand und erzeugt weiter Meldungen (so geschehen nach 0.8.1: 10 falsche Alarme zu pillow/certifi). Zusätzlicher
     Nutzen: `setup.bat` installiert nach `pyproject.toml`, nicht nach der Lock-Datei. Prüfen: SBOM
     `gh api repos/T3chSynergy/pii-redact/dependency-graph/sbom` (je Paket nur noch eine Version).
-  - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 6 kleine Updates
-    – charset-normalizer, cloudpathlib, regex, smart-open, srsly, wrapt (filelock am 26.10.2026 erledigt). Nicht möglich: numpy 2.5
-    (Presidio 2.2.364 verlangt numpy < 2.5), pydantic-core 2.49 (gehört zu pydantic 2.14, nur Beta; pydantic
-    2.13.5 braucht exakt 2.46.5). Prüfen, was zusammen auflösbar ist:
-    `uv pip compile <Pakete> --python-version 3.14 --python-platform windows`.
+  - Stand 26.10.2026: keine bekannten Lücken. Möglich, gebündelt vor dem nächsten Release (Nutzer will warten):
+    kleine Updates (u. a. charset-normalizer, cloudpathlib, regex, smart-open, srsly, wrapt, blis, cymem,
+    phonenumbers, tldextract) und zu testende Pakete spaCy 3.8.17/thinc 8.3.14, Presidio 2.2.365, onnxruntime
+    1.31, tokenizers 0.23.3, pydantic 2.14.1, omegaconf 2.4.0 (ohne antlr4). Später einzeln: PyMuPDF 2, PySide6
+    6.12, rapidocr 3.10, huggingface-hub 2. Nicht möglich: numpy 2.5 und preshed ≥ 3.0.14 (Presidio 2.2.365
+    verlangt numpy < 2.5, preshed < 3.0.14). Prüfen, was zusammen auflösbar ist:
+    `uv pip compile pyproject.toml --python-version 3.14 --python-platform windows` und mit der Lock-Datei vergleichen.
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
   eingeschaltet sein), Antwort in der Regel binnen 14 Tagen, nur neueste Version unterstützt – bei jedem
   Release die Versionstabelle anpassen (`0.x.x`).
