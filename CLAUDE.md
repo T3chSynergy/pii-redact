@@ -182,7 +182,8 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   eigenen Sende-Client an `mobile.events.data.microsoft.com` mit Geräte-ID unter
   `~/.cache/Microsoft/DeveloperTools/.onnxruntime`. Abschalten: `ORT_DISABLE_TELEMETRY=1` vor dem ersten Import
   (`pii_redact/__init__.py`, wirkt nur unter Linux/macOS) und `disable_telemetry_events()` vor jedem Modell
-  (`onnx_telemetry.py`, Windows; das ProcessInfo-Ereignis beim Laden bleibt). Tests: `tests/test_telemetry.py`.
+  (`onnx_telemetry.py`, Windows; die Lade-Ereignisse ProcessInfo, RegisterEpLibraryStart/-End und DriverInfo
+  bleiben – ohne Pfade/Modellnamen, Liste `ALLOWED` in `tools/etw_pruefen.py`). Tests: `tests/test_telemetry.py`.
   Bei onnxruntime-Updates die Bibliotheken nach `events.data.microsoft.com`/`ORT_DISABLE_TELEMETRY` durchsuchen.
   **Prüfen unter Windows:** `tools\etw_pruefen.bat [--exe dist\pii-redact\pii-redact-cli.exe]` (Administrator;
   ETW-Anbieter `{3a26b1ff-7484-7484-7484-15261f42614d}`, logman + tracerpt, Gegenprobe ohne Abschaltung); in der CI

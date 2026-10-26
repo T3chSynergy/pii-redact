@@ -9,8 +9,9 @@ Dieses Skript prüft es nach:
    Ereignisse müssen in der Aufzeichnung auftauchen, sonst zeichnet die Aufzeichnung nichts auf.
 3. Die Kommandozeile von pii-redact liest ``samples/scan.pdf`` (Texterkennung) und ``samples/beispiel.txt`` im
    Modus „Gründlich“ (nur Anzeige, es entstehen keine Dateien).
-4. Auswertung nur der Ereignisse dieses Prozesses: erlaubt ist ``ProcessInfo`` (beim Laden der Bibliothek, vom
-   Programm aus nicht abschaltbar), alles andere – vor allem ``SessionCreation`` mit Modellname – ist ein Fehler.
+4. Auswertung nur der Ereignisse dieses Prozesses: erlaubt sind die Ereignisse beim Laden der Bibliothek (vom
+   Programm aus nicht abschaltbar, ohne Pfade und Modellnamen), alles andere – vor allem ``SessionCreation`` mit
+   Modellname – ist ein Fehler.
 
 Aufruf (Eingabeaufforderung als Administrator):
     tools\\etw_pruefen.bat                                          Entwicklungsumgebung (.venv)
@@ -34,7 +35,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PROVIDER = "{3a26b1ff-7484-7484-7484-15261f42614d}"   # Microsoft.ML.ONNXRuntime (Telemetrie)
-ALLOWED = {"ProcessInfo"}                             # beim Laden der Bibliothek, nicht abschaltbar
+# Ereignisse beim Laden der Bibliothek – entstehen, bevor sich die Telemetrie abschalten lässt. Inhalt laut DLL:
+# ProcessInfo (Version, Prozessor, Arbeitsspeicher), RegisterEpLibraryStart/-End (Name des Rechenbausteins,
+# Erfolg), DriverInfo (Geräteklasse, Treibernamen/-versionen). Neue Ereignisnamen erst prüfen, dann eintragen.
+ALLOWED = {"ProcessInfo", "RegisterEpLibraryStart", "RegisterEpLibraryEnd", "DriverInfo"}
 SAMPLES = (ROOT / "samples" / "scan.pdf", ROOT / "samples" / "beispiel.txt")
 TIMEOUT = 600
 

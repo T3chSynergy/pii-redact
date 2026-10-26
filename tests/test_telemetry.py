@@ -81,6 +81,11 @@ _TRACERPT_XML = """<?xml version="1.0" encoding="UTF-8"?>
 </Event>
 <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
   <System><Provider Name="Microsoft.ML.ONNXRuntime" /><Execution ProcessID="4711" ThreadID="1" /></System>
+  <EventData><Data Name="registrationName">CPU</Data></EventData>
+  <RenderingInfo Culture="de-DE"><Task>RegisterEpLibraryStart</Task></RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System><Provider Name="Microsoft.ML.ONNXRuntime" /><Execution ProcessID="4711" ThreadID="1" /></System>
   <EventData><Data Name="sessionId">1</Data><Data Name="modelFileName">layout_rf2.4.1+imf1.onnx</Data></EventData>
   <RenderingInfo Culture="de-DE"><Task>SessionCreation</Task></RenderingInfo>
 </Event>
@@ -97,13 +102,14 @@ _TRACERPT_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def test_etw_evaluation(tmp_path):
-    """Auswertung der tracerpt-Ausgabe – nur Ereignisse des geprüften Prozesses, ProcessInfo erlaubt."""
+    """Auswertung der tracerpt-Ausgabe – nur Ereignisse des geprüften Prozesses, Lade-Ereignisse erlaubt."""
     etw = _etw_tool()
     xml = tmp_path / "ort.xml"
     xml.write_text(_TRACERPT_XML, encoding="utf-8")
     events = etw.parse_events(xml)
     assert [(e.pid, e.task, e.model) for e in events] == [
-        (4711, "ProcessInfo", ""), (4711, "SessionCreation", "layout_rf2.4.1+imf1.onnx"),
+        (4711, "ProcessInfo", ""), (4711, "RegisterEpLibraryStart", ""),
+        (4711, "SessionCreation", "layout_rf2.4.1+imf1.onnx"),
         (815, "SessionCreation", "anderes_programm.onnx"), (42, "", "")]
     assert [str(e) for e in etw.violations(events, 4711)] == ["SessionCreation – layout_rf2.4.1+imf1.onnx"]
     assert etw.violations(events, 9999) == []

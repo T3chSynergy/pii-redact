@@ -40,8 +40,9 @@ baut keine Netzwerkverbindungen auf – Firewall-Regeln sind nicht erforderlich.
 Microsoft) protokolliert unter Windows Nutzungsereignisse über die Ereignisablaufverfolgung (ETW), z. B. den
 Dateinamen des Modells, Hardwaredaten und Fehlermeldungen. Windows kann sie – abhängig von den
 Diagnosedaten-Einstellungen – an Microsoft übermitteln. pii-redact schaltet diese Ereignisse ab Version 0.8.3 vor
-dem ersten Modell ab. Übrig bleibt ein Ereignis beim Laden der Bibliothek (Version, Prozessor, Arbeitsspeicher,
-keine Dokumentdaten). Wer auch das ausschließen will, steuert die Diagnosedaten von Windows zentral
+dem ersten Modell ab. Übrig bleiben die Ereignisse beim Laden der Bibliothek (Version, Prozessor, Arbeitsspeicher,
+Namen und Versionen der Grafik-/NPU-Treiber, Registrierung der Rechenbausteine – keine Dokumentdaten, keine Pfade,
+keine Modellnamen). Wer auch das ausschließen will, steuert die Diagnosedaten von Windows zentral
 über die Richtlinie *Computerkonfiguration → Administrative Vorlagen → Windows-Komponenten → Datensammlung und
 Vorabversionen → Diagnosedaten zulassen*.
 
