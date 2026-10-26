@@ -7,6 +7,13 @@
   CVE-2026-112940). pii-redact nutzt `filelock` nicht selbst; es kommt indirekt über `tldextract` und
   `huggingface-hub` mit.
 
+**Abhängigkeiten**
+- Gebündeltes Update: spaCy 3.8.17, Presidio 2.2.365, onnxruntime 1.31.0, tokenizers 0.23.3, pydantic 2.14.1,
+  PySide6 6.11.3, opencv 4.14, omegaconf 2.4.0 (braucht `antlr4-python3-runtime` nicht mehr, das Paket entfällt)
+  sowie kleinere Updates (u. a. certifi, charset-normalizer, cloudpathlib, phonenumbers, regex, shapely,
+  smart-open, srsly, tldextract, wrapt). Die Erkennung bleibt unverändert: alle Beispieldateien liefern in beiden
+  Modi dieselben Funde wie vorher.
+
 **Intern**
 - Obergrenzen in `pyproject.toml` und `requirements.txt` für PyMuPDF (`< 2`), PySide6 (`< 6.12`), rapidocr
   (`< 3.10`) und huggingface-hub (`< 2`): `setup.bat` installiert nach diesen Bereichen und hätte sonst
