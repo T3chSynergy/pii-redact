@@ -47,7 +47,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
   `tools/lizenzen.py` (erzeugt `LIZENZEN.txt` + `LIZENZTEXTE.txt` beim Build). Transformer-Modell (Davlan) bleibt
   **AFL-3.0** (eigenständige Datendatei; Text `packaging/lizenztexte/AFL-3.0.txt`, im Modellordner
   `LICENSE-AFL-3.0.txt`; `tools/convert_model.py` legt ihn bei). Einordnung soll noch rechtlich bestätigt werden.
-- Erkennung: Presidio 2.2.364 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
+- Erkennung: Presidio 2.2.365 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
   Davlan XLM-R als ONNX int8 – **ohne PyTorch**.
   - **Modellwahl (Vergleich 03.10.2026, `tools/modelle_testen.bat`, Cloud):** Davlan base bleibt. Davlan large
     erkennt kaum mehr, ist aber ca. 3× langsamer/2× Speicher; GLiNER2-PII (fastino) und GLiNER multi PII sind
@@ -88,7 +88,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
   - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
   - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
-    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf 2.3; omegaconf 2.4 braucht antlr4 nicht mehr).
+    daraus folgt thinc < 8.4). antlr4 entfällt seit omegaconf 2.4.0 (26.10.2026).
   - **Obergrenzen in `pyproject.toml`/`requirements.txt`** (seit 26.10.2026, Gründe als Kommentar dort), weil
     `setup.bat` nach diesen Bereichen installiert, nicht nach der Lock-Datei: PyMuPDF `< 2` (Hauptversion, neue
     Pakete pymupdf-layout/pymupdf4llm), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
@@ -96,8 +96,9 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     nicht), huggingface-hub `< 2` (tokenizers erlaubt 2.x seit 0.23.3). Aufheben nur bewusst, je eigener PR.
   - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
-  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
-    Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Funde aller Beispieldateien (beide Modi) mit
+    dem alten Stand vergleichen → Nutzer testet `run.bat`/`build.bat` → Lock-Datei neu (Anleitung im Dateikopf,
+    aus der Cloud per `uv pip compile`) → `CHANGELOG.md` → PR gegen `dev`.
   - 21.10.2026: Sicherheitsupdate pillow 12.3.0 → 13.0.0 (Hauptversion, 8 CVEs; kein 12.x-Fix) und certifi →
     2026.10.19. Pillow nur über rapidocr; `ocr.py` übergibt ein ndarray, Pillows Datei-Decoder laufen nie.
   - 26.10.2026: Sicherheitsupdate filelock 4.0.3 → 4.2.4 (3 CVEs, Fix ab 4.2.1); nur indirekt über
@@ -109,11 +110,10 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     Stand und erzeugt weiter Meldungen (so geschehen nach 0.8.1: 10 falsche Alarme zu pillow/certifi). Zusätzlicher
     Nutzen: `setup.bat` installiert nach `pyproject.toml`, nicht nach der Lock-Datei. Prüfen: SBOM
     `gh api repos/T3chSynergy/pii-redact/dependency-graph/sbom` (je Paket nur noch eine Version).
-  - Stand 26.10.2026: keine bekannten Lücken. Möglich, gebündelt vor dem nächsten Release (Nutzer will warten):
-    kleine Updates (u. a. charset-normalizer, cloudpathlib, regex, smart-open, srsly, wrapt, blis, cymem,
-    phonenumbers, tldextract) und zu testende Pakete spaCy 3.8.17/thinc 8.3.14, Presidio 2.2.365, onnxruntime
-    1.31, tokenizers 0.23.3, pydantic 2.14.1, omegaconf 2.4.0 (ohne antlr4). Später einzeln: PyMuPDF 2, PySide6
-    6.12, rapidocr 3.10, huggingface-hub 2. Nicht möglich: numpy 2.5 und preshed ≥ 3.0.14 (Presidio 2.2.365
+  - Stand 26.10.2026: keine bekannten Lücken. Gebündeltes Update erledigt (kleine Updates, spaCy 3.8.17/thinc
+    8.3.14, Presidio 2.2.365, onnxruntime 1.31, tokenizers 0.23.3, pydantic 2.14.1, omegaconf 2.4.0, PySide6 6.11.3,
+    opencv 4.14; Funde aller Beispieldateien unverändert). Später einzeln: PyMuPDF 2, PySide6 6.12, rapidocr 3.10,
+    huggingface-hub 2. Nicht möglich: numpy 2.5 und preshed ≥ 3.0.14 (Presidio 2.2.365
     verlangt numpy < 2.5, preshed < 3.0.14). Prüfen, was zusammen auflösbar ist:
     `uv pip compile pyproject.toml --python-version 3.14 --python-platform windows` und mit der Lock-Datei vergleichen.
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
@@ -128,8 +128,8 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
 - Python: bevorzugt 3.14, dann 3.13, 3.12 (`setup.bat`, `build.bat`, `tools\modelle_testen.bat`). Lock-Datei
   läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `setup.bat` baut `.venv` immer neu (`--clear`, sonst bleiben
   cp312-Pakete liegen); `build.bat` legt `.venv-build` bei anderer Python-Version neu an. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
-- Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
-  antlr4-python3-runtime 4.9.3; kein torch/transformers.
+- Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.14.0.94 (< 5), omegaconf 2.4.0 (ohne antlr4);
+  kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
 - **Kommandozeile** (`cli.py`, echte Konsole ohne Qt): Ausgabe ohne Klartext (nur Anzahl/Datenart; Klartext nur
   `--nur-anzeigen`/`--details`), kein stilles Überschreiben (`--ueberschreiben`), Rückgabewert = schwerwiegendster
