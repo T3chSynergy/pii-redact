@@ -2,7 +2,7 @@
 
 import os as _os
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 
 # onnxruntime (Modus „Gründlich“, Texterkennung) bringt Telemetrie von Microsoft mit. Unter Linux/macOS startet
 # beim Laden der Bibliothek ein eigener Sende-Client – abschalten lässt er sich nur über diese Variable, gesetzt vor
