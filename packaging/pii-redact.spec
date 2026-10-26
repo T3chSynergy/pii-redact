@@ -126,7 +126,7 @@ def analysis(script):
         binaries=binaries,
         datas=datas,
         hiddenimports=hiddenimports + ["pii_redact.core.onnx_recognizer", "pii_redact.core.transformer_ner",
-                                       "pii_redact.core.ocr"],
+                                       "pii_redact.core.ocr", "pii_redact.onnx_telemetry"],
         excludes=EXCLUDES,
         noarchive=False,
     )
