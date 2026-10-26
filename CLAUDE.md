@@ -91,7 +91,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     daraus folgt thinc < 8.4). antlr4 entfällt seit omegaconf 2.4.0 (26.10.2026).
   - **Obergrenzen in `pyproject.toml`/`requirements.txt`** (seit 26.10.2026, Gründe als Kommentar dort), weil
     `setup.bat` nach diesen Bereichen installiert, nicht nach der Lock-Datei: PyMuPDF `< 2` (Hauptversion, neue
-    Pakete pymupdf-layout/pymupdf4llm), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
+    Pakete pymupdf-layout/pymupdf4llm, eigene ONNX-Modelle → Telemetrie, siehe „Wichtige Erkenntnisse“), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
     (wechselt auf opencv-python-headless – dort greift `< 5` nicht, beide cv2-Pakete zusammen vertragen sich
     nicht), huggingface-hub `< 2` (tokenizers erlaubt 2.x seit 0.23.3). Aufheben nur bewusst, je eigener PR.
   - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
@@ -182,8 +182,16 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   eigenen Sende-Client an `mobile.events.data.microsoft.com` mit Geräte-ID unter
   `~/.cache/Microsoft/DeveloperTools/.onnxruntime`. Abschalten: `ORT_DISABLE_TELEMETRY=1` vor dem ersten Import
   (`pii_redact/__init__.py`, wirkt nur unter Linux/macOS) und `disable_telemetry_events()` vor jedem Modell
-  (`onnx_telemetry.py`, Windows; das ProcessInfo-Ereignis beim Laden bleibt). Tests: `tests/test_telemetry.py`.
+  (`onnx_telemetry.py`, Windows; die Lade-Ereignisse ProcessInfo, RegisterEpLibraryStart/-End und DriverInfo
+  bleiben – ohne Pfade/Modellnamen, Liste `ALLOWED` in `tools/etw_pruefen.py`). Tests: `tests/test_telemetry.py`.
   Bei onnxruntime-Updates die Bibliotheken nach `events.data.microsoft.com`/`ORT_DISABLE_TELEMETRY` durchsuchen.
+  **Prüfen unter Windows:** `tools\etw_pruefen.bat [--exe dist\pii-redact\pii-redact-cli.exe]` (Administrator;
+  ETW-Anbieter `{3a26b1ff-7484-7484-7484-15261f42614d}`, logman + tracerpt, Gegenprobe ohne Abschaltung); in der CI
+  `tests/test_telemetry.py::test_windows_etw_no_model_events` (schlägt dort fehl statt zu überspringen).
+  Vom Nutzer bestätigt (26.10.2026): 0.8.2 meldet Texterkennung + `model.onnx`, `dev` nichts mehr.
+  **PyMuPDF 2** lädt beim Start eigene Layout-Modelle über onnxruntime (`layout_rf…`, `feature_imf1`,
+  `table_grid_model…`, aufgefallen in einer `.venv` von vor den Obergrenzen) – vor der Abschaltung. Beim Update auf
+  PyMuPDF 2 muss `onnx_telemetry.disable()` vor `import pymupdf` laufen; der ETW-Test fällt sonst rot aus.
 - Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
   freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 
