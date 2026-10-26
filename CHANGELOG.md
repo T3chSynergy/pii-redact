@@ -1,5 +1,17 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Sicherheit**
+- `filelock` 4.0.3 → 4.2.4: behebt drei Lücken in den Sperrdateien (CVE-2026-112907, CVE-2026-112913,
+  CVE-2026-112940). pii-redact nutzt `filelock` nicht selbst; es kommt indirekt über `tldextract` und
+  `huggingface-hub` mit.
+
+**Intern**
+- Mindestversionen für `pillow` (13.0.0), `certifi` (2026.10.19) und `filelock` (4.2.1) auch in `pyproject.toml`
+  und `requirements.txt`: schützt Entwicklungsumgebungen und lässt Dependabot den Abhängigkeitsgraphen neu
+  einlesen (die Meldungen zu den in 0.8.1 behobenen Lücken blieben sonst offen).
+
 ## 0.8.2 – 21.10.2026
 
 **Fehlerbehebung**

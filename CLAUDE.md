@@ -95,8 +95,17 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
   - 21.10.2026: Sicherheitsupdate pillow 12.3.0 → 13.0.0 (Hauptversion, 8 CVEs; kein 12.x-Fix) und certifi →
     2026.10.19. Pillow nur über rapidocr; `ocr.py` übergibt ein ndarray, Pillows Datei-Decoder laufen nie.
-  - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 7 kleine Updates
-    – charset-normalizer, cloudpathlib, filelock, regex, smart-open, srsly, wrapt. Nicht möglich: numpy 2.5
+  - 26.10.2026: Sicherheitsupdate filelock 4.0.3 → 4.2.4 (3 CVEs, Fix ab 4.2.1); nur indirekt über
+    tldextract/huggingface-hub, im Programm nicht direkt genutzt.
+  - **Bei jedem Sicherheitsupdate auch die Untergrenze in `pyproject.toml` und `requirements.txt` anheben**
+    (Abschnitt „Sicherheits-Untergrenzen“). Grund: Dependabot liest den Abhängigkeitsgraphen in zwei Durchläufen –
+    `/packaging` (nur bei Änderung der Lock-Datei) und `/` (nur bei Änderung von pyproject.toml/requirements*.txt
+    in der Wurzel, liest dabei aber **auch** die Lock-Datei). Ändert sich nur die Lock-Datei, behält `/` den alten
+    Stand und erzeugt weiter Meldungen (so geschehen nach 0.8.1: 10 falsche Alarme zu pillow/certifi). Zusätzlicher
+    Nutzen: `setup.bat` installiert nach `pyproject.toml`, nicht nach der Lock-Datei. Prüfen: SBOM
+    `gh api repos/T3chSynergy/pii-redact/dependency-graph/sbom` (je Paket nur noch eine Version).
+  - Stand 02.10.2026: keine bekannten Lücken. Möglich, aber nicht dringend (Nutzer will warten): 6 kleine Updates
+    – charset-normalizer, cloudpathlib, regex, smart-open, srsly, wrapt (filelock am 26.10.2026 erledigt). Nicht möglich: numpy 2.5
     (Presidio 2.2.364 verlangt numpy < 2.5), pydantic-core 2.49 (gehört zu pydantic 2.14, nur Beta; pydantic
     2.13.5 braucht exakt 2.46.5). Prüfen, was zusammen auflösbar ist:
     `uv pip compile <Pakete> --python-version 3.14 --python-platform windows`.
