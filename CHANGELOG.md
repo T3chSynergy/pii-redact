@@ -23,6 +23,10 @@
   Modi dieselben Funde wie vorher.
 
 **Intern**
+- Neues Prüfskript `tools\etw_pruefen.bat` (als Administrator): zeichnet die Telemetrie-Ereignisse von
+  onnxruntime lokal auf, lässt pii-redact eine Scan-PDF und einen Text im Modus „Gründlich“ verarbeiten und meldet,
+  ob Modell-Ereignisse entstanden sind – für die Entwicklungsumgebung oder das gebaute Programm
+  (`--exe dist\pii-redact\pii-redact-cli.exe`), mit Gegenprobe. Derselbe Ablauf läuft als Test in der Windows-CI.
 - Obergrenzen in `pyproject.toml` und `requirements.txt` für PyMuPDF (`< 2`), PySide6 (`< 6.12`), rapidocr
   (`< 3.10`) und huggingface-hub (`< 2`): `setup.bat` installiert nach diesen Bereichen und hätte sonst
   ungetestete neue Versionen geholt (PyMuPDF 2.0, PySide6 6.12 mit WebEngine, rapidocr 3.10 mit opencv 5).

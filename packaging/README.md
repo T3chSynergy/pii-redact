@@ -45,6 +45,12 @@ keine Dokumentdaten). Wer auch das ausschließen will, steuert die Diagnosedaten
 über die Richtlinie *Computerkonfiguration → Administrative Vorlagen → Windows-Komponenten → Datensammlung und
 Vorabversionen → Diagnosedaten zulassen*.
 
+Nachprüfen lässt sich das mit `tools\etw_pruefen.bat --exe dist\pii-redact\pii-redact-cli.exe` (Eingabeaufforderung
+als Administrator, im Quellcode-Ordner nach `build.bat`). Das Skript zeichnet die Ereignisse von onnxruntime
+lokal auf, lässt das Programm eine Scan-PDF und einen Text im Modus „Gründlich“ verarbeiten und meldet „OK“, wenn
+kein Modell-Ereignis entstanden ist. Eine Gegenprobe ohne Abschaltung zeigt, dass die Aufzeichnung funktioniert.
+An Microsoft geht dabei nichts.
+
 Größe (inkl. Texterkennung): ca. 750–950 MB entpackt, ZIP ca. 500 MB. Empfohlen: Windows 10/11 64 Bit, 8 GB RAM.
 
 ## Build-Rechner einrichten (einmalig)
