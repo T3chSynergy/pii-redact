@@ -279,7 +279,7 @@ src/pii_redact/
 ├── about.py              # Lizenz, Quellcode-Link, verwendete Komponenten
 ├── cli.py
 └── app.py
-tools/                    # nur Entwicklung: Modell-Umwandlung, Vergleich, Test-Mini-Modell, ETW-Prüfung
+tools/                    # nur Entwicklung: Modell-Umwandlung, Vergleich, Test-Mini-Modell, ETW-Prüfung, Symbol
 packaging/                # Build: PyInstaller-Spec, Lock-Datei, Icon, Lizenztexte, IT-Anleitung
 deploy/                   # Vorlagen für die Softwareverteilung
 ```
