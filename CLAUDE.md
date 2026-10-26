@@ -77,6 +77,11 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 123 Tests (Stand 26.10.2026). `run.b
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,
   Lesezeichen löschen, Formularfelder backen), `verify_pdf` prüft alles nach. OCR (RapidOCR 3.9.2) nur als
   Rückfallebene.
+- **Programmsymbol:** selbst gezeichnet aus Grundformen (blaues abgerundetes Quadrat, weißes Blatt, zwei schwarze
+  Balken, zwei graue Linien; keine Schrift, keine fremde Grafik). Erzeugt mit `tools/make_icon.py` (Pillow, ohne
+  Kantenglättung; ICO mit den Pillow-Standardgrößen 16–256), pixelgenau wie die Dateien vom 26.09.2026 – deren
+  Entstehung war vorher nicht dokumentiert (auch im alten Chat nicht). `tests/test_icon.py` prüft Gleichheit.
+  Änderungen am Symbol nur über das Skript.
 - **Verteilung:** Build liefert den **Programmordner** `dist\pii-redact` (PyInstaller onedir) und daraus
   `dist\pii-redact-<version>.zip`; das Installationspaket (MSI) erstellt die IT mit eigenen Werkzeugen.
   WiX/MSI wurde aus dem Projekt entfernt.

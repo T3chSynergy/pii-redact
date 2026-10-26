@@ -1,5 +1,13 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Intern**
+- Neues Skript `tools/make_icon.py`: zeichnet das Programmsymbol (`packaging/pii-redact.ico`,
+  `src/pii_redact/resources/icon.png`) aus Grundformen – pixelgenau wie die bisherigen Dateien. Damit ist
+  dokumentiert, dass das Symbol selbst erstellt ist, und es lässt sich leicht anpassen. Ein Test prüft, dass Skript
+  und Dateien übereinstimmen.
+
 ## 0.8.3 – 26.10.2026
 
 **Datenschutz**
