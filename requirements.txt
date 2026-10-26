@@ -1,11 +1,13 @@
 # Laufzeit – alternativ: pip install -e .
 presidio-analyzer>=2.2.360
 spacy>=3.7,<4
-pymupdf>=1.24.3
-PySide6>=6.6
+# Obergrenzen: neue Versionen erst nach eigenem Test übernehmen (Gründe in pyproject.toml)
+pymupdf>=1.24.3,<2
+PySide6>=6.6,<6.12
 onnxruntime>=1.17
 tokenizers>=0.15
-rapidocr>=3.9,<4
+huggingface-hub<2
+rapidocr>=3.9,<3.10
 opencv-python>=4.8,<5
 # Sicherheits-Untergrenzen für indirekte Abhängigkeiten (gebaut wird mit packaging/requirements-lock.txt)
 pillow>=13.0.0

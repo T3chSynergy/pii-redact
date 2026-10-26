@@ -8,6 +8,10 @@
   `huggingface-hub` mit.
 
 **Intern**
+- Obergrenzen in `pyproject.toml` und `requirements.txt` für PyMuPDF (`< 2`), PySide6 (`< 6.12`), rapidocr
+  (`< 3.10`) und huggingface-hub (`< 2`): `setup.bat` installiert nach diesen Bereichen und hätte sonst
+  ungetestete neue Versionen geholt (PyMuPDF 2.0, PySide6 6.12 mit WebEngine, rapidocr 3.10 mit opencv 5).
+  Der Build mit der Lock-Datei ändert sich nicht.
 - Mindestversionen für `pillow` (13.0.0), `certifi` (2026.10.19) und `filelock` (4.2.1) auch in `pyproject.toml`
   und `requirements.txt`: schützt Entwicklungsumgebungen und lässt Dependabot den Abhängigkeitsgraphen neu
   einlesen (die Meldungen zu den in 0.8.1 behobenen Lücken blieben sonst offen).
