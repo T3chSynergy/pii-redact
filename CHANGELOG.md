@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.3 – 26.10.2026
 
 **Datenschutz**
 - **Telemetrie von onnxruntime abgeschaltet:** Die Bibliothek für den Modus „Gründlich“ und die Texterkennung
