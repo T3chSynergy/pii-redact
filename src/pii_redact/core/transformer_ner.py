@@ -105,6 +105,10 @@ class OnnxNerModel:
         import onnxruntime as ort
         from tokenizers import Tokenizer
 
+        from ..onnx_telemetry import disable as disable_telemetry
+
+        disable_telemetry()
+
         model_dir = Path(model_dir)
         if not (model_dir / "model.onnx").is_file():
             raise NerModelMissingError(f"Kein ONNX-Modell in {model_dir}")

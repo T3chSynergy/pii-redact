@@ -1,13 +1,32 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.3 – 26.10.2026
+
+**Datenschutz**
+- **Telemetrie von onnxruntime abgeschaltet:** Die Bibliothek für den Modus „Gründlich“ und die Texterkennung
+  (onnxruntime von Microsoft) protokollierte unter Windows Nutzungsereignisse, u. a. den Dateinamen des Modells,
+  Hardwaredaten und Fehlermeldungen (keine Dokumentinhalte). Windows kann sie je nach Diagnosedaten-Einstellung an
+  Microsoft übermitteln. pii-redact schaltet sie jetzt vor dem ersten Modell ab; unter Linux/macOS ist zusätzlich
+  der eigene Sende-Client von onnxruntime aus (keine Geräte-ID, kein Versand). Hinweise für die IT in
+  `packaging/README.md`.
 
 **Sicherheit**
 - `filelock` 4.0.3 → 4.2.4: behebt drei Lücken in den Sperrdateien (CVE-2026-112907, CVE-2026-112913,
   CVE-2026-112940). pii-redact nutzt `filelock` nicht selbst; es kommt indirekt über `tldextract` und
   `huggingface-hub` mit.
 
+**Abhängigkeiten**
+- Gebündeltes Update: spaCy 3.8.17, Presidio 2.2.365, onnxruntime 1.31.0, tokenizers 0.23.3, pydantic 2.14.1,
+  PySide6 6.11.3, opencv 4.14, omegaconf 2.4.0 (braucht `antlr4-python3-runtime` nicht mehr, das Paket entfällt)
+  sowie kleinere Updates (u. a. certifi, charset-normalizer, cloudpathlib, phonenumbers, regex, shapely,
+  smart-open, srsly, tldextract, wrapt). Die Erkennung bleibt unverändert: alle Beispieldateien liefern in beiden
+  Modi dieselben Funde wie vorher.
+
 **Intern**
+- Neues Prüfskript `tools\etw_pruefen.bat` (als Administrator): zeichnet die Telemetrie-Ereignisse von
+  onnxruntime lokal auf, lässt pii-redact eine Scan-PDF und einen Text im Modus „Gründlich“ verarbeiten und meldet,
+  ob Modell-Ereignisse entstanden sind – für die Entwicklungsumgebung oder das gebaute Programm
+  (`--exe dist\pii-redact\pii-redact-cli.exe`), mit Gegenprobe. Derselbe Ablauf läuft als Test in der Windows-CI.
 - Obergrenzen in `pyproject.toml` und `requirements.txt` für PyMuPDF (`< 2`), PySide6 (`< 6.12`), rapidocr
   (`< 3.10`) und huggingface-hub (`< 2`): `setup.bat` installiert nach diesen Bereichen und hätte sonst
   ungetestete neue Versionen geholt (PyMuPDF 2.0, PySide6 6.12 mit WebEngine, rapidocr 3.10 mit opencv 5).

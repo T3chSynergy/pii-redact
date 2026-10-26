@@ -4,11 +4,14 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.2 (Silbentrennung und Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung);
-davor v0.8.1 (Sicherheitsupdate pillow 13/certifi, README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`, Testtexte + Erkennungsquote,
-Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build; 0.7.1: Refactoring Hauptfenster,
-`.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung + Modellvergleich), Lizenz AGPL-3.0-or-later. 117 Tests (Stand 21.10.2026). `run.bat` und
-`build.bat` auf Windows mit 3.14 erfolgreich getestet (21.10.2026, mit pillow 13 vor Release 0.8.1; `run.bat` mit 0.8.2-Stand 21.10.2026). v0.3.0 läuft auf dem Test-PC.
+**Stand:** v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
+Paket-Update, Sicherheitsupdate filelock, Ober-/Untergrenzen in `pyproject.toml`); davor v0.8.2 (Silbentrennung und
+Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); v0.8.1 (Sicherheitsupdate pillow 13/certifi,
+README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
+Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
+0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
+Modellvergleich), Lizenz AGPL-3.0-or-later. 123 Tests (Stand 26.10.2026). `run.bat` und `build.bat` auf Windows mit
+3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
 - Sprache mit dem Nutzer und in Code/Doku/Commits: **Deutsch**.
@@ -47,7 +50,7 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
   `tools/lizenzen.py` (erzeugt `LIZENZEN.txt` + `LIZENZTEXTE.txt` beim Build). Transformer-Modell (Davlan) bleibt
   **AFL-3.0** (eigenständige Datendatei; Text `packaging/lizenztexte/AFL-3.0.txt`, im Modellordner
   `LICENSE-AFL-3.0.txt`; `tools/convert_model.py` legt ihn bei). Einordnung soll noch rechtlich bestätigt werden.
-- Erkennung: Presidio 2.2.364 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
+- Erkennung: Presidio 2.2.365 + spaCy `de_core_news_md` 3.8.0; Modus **Gründlich** (Standard) zusätzlich
   Davlan XLM-R als ONNX int8 – **ohne PyTorch**.
   - **Modellwahl (Vergleich 03.10.2026, `tools/modelle_testen.bat`, Cloud):** Davlan base bleibt. Davlan large
     erkennt kaum mehr, ist aber ca. 3× langsamer/2× Speicher; GLiNER2-PII (fastino) und GLiNER multi PII sind
@@ -88,16 +91,17 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     auch mit `pip-audit -r <Lock-Datei ohne Modell-Zeile> --no-deps --disable-pip`).
   - **Sonst gebündelt** vor einem Release bzw. alle 2–3 Monate; neue **Hauptversionen nur bewusst**, eigener PR.
   - Bewusst blockiert: opencv `< 5`, spaCy `< 4` (Modell `de_core_news_md` 3.8 passt nur zu spaCy 3.8.x;
-    daraus folgt thinc < 8.4), antlr4 4.9.x (über omegaconf 2.3; omegaconf 2.4 braucht antlr4 nicht mehr).
+    daraus folgt thinc < 8.4). antlr4 entfällt seit omegaconf 2.4.0 (26.10.2026).
   - **Obergrenzen in `pyproject.toml`/`requirements.txt`** (seit 26.10.2026, Gründe als Kommentar dort), weil
     `setup.bat` nach diesen Bereichen installiert, nicht nach der Lock-Datei: PyMuPDF `< 2` (Hauptversion, neue
-    Pakete pymupdf-layout/pymupdf4llm), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
+    Pakete pymupdf-layout/pymupdf4llm, eigene ONNX-Modelle → Telemetrie, siehe „Wichtige Erkenntnisse“), PySide6 `< 6.12` (zieht WebEngine + Pdf-Module mit), rapidocr `< 3.10`
     (wechselt auf opencv-python-headless – dort greift `< 5` nicht, beide cv2-Pakete zusammen vertragen sich
     nicht), huggingface-hub `< 2` (tokenizers erlaubt 2.x seit 0.23.3). Aufheben nur bewusst, je eigener PR.
   - Kritisch, nach Update genau testen: **PyMuPDF** (Schwärzung/`verify_pdf`), spaCy + Modell, Presidio,
     onnxruntime/tokenizers (Modus „Gründlich“), PySide6 (Oberfläche → Windows-Klicktest), rapidocr/opencv (OCR).
-  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Nutzer testet `run.bat`/`build.bat` →
-    Lock-Datei neu (Anleitung im Dateikopf) → `CHANGELOG.md` → PR gegen `dev`.
+  - Ablauf: frische Umgebung → `pytest` inkl. Modell „Gründlich“ → Funde aller Beispieldateien (beide Modi) mit
+    dem alten Stand vergleichen → Nutzer testet `run.bat`/`build.bat` → Lock-Datei neu (Anleitung im Dateikopf,
+    aus der Cloud per `uv pip compile`) → `CHANGELOG.md` → PR gegen `dev`.
   - 21.10.2026: Sicherheitsupdate pillow 12.3.0 → 13.0.0 (Hauptversion, 8 CVEs; kein 12.x-Fix) und certifi →
     2026.10.19. Pillow nur über rapidocr; `ocr.py` übergibt ein ndarray, Pillows Datei-Decoder laufen nie.
   - 26.10.2026: Sicherheitsupdate filelock 4.0.3 → 4.2.4 (3 CVEs, Fix ab 4.2.1); nur indirekt über
@@ -109,11 +113,10 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
     Stand und erzeugt weiter Meldungen (so geschehen nach 0.8.1: 10 falsche Alarme zu pillow/certifi). Zusätzlicher
     Nutzen: `setup.bat` installiert nach `pyproject.toml`, nicht nach der Lock-Datei. Prüfen: SBOM
     `gh api repos/T3chSynergy/pii-redact/dependency-graph/sbom` (je Paket nur noch eine Version).
-  - Stand 26.10.2026: keine bekannten Lücken. Möglich, gebündelt vor dem nächsten Release (Nutzer will warten):
-    kleine Updates (u. a. charset-normalizer, cloudpathlib, regex, smart-open, srsly, wrapt, blis, cymem,
-    phonenumbers, tldextract) und zu testende Pakete spaCy 3.8.17/thinc 8.3.14, Presidio 2.2.365, onnxruntime
-    1.31, tokenizers 0.23.3, pydantic 2.14.1, omegaconf 2.4.0 (ohne antlr4). Später einzeln: PyMuPDF 2, PySide6
-    6.12, rapidocr 3.10, huggingface-hub 2. Nicht möglich: numpy 2.5 und preshed ≥ 3.0.14 (Presidio 2.2.365
+  - Stand 26.10.2026: keine bekannten Lücken. Gebündeltes Update erledigt (kleine Updates, spaCy 3.8.17/thinc
+    8.3.14, Presidio 2.2.365, onnxruntime 1.31, tokenizers 0.23.3, pydantic 2.14.1, omegaconf 2.4.0, PySide6 6.11.3,
+    opencv 4.14; Funde aller Beispieldateien unverändert). Später einzeln: PyMuPDF 2, PySide6 6.12, rapidocr 3.10,
+    huggingface-hub 2. Nicht möglich: numpy 2.5 und preshed ≥ 3.0.14 (Presidio 2.2.365
     verlangt numpy < 2.5, preshed < 3.0.14). Prüfen, was zusammen auflösbar ist:
     `uv pip compile pyproject.toml --python-version 3.14 --python-platform windows` und mit der Lock-Datei vergleichen.
 - **`SECURITY.md`:** Meldungen über GitHubs „Private vulnerability reporting“ (muss in den Repo-Einstellungen
@@ -128,8 +131,8 @@ Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release
 - Python: bevorzugt 3.14, dann 3.13, 3.12 (`setup.bat`, `build.bat`, `tools\modelle_testen.bat`). Lock-Datei
   läuft unverändert auf 3.12–3.14 (Tests 30.09.2026). `setup.bat` baut `.venv` immer neu (`--clear`, sonst bleiben
   cp312-Pakete liegen); `build.bat` legt `.venv-build` bei anderer Python-Version neu an. In der Cloud: `uv python install 3.14` (vorinstalliertes uv kennt nur rc2).
-- Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.13.0.92 (< 5), omegaconf 2.3.1,
-  antlr4-python3-runtime 4.9.3; kein torch/transformers.
+- Lock: PyMuPDF 1.28.2, rapidocr 3.9.2, opencv-python 4.14.0.94 (< 5), omegaconf 2.4.0 (ohne antlr4);
+  kein torch/transformers.
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
 - **Kommandozeile** (`cli.py`, echte Konsole ohne Qt): Ausgabe ohne Klartext (nur Anzahl/Datenart; Klartext nur
   `--nur-anzeigen`/`--details`), kein stilles Überschreiben (`--ueberschreiben`), Rückgabewert = schwerwiegendster
@@ -177,6 +180,21 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   zusätzlich analysiert; übernommen nur Muster-Treffer (keine NER), die über den Umbruch reichen und noch nicht
   von einem Muster-Fund abgedeckte Zeichen enthalten (Adressblöcke bleiben zwei Funde). Nicht abgedeckt: Zahl ohne
   Leerzeichen mitten umbrochen (Steuer-ID „86095⏎742719“) – kommt bei Fließtext praktisch nicht vor.
+- **Telemetrie von onnxruntime** (gefunden 26.10.2026): Windows-Wheels protokollieren über ETW (ProcessInfo beim
+  Laden; SessionCreation u. a. mit `modelFileName`, RuntimeError mit Meldung), Linux-Wheels (mind. 1.30) haben einen
+  eigenen Sende-Client an `mobile.events.data.microsoft.com` mit Geräte-ID unter
+  `~/.cache/Microsoft/DeveloperTools/.onnxruntime`. Abschalten: `ORT_DISABLE_TELEMETRY=1` vor dem ersten Import
+  (`pii_redact/__init__.py`, wirkt nur unter Linux/macOS) und `disable_telemetry_events()` vor jedem Modell
+  (`onnx_telemetry.py`, Windows; die Lade-Ereignisse ProcessInfo, RegisterEpLibraryStart/-End und DriverInfo
+  bleiben – ohne Pfade/Modellnamen, Liste `ALLOWED` in `tools/etw_pruefen.py`). Tests: `tests/test_telemetry.py`.
+  Bei onnxruntime-Updates die Bibliotheken nach `events.data.microsoft.com`/`ORT_DISABLE_TELEMETRY` durchsuchen.
+  **Prüfen unter Windows:** `tools\etw_pruefen.bat [--exe dist\pii-redact\pii-redact-cli.exe]` (Administrator;
+  ETW-Anbieter `{3a26b1ff-7484-7484-7484-15261f42614d}`, logman + tracerpt, Gegenprobe ohne Abschaltung); in der CI
+  `tests/test_telemetry.py::test_windows_etw_no_model_events` (schlägt dort fehl statt zu überspringen).
+  Vom Nutzer bestätigt (26.10.2026): 0.8.2 meldet Texterkennung + `model.onnx`, `dev` nichts mehr.
+  **PyMuPDF 2** lädt beim Start eigene Layout-Modelle über onnxruntime (`layout_rf…`, `feature_imf1`,
+  `table_grid_model…`, aufgefallen in einer `.venv` von vor den Obergrenzen) – vor der Abschaltung. Beim Update auf
+  PyMuPDF 2 muss `onnx_telemetry.disable()` vor `import pymupdf` laufen; der ETW-Test fällt sonst rot aus.
 - Hugging Face und download.pytorch.org sind nur erreichbar, wenn der Nutzer sie in der Cloud-Umgebung
   freigegeben hat (Network access → Custom); sonst Modellvergleich nur auf seinem Rechner.
 

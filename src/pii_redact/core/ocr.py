@@ -58,6 +58,9 @@ def _get_engine():
     global _engine
     if _engine is None:
         try:
+            from ..onnx_telemetry import disable as disable_telemetry
+
+            disable_telemetry()            # vor dem ersten Modell der Texterkennung
             from rapidocr import RapidOCR
         except Exception as exc:
             raise OcrUnavailableError(f"Texterkennung (RapidOCR) nicht verfügbar: {exc}") from exc
