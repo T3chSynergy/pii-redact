@@ -10,5 +10,6 @@ opencv-python>=4.8,<5
 # Sicherheits-Untergrenzen für indirekte Abhängigkeiten (gebaut wird mit packaging/requirements-lock.txt)
 pillow>=13.0.0
 certifi>=2026.10.19
+filelock>=4.2.1
 # Deutsches Sprachmodell separat laden:
 #   python -m spacy download de_core_news_md
