@@ -22,6 +22,9 @@ dependencies = [
     # Texterkennung (OCR) als Rückfallebene für gescannte Seiten – ebenfalls über onnxruntime
     "rapidocr>=3.9,<4",
     "opencv-python>=4.8,<5",
+    # Sicherheits-Untergrenzen für indirekte Abhängigkeiten (gebaut wird mit packaging/requirements-lock.txt):
+    "pillow>=13.0.0",          # über rapidocr; 8 Lücken in 12.x (Okt. 2026)
+    "certifi>=2026.10.19",     # über requests/httpx; kompromittierte Zertifizierungsstelle (emSign)
 ]
 
 [project.optional-dependencies]

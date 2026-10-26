@@ -1,5 +1,12 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Intern**
+- Mindestversionen für `pillow` (13.0.0) und `certifi` (2026.10.19) auch in `pyproject.toml` und
+  `requirements.txt`: schützt Entwicklungsumgebungen und lässt Dependabot den Abhängigkeitsgraphen neu einlesen
+  (die Meldungen zu den in 0.8.1 behobenen Lücken blieben sonst offen).
+
 ## 0.8.2 – 21.10.2026
 
 **Fehlerbehebung**
