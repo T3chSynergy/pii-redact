@@ -578,7 +578,8 @@ def test_further_occurrences_surname_alone():
     # ganzer Name hat Vorrang; allein: groß geschrieben, nicht nach „im“/„der“; klein nur in Dateiname/Kennung
     assert found(text, "Erika Winter") == [("Winter", "Nachname"), ("WINTER", "Nachname"), ("winter", "Nachname"),
                                            ("winter", "Nachname"), ("Erika Winter", "weiteres")]
-    assert found("Max Mustermann wohnt in Musterstadt. Mustermann zahlt.", "Max Mustermann") == [("Mustermann", "Nachname")]
+    assert found("Max Mustermann wohnt in Musterstadt. Mustermann zahlt.", "Max Mustermann") == [
+        ("Mustermann", "Nachname")]
     # nur bei Personen – ein Ort oder eine Firma aus zwei Wörtern löst keine Suche nach dem letzten Wort aus
     assert found("Sitz in Bad Homburg. Die Homburg GmbH liefert.", "Bad Homburg", "LOCATION") == []
     # steht der Nachname schon als Fund in der Liste (auch abgewählt), wird er nicht vorgeschlagen
