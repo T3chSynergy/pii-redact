@@ -151,6 +151,17 @@ def is_configured(settings: Settings) -> bool:
 
 
 # ---------------------------------------------------------------------- Anfrage
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Weiterleitungen nicht folgen: urllib schickte sonst bei 301/302/303 den API-Schlüssel an die neue
+    Adresse (auch an einen anderen Server) und machte aus der Anfrage ein GET ohne Inhalt."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirect)
+
+
 def chat(settings: Settings, messages: list[dict], timeout: float | None = None) -> str:
     """Eine Chat-Anfrage an den konfigurierten Server; Rückgabe: Antworttext des Modells."""
     url = endpoint(settings)
@@ -163,9 +174,14 @@ def chat(settings: Settings, messages: list[dict], timeout: float | None = None)
         headers["Authorization"] = f"Bearer {key}"
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout or settings.llm_timeout) as resp:
+        with _opener.open(req, timeout=timeout or settings.llm_timeout) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
+        if exc.code in (301, 302, 303, 307, 308):
+            where = urlparse(exc.headers.get("Location") or "").netloc or "eine andere Adresse"
+            raise LlmError(f"Der Server leitet auf {where} weiter (Fehler {exc.code}). Weiterleitungen werden nicht "
+                           "befolgt, damit Anfrage und API-Schlüssel nur an die eingestellte Adresse gehen – "
+                           "bitte die Server-Adresse in den Einstellungen anpassen.") from None
         detail = exc.read().decode("utf-8", errors="replace")[:300] if exc.fp else ""
         hint = {401: " (API-Schlüssel fehlt oder ist ungültig)", 403: " (Zugriff verweigert)",
                 404: " (Adresse oder Modellname falsch?)", 429: " (zu viele Anfragen – später erneut versuchen)"}

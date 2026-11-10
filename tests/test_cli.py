@@ -43,6 +43,14 @@ def test_missing_settings_file(work):
     assert exc.value.code == cli.ERROR
 
 
+@pytest.mark.parametrize("wert", ["1.5", "-0.1", "nan"])
+def test_threshold_out_of_range(work, wert, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main([str(work / "brief.txt"), "--schnell", f"--schwelle={wert}"])
+    assert exc.value.code == cli.ERROR and "zwischen 0 und 1" in capsys.readouterr().err
+    assert not (work / "brief_anonymisiert.txt").exists()
+
+
 @needs_model
 def test_output_without_plain_text_and_no_overwrite(work, capsys):
     src = work / "brief.txt"

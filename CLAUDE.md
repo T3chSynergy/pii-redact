@@ -14,7 +14,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 202 Tests (Stand 10.11.2026; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 213 Tests (Stand 10.11.2026, `dev` nach 0.8.5: kleine Korrekturen, noch unveröffentlicht; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -234,6 +234,13 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.
+- **Weiterleitungen bei der KI-Anfrage** (nachgestellt 10.11.2026): urllib folgt bei POST den Codes 301/302/303
+  als GET ohne Inhalt, aber **mit** `Authorization` – auch zu einem anderen Server. `llm_review._opener` folgt
+  deshalb keiner Weiterleitung; Meldung nennt das Ziel. (307/308 folgte urllib bei POST ohnehin nie.)
+- Textdateien, die eine vorhandene ersetzen (Text-Export, `Settings.save`), über `models.write_text_safely`
+  (`.tmp` + Umbenennen). `Settings.load` übergeht Werte der falschen Art je Datei (`_same_kind`).
+- Arbeitsstand mit „..“ im Pfad (von Hand verändert) ist unkritisch: `sync_with_disk` setzt alles, was der
+  Abgleich im Quellordner nicht findet, auf „fehlt“; Kommandozeile und Oberfläche übergehen diese Einträge (Test).
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in
   `sys.modules` eintragen.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.

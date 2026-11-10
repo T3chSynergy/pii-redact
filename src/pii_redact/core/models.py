@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
+import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -115,21 +117,53 @@ class Settings:
         """Zentrale Vorgaben (defaults.json) als Grundlage, persönliche Einstellungen darüber.
         Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich; unter ``locked`` aufgeführte
         Einstellungen kommen immer aus defaults.json."""
-        base = _read_json(defaults_path) if defaults_path else {}
-        user = _read_json(path)
-        locked = [k for k in base.get("locked", []) if isinstance(k, str) and k in base]
+        fallback = cls()
+
+        def usable(raw: dict) -> dict:
+            # Unpassende Werte je Datei übergehen – ein Fehler im Nutzerprofil verdrängt keine Vorgabe der IT
+            return {k: v for k, v in raw.items()
+                    if k in cls.__dataclass_fields__ and _same_kind(getattr(fallback, k), v)}
+
+        base = usable(_read_json(defaults_path)) if defaults_path else {}
+        user = usable(_read_json(path))
+        locked = [k for k in base.get("locked", []) if k in base]
         data = {k: v for k, v in base.items() if k not in ("allow_list", "deny_list", "locked")}
         data.update({k: v for k, v in user.items() if k not in locked and k not in cls._NOT_SAVED})
         data["locked"] = locked
         data["org_allow_list"] = list(base.get("allow_list", []))
         data["org_deny_list"] = list(base.get("deny_list", []))
-        known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-        return cls(**known)
+        return cls(**data)
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {k: v for k, v in asdict(self).items() if k not in self._NOT_SAVED}
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        write_text_safely(path, json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def write_text_safely(path: Path, text: str) -> None:
+    """Erst nach ``<Ziel>.tmp`` schreiben, dann umbenennen – bricht das Schreiben ab (Datenträger voll,
+    Netzlaufwerk weg), bleibt die bisherige Datei unverändert und keine halbe Datei unter dem Zielnamen."""
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def _same_kind(default: object, value: object) -> bool:
+    """Passt ein Wert aus einer Einstellungsdatei zur Art der Voreinstellung? Unpassende Werte (von Hand
+    bearbeitete Datei, etwa ``"threshold": "hoch"``) werden übergangen – dann gilt die Voreinstellung."""
+    if isinstance(default, bool):
+        return isinstance(value, bool)
+    if isinstance(default, int):
+        return isinstance(value, int) and not isinstance(value, bool)
+    if isinstance(default, float):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if isinstance(default, list):
+        return isinstance(value, list) and all(isinstance(v, str) for v in value)
+    return isinstance(value, type(default))
 
 
 def _read_json(path: Path | None) -> dict:
