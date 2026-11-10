@@ -46,8 +46,9 @@ class Dialogs:
         self.boxes.append({"title": box.windowTitle(), "text": box.text(), "info": box.informativeText(),
                            "buttons": sorted(buttons), "default": box.defaultButton().text()})
         # ohne Vorgabe: die voreingestellte Schaltfläche (Eingabetaste)
-        (buttons[self.click] if self.click else box.defaultButton()).click()
-        return 0
+        button = buttons[self.click] if self.click else box.defaultButton()
+        button.click()
+        return box.standardButton(button)        # wie das echte exec(): Kennung einer Standard-Schaltfläche
 
 
 def _text_file(window, tmp_path, text=KAYA, name="brief.txt"):
