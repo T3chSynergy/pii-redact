@@ -517,6 +517,7 @@ def test_check_before_saving_adds_suggestions_and_asks(window, tmp_path, monkeyp
     target.unlink()
     window.export_text()
     assert len(asked) == 1 and "antrag_kaya.pdf" in target.read_text(encoding="utf-8")
+    assert not target.with_name(target.name + ".tmp").exists()      # geschrieben über <Ziel>.tmp, dann umbenannt
 
 
 def test_check_before_saving_pdf_save_anyway(window, tmp_path, monkeypatch):

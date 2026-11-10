@@ -125,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.modus:
         settings.replace_mode = args.modus
     if args.schwelle is not None:
+        if not 0 <= args.schwelle <= 1:   # schließt auch „nan“ aus
+            p.error("--schwelle erwartet einen Wert zwischen 0 und 1 (zum Beispiel 0.45).")
         settings.threshold = args.schwelle
 
     analyzer = PiiAnalyzer.for_settings(settings)

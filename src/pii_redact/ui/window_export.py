@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from ..core import save_redacted_pdf
 from ..core.analyzer import further_occurrences
+from ..core.models import write_text_safely
 
 #: Kennzeichen der Kontrollmeldung für weitere Vorkommen (siehe core.redactor.verify_pdf)
 ELSEWHERE = " – an anderer Stelle noch lesbar"
@@ -46,7 +47,7 @@ class ExportMixin:
         if Path(path).resolve() == doc.path.resolve():
             QMessageBox.warning(self, "Export", "Das Original darf nicht überschrieben werden.")
             return
-        Path(path).write_text(self.session.output_text(), encoding="utf-8")
+        write_text_safely(Path(path), self.session.output_text())
         self.session.dirty = False
         self._update_title()
         self._show_saved(Path(path), "Text gespeichert")

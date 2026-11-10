@@ -1,5 +1,20 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Kleine Korrekturen**
+- **KI-Nachprüfung folgt keinen Weiterleitungen mehr:** Antwortete der eingestellte Server mit einer
+  Weiterleitung (301/302/303), ging die Anfrage bisher an die neue Adresse – auch an einen anderen Server, samt
+  API-Schlüssel. Jetzt bricht die Anfrage mit einer Meldung ab, die das Ziel nennt; die Server-Adresse ist dann
+  in den Einstellungen anzupassen.
+- **Text-Export und Einstellungen werden sicher geschrieben:** erst in eine Datei `<Name>.tmp`, dann umbenannt
+  (wie schon beim PDF-Export). Bricht das Schreiben ab – Datenträger voll, Netzlaufwerk getrennt –, bleibt die
+  bisherige Datei unverändert, und unter dem Zielnamen liegt keine halbe Datei.
+- **Einstellungsdatei mit unpassenden Werten:** In einer von Hand bearbeiteten `settings.json` oder
+  `defaults.json` werden Werte der falschen Art (etwa Text statt Zahl) übergangen; dafür gilt die Vorgabe der IT
+  bzw. die Voreinstellung. Bisher konnte das Programm damit später an unerwarteter Stelle abbrechen.
+- **Kommandozeile:** `--schwelle` nimmt nur noch Werte von 0 bis 1 an (sonst Aufruffehler, Rückgabewert 1).
+
 ## 0.8.5 – 10.11.2026
 
 **Kontrolle nach dem Export**
@@ -12,7 +27,6 @@
   dabei nicht.
 - Die Meldungen sagen, was gefunden wurde: „an der geschwärzten Stelle noch vorhanden“ oder „an anderer Stelle
   noch lesbar“, jeweils mit Seite. Erklärung in der Hilfe unter „Häufige Fragen“.
-
 - **Kontrolle vor dem Speichern:** Steht ein geschwärzter Text noch an einer nicht markierten Stelle (etwa ein
   Name im Dateinamen „antrag_mustermann.pdf“ oder in Großbuchstaben), fragt das Programm jetzt **vor** dem
   Speichern nach, statt danach zu warnen. Die Stellen kommen als Vorschläge in die Fundliste (Herkunft

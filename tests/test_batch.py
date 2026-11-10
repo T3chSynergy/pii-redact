@@ -71,6 +71,27 @@ def _analyze_fake(ws: Workspace):
                         findings=[Finding(0, 4, "PERSON", doc.text[0:4])], warnings=doc.warnings, mode="schnell")
 
 
+def test_workspace_entry_outside_source_is_not_processed(folder, tmp_path):
+    """Von Hand veränderter Arbeitsstand mit „..“ im Pfad: Die Datei gilt als fehlend und wird übergangen –
+    gelesen und geschrieben wird nur, was der Abgleich im Quellordner findet."""
+    import json
+
+    from pii_redact.core.batch import WORKSPACE_NAME
+
+    (tmp_path / "aussen.txt").write_text("Frau Erika Beispiel", encoding="utf-8")
+    target = tmp_path / "ziel"
+    Workspace.create(folder, target).save()
+    path = target / WORKSPACE_NAME
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["files"]["../aussen.txt"] = dict(next(iter(data["files"].values())), status=Status.TO_REVIEW)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    ws = Workspace.load(target)
+    todo = ws.sync_with_disk()
+    assert "../aussen.txt" not in todo and ws.entries["../aussen.txt"].status == Status.MISSING
+    assert not ws.entries["../aussen.txt"].analyzed
+
+
 def test_workspace_resume_and_change_detection(folder, tmp_path):
     target = tmp_path / "ziel"
     ws = Workspace.create(folder, target)

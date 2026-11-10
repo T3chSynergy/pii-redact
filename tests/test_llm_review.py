@@ -65,6 +65,31 @@ def server(monkeypatch):
     srv.shutdown()
 
 
+@pytest.mark.parametrize("code", [301, 302, 303, 307, 308])
+def test_redirect_is_not_followed(server, code):
+    """Weiterleitung auf einen anderen Server: weder Anfrage noch API-Schlüssel gehen dorthin."""
+    class Umleitung(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(code)
+            self.send_header("Location", server.replace("127.0.0.1", "localhost") + "/chat/completions")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *_a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Umleitung)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(lr.LlmError) as exc:
+            lr.chat(_settings(f"http://127.0.0.1:{srv.server_port}/v1"), [{"role": "user", "content": "x"}])
+    finally:
+        srv.shutdown()
+    assert "leitet auf localhost" in str(exc.value) and "geheim" not in str(exc.value)
+    assert FakeLLM.requests == []
+
+
 def _settings(url, **kw):
     s = Settings(llm_enabled=True, llm_url=url, llm_model="test/modell", llm_api_key="geheim", **kw)
     return s
