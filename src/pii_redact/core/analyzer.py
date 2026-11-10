@@ -432,10 +432,8 @@ def word_pattern(text: str) -> re.Pattern | None:
     einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“).
     None bei Texten unter drei Zeichen."""
     # Satzzeichen am Rand gehören nicht zum gesuchten Text („KAYA.“ am Satzende → „kaya“ im Dateinamen)
-    words = join_hyphenated(plain_spaces(text)).strip(_TRIM_CHARS + ".!?").split()
     # Anrede und Titel gehören nicht zum Namen („Herrn Kaya“ → „kaya“ im Dateinamen)
-    while len(words) > 1 and words[0].casefold().rstrip(".") in _SALUTATIONS:
-        words = words[1:]
+    words = _name_words(text)
     if not words or len("".join(words)) < 3:
         return None
     core = r"\s*".join(re.escape(w) for w in words)
@@ -449,10 +447,60 @@ def word_pattern(text: str) -> re.Pattern | None:
 CHECK_SOURCE = "kontrolle"
 
 
+def _name_words(text: str) -> list[str]:
+    """Wörter eines Fundtextes ohne Satzzeichen am Rand und ohne Anrede/Titel am Anfang."""
+    words = join_hyphenated(plain_spaces(text)).strip(_TRIM_CHARS + ".!?").split()
+    while len(words) > 1 and words[0].casefold().rstrip(".") in _SALUTATIONS:
+        words = words[1:]
+    return words
+
+
+def surname(text: str) -> str | None:
+    """Nachname eines mehrteiligen Personennamens: das letzte Wort („Max Mustermann“, „Herr Dr. Max Mustermann“),
+    bei „Mustermann, Max“ das Wort vor dem Komma. None bei einem einzelnen Wort, bei weniger als drei Buchstaben
+    und bei Wörtern mit Ziffern."""
+    words = _name_words(text)
+    if len(words) < 2:
+        return None
+    with_comma = [w for w in words[:-1] if w.endswith(",")]
+    name = (with_comma[0] if with_comma else words[-1]).strip(_TRIM_CHARS + ".!?")
+    if len(name) < 3 or not all(c.isalpha() or c in "-'’" for c in name) or not name[0].isalpha():
+        return None
+    return name
+
+
+#: Wörter, nach denen ein großgeschriebenes Wort ein gewöhnliches Hauptwort ist und kein allein stehender Nachname
+_NOUN_MARKERS = frozenset({
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines", "kein", "keine",
+    "keinen", "im", "am", "vom", "zum", "zur", "beim", "ins", "ans", "aufs", "mein", "meine", "dein", "deine", "sein",
+    "seine", "ihr", "ihre", "unser", "unsere", "dieser", "diese", "dieses", "diesen", "diesem", "jeder", "jede",
+    "jedes", "jeden", "jedem",
+})
+
+#: Zeichen, die ein kleingeschriebenes Wort als Teil eines Dateinamens, einer Adresse oder Kennung ausweisen
+_JOINERS = "_-./\\@"
+
+
+def _surname_hit(text: str, start: int, end: int) -> bool:
+    """Zählt die Fundstelle eines allein stehenden Nachnamens? Groß geschrieben immer („Mustermann“,
+    „MUSTERMANN“). Klein geschrieben nur als Teil eines Dateinamens o. Ä. („antrag_mustermann.pdf“) – im Fließtext
+    wäre es ein gewöhnliches Wort („klein“, „jung“, „kurz“ sind auch Nachnamen)."""
+    if text[start].isupper():
+        # „im Winter“, „der Fuchs“: nach Artikel oder Verhältniswort steht ein gewöhnliches Hauptwort
+        previous = re.search(r"([^\W\d_]+)\s+$", text[max(0, start - 20):start])
+        return not (previous and previous.group(1).casefold() in _NOUN_MARKERS)
+    before = text[start - 1] if start else " "
+    after = text[end] if end < len(text) else " "
+    return before in _JOINERS or before.isdigit() or (after in _JOINERS and end + 1 < len(text)
+                                                       and text[end + 1].isalnum()) or after.isdigit()
+
+
 def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
     """Stellen, an denen der Text eines aktiven Fundes noch einmal steht, ohne selbst als Fund markiert zu sein –
     etwa ein Name im Dateinamen („antrag_kaya.pdf“) oder in anderer Groß-/Kleinschreibung. Sie blieben im Ergebnis
-    lesbar. Rückgabe: nicht aktivierte Vorschläge (Herkunft „kontrolle“) mit der Datenart des Fundes.
+    lesbar. Bei mehrteiligen Personennamen zählt auch der Nachname allein („Max Mustermann“ geschwärzt, später
+    „Herr Mustermann“ nicht erkannt). Rückgabe: nicht aktivierte Vorschläge (Herkunft „kontrolle“) mit der
+    Datenart des Fundes.
 
     Stellen, die ein vorhandener Fund berührt, zählen nicht: aktive werden geschwärzt, abgewählte sind eine
     bewusste Entscheidung (auch ein früher abgelehnter Vorschlag)."""
@@ -462,22 +510,37 @@ def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
             marked[f.start:f.end] = b"\x01" * (f.end - f.start)
     joined, hmap = dehyphenate(plain_spaces(text))
     out: list[Finding] = []
-    seen: set[str] = set()
-    for f in sorted(findings, key=lambda f: f.start):
-        key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
-        if not f.active or f.area is not None or key in seen:
-            continue
-        seen.add(key)
-        pattern = word_pattern(f.text)
-        if pattern is None:
-            continue
+
+    def collect(pattern: re.Pattern, entity_type: str, why: str, accept=None) -> None:
         for m in pattern.finditer(joined):
+            if accept and not accept(joined, m.start(), m.end()):
+                continue
             s, e = hmap.span(m.start(), m.end()) if hmap else (m.start(), m.end())
             if any(marked[s:e]):
                 continue
             marked[s:e] = b"\x01" * (e - s)
-            out.append(Finding(s, e, f.entity_type, text[s:e], 1.0, source=CHECK_SOURCE, active=False,
-                               recognizer="Kontrolle: weiteres Vorkommen eines geschwärzten Textes"))
+            out.append(Finding(s, e, entity_type, text[s:e], 1.0, source=CHECK_SOURCE, active=False,
+                               recognizer=why))
+
+    active = [f for f in sorted(findings, key=lambda f: f.start) if f.active and f.area is None]
+    seen: set[str] = set()
+    for f in active:                      # 1. der ganze Wortlaut
+        key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        pattern = word_pattern(f.text)
+        if pattern is not None:
+            collect(pattern, f.entity_type, "Kontrolle: weiteres Vorkommen eines geschwärzten Textes")
+    for f in active:                      # 2. danach der Nachname allein (der ganze Name hat Vorrang)
+        name = surname(f.text) if f.entity_type == "PERSON" else None
+        if name is None or name.casefold() in seen:
+            continue
+        seen.add(name.casefold())
+        pattern = word_pattern(name)
+        if pattern is not None:
+            collect(pattern, f.entity_type, "Kontrolle: Nachname eines geschwärzten Namens steht allein",
+                    _surname_hit)
     return sorted(out, key=lambda f: f.start)
 
 

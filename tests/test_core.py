@@ -558,6 +558,36 @@ def test_further_occurrences_become_inactive_suggestions():
     assert further_occurrences(text, [at("Kaya", "PERSON", active=False)]) == []
 
 
+def test_further_occurrences_surname_alone():
+    """Mehrteiliger Personenname geschwärzt: der Nachname allein wird an anderer Stelle vorgeschlagen."""
+    from pii_redact.core.analyzer import further_occurrences, surname
+
+    assert surname("Herrn Dr. Max Mustermann") == "Mustermann" and surname("Mustermann, Max") == "Mustermann"
+    assert surname("Erika Müller-Lüdenscheid.") == "Müller-Lüdenscheid"
+    assert surname("Mustermann") is None and surname("Herr Mustermann") is None      # kein mehrteiliger Name
+    assert surname("Max Li") is None and surname("Zimmer 12") is None
+
+    def found(text, name, typ="PERSON"):
+        pos = text.index(name)
+        return [(f.text, f.recognizer.split(":")[1].strip()[:8])
+                for f in further_occurrences(text, [Finding(pos, pos + len(name), typ, name)])]
+
+    text = ("Frau Erika Winter stellt den Antrag. Im Winter ist das Büro geschlossen, der Winter war lang.\n"
+            "Rückfragen an Winter oder WINTER, Anhang: antrag_winter.pdf, Akte winter2 – winterfest, im winter.\n"
+            "Gruß, Erika Winter")
+    # ganzer Name hat Vorrang; allein: groß geschrieben, nicht nach „im“/„der“; klein nur in Dateiname/Kennung
+    assert found(text, "Erika Winter") == [("Winter", "Nachname"), ("WINTER", "Nachname"), ("winter", "Nachname"),
+                                           ("winter", "Nachname"), ("Erika Winter", "weiteres")]
+    assert found("Max Mustermann wohnt in Musterstadt. Mustermann zahlt.", "Max Mustermann") == [
+        ("Mustermann", "Nachname")]
+    # nur bei Personen – ein Ort oder eine Firma aus zwei Wörtern löst keine Suche nach dem letzten Wort aus
+    assert found("Sitz in Bad Homburg. Die Homburg GmbH liefert.", "Bad Homburg", "LOCATION") == []
+    # steht der Nachname schon als Fund in der Liste (auch abgewählt), wird er nicht vorgeschlagen
+    t2 = "Max Mustermann und Mustermann."
+    fs = [Finding(0, 14, "PERSON", "Max Mustermann"), Finding(19, 29, "PERSON", "Mustermann", active=False)]
+    assert further_occurrences(t2, fs) == []
+
+
 def test_further_occurrences_across_hyphenation_and_special_spaces():
     from pii_redact.core.analyzer import further_occurrences
 
