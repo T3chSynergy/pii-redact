@@ -2,6 +2,15 @@
 
 ## Unveröffentlicht
 
+**Kontrolle vor dem Speichern**
+- **Nachname allein:** Ist ein Personenname aus mehreren Wörtern geschwärzt („Max Mustermann“), schlägt die
+  Kontrolle jetzt auch Stellen vor, an denen nur der Nachname steht („Mustermann zahlt …“,
+  „antrag_mustermann.pdf“). Bisher suchte sie nur den ganzen Wortlaut. Weil viele Nachnamen auch gewöhnliche
+  Wörter sind, zählt der Nachname nur groß geschrieben und nicht nach einem Artikel oder „im“/„am“ („im Winter“,
+  „der Koch“), klein geschrieben nur in Dateinamen und Kennungen. Wie alle Vorschläge der Kontrolle: ohne
+  Häkchen in der Fundliste, Rückfrage vor dem Speichern; automatischer Export und Kommandozeile halten die Datei
+  zurück (Rückgabewert 3). Hilfe: „Kontrolle vor dem Speichern“.
+
 **Kleine Korrekturen**
 - **KI-Nachprüfung folgt keinen Weiterleitungen mehr:** Antwortete der eingestellte Server mit einer
   Weiterleitung (301/302/303), ging die Anfrage bisher an die neue Adresse – auch an einen anderen Server, samt
