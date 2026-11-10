@@ -164,12 +164,23 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - PyMuPDF `scrub()` entfernt keine Kommentare/Lesezeichen; `reset_fields` löscht Formularwerte.
 - PyMuPDF-Schwärzung: `LINE_ART_REMOVE_IF_COVERED` greift bei Bézierkurven oft nicht → TOUCHED +
   Kollateral-Wiederherstellung.
-- **Nicht angezeigter PDF-Inhalt** (gefunden 10.11.2026): `get_text` liest weder Text außerhalb der CropBox noch
-  auf ausgeblendeten Ebenen (OCG) – beides blieb ungeprüft im Ergebnis. `strip_pdf_extras` setzt deshalb die
-  CropBox je Seite gleich der MediaBox (per `xref_set_key`; `set_cropbox(mediabox)` scheitert bei versetztem
-  Nullpunkt, ein Eintrag an der Seite schlägt einen geerbten) und löscht `OCProperties` aus dem Katalog (ohne
-  Ebenenverzeichnis ist alles sichtbar). Beides wirkt erst nach `tobytes` + erneutem Öffnen. Kritische Hinweise
-  `cropped`/`layers`; `verify_pdf` meldet beides. Offen: Inhalt außerhalb der MediaBox liest MuPDF gar nicht.
+- **Nicht angezeigter PDF-Inhalt** (gefunden 10.11.2026, `core/pdf_hidden.py`): `get_text` liest weder Inhalt
+  außerhalb des Seitenbereichs (CropBox, auch außerhalb der MediaBox) noch ausgeblendete Ebenen (OCG) – beides
+  blieb ungeprüft im Ergebnis. **Entscheidung des Nutzers: entfernen statt einblenden** (wie Metadaten/Lesezeichen;
+  das Ergebnis enthält, was die Ansicht zeigt). `remove_hidden_content` läuft beim Laden nach `strip_pdf_extras`:
+  - Außerhalb: `get_bboxlog`/`get_texttrace` liefern auch nicht Angezeigtes (ungedrehte Koordinaten → vorher
+    `set_rotation(0)`). Entfernt mit vier Schwärzungsrechtecken rund um `page.rect` (Annotationen außerhalb der
+    Seite funktionieren), Grafik nur `REMOVE_IF_COVERED`, Bilder `IMAGE_PIXELS`; Zuschnitt bleibt.
+  - Ebenen: PyMuPDF kann Ebenen-Inhalt nicht löschen → `_LayerStripper` zerlegt die Inhaltsströme (`_instructions`)
+    und entfernt zwischen `/OC … BDC` und `EMC` sowie bei XObjects mit `/OC` nur die zeichnenden Anweisungen;
+    danach `OCProperties` löschen (wirkt erst nach `tobytes` + Öffnen). Prüfung: `_snapshot` (Zeichenschritte +
+    Seitenbild) muss gleich dem Stand vorher sein.
+  - Rückfall, wenn die Prüfung scheitert: einblenden (Ebenen sichtbar bzw. CropBox = MediaBox per `xref_set_key`;
+    `set_cropbox` scheitert bei versetztem Nullpunkt) + kritischer Hinweis `layers_shown`/`cropped`/`outside_left`.
+    OCMD (zusammengesetzte Sichtbarkeit) geht immer in den Rückfall – MuPDF wertet sie anders aus als die Norm.
+  - Bewusst **nicht**: unsichtbaren Text *auf* der Seite (weiß auf weiß, verdeckt) erkennen oder entfernen, auch
+    kein Hinweis dazu (unzuverlässig) – er wird wie normaler Text geprüft; Hilfe `#textansicht` erklärt es.
+  - `verify_pdf` meldet Ebenen und Inhalt außerhalb (`has_outside_content(leftover=True)`).
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen

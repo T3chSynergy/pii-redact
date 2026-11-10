@@ -12,7 +12,8 @@ import pymupdf as fitz  # PyMuPDF
 
 from .entities import info
 from .hyphenation import join_hyphenated
-from .loaders import LoadedDocument, has_layers, is_cropped, strip_pdf_extras
+from .loaders import LoadedDocument, strip_pdf_extras
+from .pdf_hidden import has_layers, has_outside_content
 from .models import Finding, ReplaceMode, Settings
 
 BLACK_CHAR = "█"
@@ -407,7 +408,8 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
 
     Prüft, ob Texte aktiver Funde noch extrahierbar sind – im Seitentext, in Kommentaren,
     Formularfeldern, Lesezeichen und Metadaten – und ob noch Kommentare, Formularfelder,
-    Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder zugeschnittene Seiten vorhanden sind.
+    Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder Inhalt außerhalb des sichtbaren Seitenbereichs
+    vorhanden sind.
 
     Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per
     OCR gelesen.
@@ -423,9 +425,9 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
         for pno in ocr_pages:
             if 0 <= pno < pdf.page_count:
                 parts.append(ocr_mod.ocr_page_text(pdf[pno], key))
-    n_annots = n_widgets = n_links = n_cropped = 0
+    n_annots = n_widgets = n_links = n_outside = 0
     for page in pdf:
-        n_cropped += is_cropped(page)
+        n_outside += has_outside_content(page, leftover=True)
         for a in page.annots():
             n_annots += 1
             parts += [a.info.get("content", ""), a.info.get("title", ""), a.info.get("subject", "")]
@@ -445,7 +447,7 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
 
     problems = []
     for n, what in ((n_annots, "Kommentare/Markierungen"), (n_widgets, "Formularfelder"), (len(toc), "Lesezeichen"),
-                    (n_links, "Links"), (n_files, "Dateianhänge"), (n_cropped, "Zugeschnittene Seiten")):
+                    (n_links, "Links"), (n_files, "Dateianhänge"), (n_outside, "Seiten mit Inhalt außerhalb des sichtbaren Bereichs")):
         if n:
             problems.append(f"{what} noch vorhanden: {n}")
     if layers:

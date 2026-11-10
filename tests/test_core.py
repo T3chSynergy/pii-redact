@@ -374,7 +374,7 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
 
 
-# ---------------------------------------------------------------- nicht angezeigter Inhalt: Zuschnitt, Ebenen
+# ---------------------------------------------------------------- Helfer für erzeugte PDFs
 def _find(doc, needle: str, typ: str = "PERSON") -> Finding:
     s = doc.text.index(needle)
     return Finding(s, s + len(needle), typ, needle)
@@ -384,71 +384,6 @@ def _load_bytes(tmp_path, data: bytes, name: str = "test.pdf"):
     path = tmp_path / name
     path.write_bytes(data)
     return load_document(path, ocr=False)
-
-
-@pytest.mark.parametrize("offset", [False, True], ids=["Nullpunkt", "versetzte Seite"])
-@pytest.mark.parametrize("inherited", [False, True], ids=["an der Seite", "geerbt"])
-def test_cropped_page_is_uncropped_checked_and_redacted(tmp_path, offset, inherited):
-    """Der abgeschnittene Teil einer Seite steckt weiter in der Datei – er muss geprüft und geschwärzt werden."""
-    pdf = pymupdf.open()
-    page = pdf.new_page(width=595, height=842)
-    page.insert_text((72, 100), "Sichtbar: Frau Zofia Jaeger")
-    page.insert_text((72, 700), "Abgeschnitten: Herr Karl Bergenthaler")
-    if offset:
-        pdf.xref_set_key(page.xref, "MediaBox", "[10 20 605 862]")
-    holder = int(pdf.xref_get_key(page.xref, "Parent")[1].split()[0]) if inherited else page.xref
-    pdf.xref_set_key(holder, "CropBox", "[10 462 605 862]" if offset else "[0 442 595 842]")   # nur obere Hälfte
-    original = pdf.tobytes()
-    assert "Bergenthaler" not in pymupdf.open(stream=original)[0].get_text()   # Ausgangslage: nicht angezeigt
-
-    doc = _load_bytes(tmp_path, original)
-    assert "Karl Bergenthaler" in doc.text
-    notice = {n.kind: n for n in doc.notices}["cropped"]
-    assert notice.critical and notice.pages == [0]
-
-    findings = [_find(doc, "Zofia Jaeger"), _find(doc, "Karl Bergenthaler")]
-    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
-    assert verify_pdf(out, findings) == []
-    result = pymupdf.open(stream=out)
-    assert result[0].cropbox.height == pytest.approx(result[0].mediabox.height)
-    text = result[0].get_text()
-    assert "Abgeschnitten: Herr" in text and "Bergenthaler" not in text and "Jaeger" not in text
-    # die Kontrolle erkennt ein zugeschnittenes Ergebnis
-    assert any("Zugeschnittene Seiten" in p for p in verify_pdf(original, []))
-
-
-def test_hidden_layer_is_shown_checked_and_redacted(tmp_path):
-    """Text auf einer ausgeblendeten Ebene lässt sich im PDF-Programm wieder einblenden."""
-    pdf = pymupdf.open()
-    page = pdf.new_page()
-    page.insert_text((72, 100), "Sichtbar: Frau Zofia Jaeger")
-    layer = pdf.add_ocg("Intern", on=False)
-    page.insert_text((72, 200), "Intern: Herr Karl Bergenthaler", oc=layer)
-    original = pdf.tobytes()
-    assert "Bergenthaler" not in pymupdf.open(stream=original)[0].get_text()
-
-    doc = _load_bytes(tmp_path, original)
-    assert "Karl Bergenthaler" in doc.text
-    notice = {n.kind: n for n in doc.notices}["layers"]
-    assert notice.critical and "1 ausgeblendete Ebene" in notice.short
-
-    findings = [_find(doc, "Karl Bergenthaler")]
-    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
-    assert verify_pdf(out, findings) == []
-    result = pymupdf.open(stream=out)
-    assert result.get_ocgs() == {}
-    assert b"Bergenthaler" not in b"".join(result.xref_stream(x) or b"" for x in range(1, result.xref_length()))
-    assert "Intern: Herr" in result[0].get_text()
-    assert "Ebenen noch vorhanden" in verify_pdf(original, [])
-
-
-def test_visible_layers_give_no_notice(tmp_path):
-    pdf = pymupdf.open()
-    page = pdf.new_page()
-    page.insert_text((72, 100), "Text auf einer Ebene", oc=pdf.add_ocg("Entwurf", on=True))
-    doc = _load_bytes(tmp_path, pdf.tobytes())
-    assert "Text auf einer Ebene" in doc.text and not doc.notices
-    assert pymupdf.open(stream=doc.pdf_bytes).get_ocgs() == {}
 
 
 # ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile

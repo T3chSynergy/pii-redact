@@ -3,16 +3,22 @@
 ## Unveröffentlicht
 
 **Sicherheit des Ergebnisses**
-- **Zugeschnittene Seiten:** War eine PDF-Seite zugeschnitten, wurde der abgeschnittene Teil weder geprüft noch
-  entfernt – er blieb im Ergebnis und ließ sich im PDF-Programm wieder hervorholen; die Kontrolle bemerkte das
-  nicht. pii-redact hebt den Zuschnitt jetzt beim Öffnen auf: Die ganze Seite wird angezeigt, geprüft und
-  geschwärzt. Ein kritischer Hinweis nennt die betroffenen Seiten.
-- **Ausgeblendete Ebenen:** Dasselbe galt für Text auf ausgeblendeten Ebenen. Alle Ebenen werden jetzt
-  eingeblendet und aufgelöst; ihr Inhalt wird geprüft und steht sichtbar im Ergebnis (kritischer Hinweis).
-- Die Kontrolle nach dem Export meldet zusätzlich, wenn das Ergebnis noch Ebenen oder zugeschnittene Seiten
-  enthält.
-- Nicht behoben: Inhalt, der ganz außerhalb des Blattes liegt (außerhalb der MediaBox), wird weiterhin nicht
-  gelesen.
+- **Nicht angezeigter Inhalt wird entfernt:** Ein PDF kann Inhalt tragen, den kein PDF-Programm anzeigt – im
+  abgeschnittenen Teil einer zugeschnittenen Seite, neben dem Blatt oder auf einer ausgeblendeten Ebene. Bisher
+  wurde er weder geprüft noch entfernt: Er blieb im Ergebnis und ließ sich wieder hervorholen, die Kontrolle
+  bemerkte das nicht. pii-redact entfernt ihn jetzt schon beim Öffnen, wie Kommentare und Lesezeichen. Die Seite
+  sieht aus wie vorher (Zuschnitt und Drehung bleiben); der Hinweis-Zähler nennt die Seiten.
+  - Außerhalb des Seitenbereichs: Text, Bilder und ganz außerhalb liegende Linien/Flächen werden entfernt. Ragt
+    ein Bild über den Rand, werden seine Bildpunkte außerhalb geleert. Linien und Flächen, die über den Rand
+    ragen (Hintergründe, Rahmen), bleiben unverändert.
+  - Ausgeblendete Ebenen: Text, Bilder, Zeichnungen und eingebettete Seiten der Ebene werden aus dem Seiteninhalt
+    entfernt, danach werden alle Ebenen aufgelöst.
+  - Jeder Schritt wird nachgeprüft. Gelingt das Entfernen nicht nachweislich (z. B. Ebenen mit zusammengesetzter
+    Sichtbarkeit), wird der Inhalt stattdessen eingeblendet und geprüft – mit kritischem Hinweis.
+- Die Kontrolle nach dem Export meldet zusätzlich Ebenen und Inhalt außerhalb des sichtbaren Seitenbereichs.
+- Hilfe: neuer Abschnitt „Bei PDFs auch den Reiter Text lesen“ – unsichtbarer Text auf der Seite (weiß auf weiß,
+  verdeckt, winzig) wird wie jeder Text geprüft und geschwärzt; was die Erkennung dort übersieht, zeigt nur die
+  Textansicht.
 
 **Fehlerbehebung**
 - **Enger Zeilenabstand:** Beim Schwärzen einer Textstelle verschwand bei engem Zeilenabstand auch Text aus der

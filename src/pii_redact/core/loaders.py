@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pymupdf as fitz  # PyMuPDF
 
+from .pdf_hidden import HiddenReport, remove_hidden_content
+
 #: Anfang des Hinweises auf per OCR gelesene Seiten (die Oberfläche zeigt ihn gesondert an).
 OCR_WARNING_PREFIX = "Per Texterkennung (OCR)"
 
@@ -36,8 +38,8 @@ class Notice:
 
     ``short`` ist eine Zeile für Hinweisleiste und Liste, ``detail`` die ausführliche Fassung (Tooltip,
     Protokoll, Kommandozeile), ``badge`` die Beschriftung des Seitensymbols in der Seitenansicht."""
-    kind: str                     # "ocr", "ocr_error", "no_text", "pages_no_text", "layers", "cropped", "removed",
-                                  # "widgets", "images"
+    kind: str                     # "ocr", "ocr_error", "no_text", "pages_no_text", "layers_shown", "cropped",
+                                  # "outside_left", "removed", "widgets", "images"
     level: str
     short: str
     detail: str
@@ -241,11 +243,19 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     if doc.needs_pass:
         raise UnsupportedFileError("Das PDF ist passwortgeschützt.")
 
-    # Kommentare, Lesezeichen, Formularfelder, ausgeblendete Ebenen und Seitenzuschnitt vorab bereinigen:
-    # Ansicht, Analyse und Ergebnis beruhen damit auf demselben Inhalt.
+    # Kommentare, Lesezeichen, Formularfelder und nicht angezeigten Inhalt (ausgeblendete Ebenen, Inhalt
+    # außerhalb des Seitenbereichs) vorab bereinigen: Ansicht, Analyse und Ergebnis beruhen damit auf
+    # demselben Inhalt.
     extras = strip_pdf_extras(doc)
-    if extras["annots"] or extras["widgets"] or extras["toc"] or extras["layers"] or extras["cropped_pages"]:
+    changed = bool(extras["annots"] or extras["widgets"] or extras["toc"])
+    if changed:   # vor dem Vergleich der Ebenen: Kommentare und Formularfelder sind dann schon fester Inhalt bzw. weg
         data = doc.tobytes()
+        doc.close()
+        doc = fitz.open(stream=data, filetype="pdf")
+    doc, hidden, hidden_changed = remove_hidden_content(doc)
+    extras["hidden"] = hidden   # type: ignore[assignment]
+    if hidden_changed:
+        data = doc.tobytes(garbage=4)   # ersetzte Inhaltsströme nicht als unbenutzte Objekte mitschleppen
         doc.close()
         doc = fitz.open(stream=data, filetype="pdf")
 
@@ -340,25 +350,32 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
                 "pages_no_text", Level.CRITICAL, f"{_seiten(pages_without_text)} ohne Text – nicht geprüft",
                 f"Seiten ohne Text (nicht geprüft): {pages_txt}", [p - 1 for p in pages_without_text],
                 "ohne Text – nicht geprüft"))
-    if extras.get("hidden_layers"):
-        n = extras["hidden_layers"]
+    hidden: HiddenReport = extras.get("hidden") or HiddenReport()
+    show = ("Deshalb ist er hier eingeblendet: Er wird geprüft und steht sichtbar im Ergebnis. Was nicht "
+            "hineingehört, bitte schwärzen (bei Bedarf einen Rahmen darum ziehen).")
+    if hidden.layers_shown:
+        pages = [p + 1 for p in hidden.layers_shown]
         notices.append(Notice(
-            "layers", Level.CRITICAL,
-            ("1 ausgeblendete Ebene wurde eingeblendet" if n == 1 else f"{n} ausgeblendete Ebenen wurden eingeblendet")
-            + " – Inhalt bitte prüfen",
-            f"Das PDF enthielt {_count(n, 'ausgeblendete Ebene', 'ausgeblendete Ebenen')}. Ihr Inhalt steckt in der "
-            "Datei, auch wenn er nicht angezeigt wird. Deshalb sind hier alle Ebenen eingeblendet: Der Inhalt wird "
-            "geprüft und steht sichtbar im Ergebnis. Was nicht hineingehört, bitte schwärzen (bei Bedarf einen Rahmen "
-            "darum ziehen)."))
-    if extras.get("cropped_pages"):
-        pages = [p + 1 for p in extras["cropped_pages"]]
+            "layers_shown", Level.CRITICAL,
+            f"Ausgeblendete Ebenen auf {_seiten(pages)} eingeblendet – Inhalt bitte prüfen",
+            f"Ausgeblendete Ebenen auf {_seiten(pages)}: Der Inhalt ließ sich nicht sicher entfernen. " + show,
+            list(hidden.layers_shown), "Ebene eingeblendet"))
+    if hidden.uncropped:
+        pages = [p + 1 for p in hidden.uncropped]
         notices.append(Notice(
             "cropped", Level.CRITICAL,
-            f"{_seiten(pages)} {'war' if len(pages) == 1 else 'waren'} zugeschnitten – abgeschnittener Teil bitte prüfen",
-            f"Zugeschnittene Seiten: {_fmt_pages(pages)}. Der abgeschnittene Teil steckt weiter in der Datei, auch "
-            "wenn er nicht angezeigt wird. Deshalb ist der Zuschnitt hier aufgehoben: Die ganze Seite wird geprüft "
-            "und steht sichtbar im Ergebnis. Was nicht hineingehört, bitte schwärzen (bei Bedarf einen Rahmen darum "
-            "ziehen).", list(extras["cropped_pages"]), "Zuschnitt aufgehoben"))
+            f"Zuschnitt auf {_seiten(pages)} aufgehoben – abgeschnittenen Teil bitte prüfen",
+            f"Zugeschnittene Seiten: {_fmt_pages(pages)}. Der abgeschnittene Teil ließ sich nicht sicher "
+            "entfernen. " + show, list(hidden.uncropped), "Zuschnitt aufgehoben"))
+    if hidden.outside_left:
+        pages = [p + 1 for p in hidden.outside_left]
+        notices.append(Notice(
+            "outside_left", Level.CRITICAL,
+            f"Inhalt neben dem Blatt auf {_seiten(pages)} – wird nicht geprüft",
+            f"Auf {_seiten(pages)} liegt Inhalt außerhalb des Blattes, der sich nicht entfernen ließ. Er wird "
+            "nicht angezeigt und nicht geprüft, steckt aber im Ergebnis. Abhilfe: das PDF neu erzeugen (z. B. "
+            "über „Drucken → Als PDF speichern“) und die neue Datei öffnen.",
+            list(hidden.outside_left), "Inhalt neben dem Blatt"))
     removed = []
     if extras["annots"]:
         removed.append(_count(extras["annots"], "Kommentar/Markierung", "Kommentare/Markierungen")
@@ -367,10 +384,20 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
         removed.append(_count(extras["toc"], "Lesezeichen", "Lesezeichen"))
     if extras["files"]:
         removed.append(_count(extras["files"], "Dateianhang", "Dateianhänge") + " (Inhalt wird nicht geprüft)")
+    removed_pages: list[int] = []
+    if hidden.outside_removed:
+        removed.append("nicht sichtbarer Inhalt außerhalb des Seitenbereichs ("
+                       + _seiten([p + 1 for p in hidden.outside_removed]) + "; in der Ansicht bereits entfernt)")
+        removed_pages += hidden.outside_removed
+    if hidden.layers_removed:
+        removed.append("Inhalt ausgeblendeter Ebenen ("
+                       + _seiten([p + 1 for p in hidden.layers_removed]) + "; in der Ansicht bereits entfernt)")
+        removed_pages += hidden.layers_removed
     if removed:
         short = ", ".join(r.split(" (")[0] for r in removed)
         notices.append(Notice("removed", Level.INFO, f"Wird beim Schwärzen entfernt: {short}",
-                              "Wird beim Schwärzen entfernt: " + ", ".join(removed) + "."))
+                              "Wird beim Schwärzen entfernt: " + ", ".join(removed) + ".",
+                              sorted(set(removed_pages)), "nicht sichtbarer Inhalt entfernt" if removed_pages else ""))
     if extras["widgets"]:
         notices.append(Notice(
             "widgets", Level.INFO,
@@ -396,17 +423,14 @@ def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:
       samt Autorenname werden gelöscht,
     * Lesezeichen (Inhaltsverzeichnis in der Seitenleiste) werden gelöscht,
     * Formularfelder werden in festen Seiteninhalt umgewandelt – ihre Werte sind danach
-      normaler Text, der geprüft und exakt geschwärzt wird,
-    * Ebenen (auch ausgeblendete) werden aufgelöst und ein Seitenzuschnitt wird aufgehoben – Inhalt, der nur
-      nicht angezeigt wird, steckt sonst ungeprüft im Ergebnis. Beides wirkt erst nach erneutem Öffnen
-      (``tobytes``), das Laden erledigt das.
+      normaler Text, der geprüft und exakt geschwärzt wird.
+
+    Nicht angezeigter Inhalt (ausgeblendete Ebenen, Inhalt außerhalb des Seitenbereichs) wird gesondert
+    entfernt: :func:`pii_redact.core.pdf_hidden.remove_hidden_content`.
 
     Ändert ``pdf`` direkt. Rückgabe: Anzahl der gefundenen Elemente je Art (dazu ``widget_pages``:
-    Seiten mit Formularfeldern, ``cropped_pages``: Seiten mit aufgehobenem Zuschnitt, ``hidden_layers``:
-    Anzahl der zuvor ausgeblendeten Ebenen)."""
+    Seiten mit Formularfeldern)."""
     counts: dict = {"annots": 0, "widgets": 0, "toc": 0, "files": 0}
-    counts["layers"], counts["hidden_layers"] = _remove_layers(pdf)
-    counts["cropped_pages"] = _remove_crop(pdf)
     widget_pages: list[int] = []
     for page in pdf:
         n = sum(1 for _ in page.widgets())
@@ -428,43 +452,6 @@ def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:
         pdf.set_toc([])
     counts["widget_pages"] = widget_pages  # type: ignore[assignment]
     return counts
-
-
-def has_layers(pdf: fitz.Document) -> bool:
-    """Enthält das PDF Ebenen (optionale Inhalte, die ein- und ausgeblendet werden können)?"""
-    return pdf.xref_get_key(pdf.pdf_catalog(), "OCProperties")[0] not in ("null", "")
-
-
-def _remove_layers(pdf: fitz.Document) -> tuple[int, int]:
-    """Ebenen auflösen: Ohne das Ebenenverzeichnis gilt jeder Inhalt als sichtbar – er wird damit geprüft
-    und geschwärzt wie alles andere. Rückgabe: (Ebenen vorhanden: 1/0, davon ausgeblendet)."""
-    if not has_layers(pdf):
-        return 0, 0
-    try:
-        hidden = sum(1 for o in pdf.get_ocgs().values() if not o.get("on", True))
-    except Exception:  # noqa: BLE001 – defektes Ebenenverzeichnis: vorsichtshalber als ausgeblendet melden
-        hidden = 1
-    pdf.xref_set_key(pdf.pdf_catalog(), "OCProperties", "null")
-    return 1, hidden
-
-
-def is_cropped(page: fitz.Page) -> bool:
-    """Zeigt die Seite nur einen Ausschnitt (CropBox kleiner als MediaBox)?"""
-    crop, media = page.cropbox, page.mediabox
-    return abs(crop.width - media.width) > 0.01 or abs(crop.height - media.height) > 0.01
-
-
-def _remove_crop(pdf: fitz.Document) -> list[int]:
-    """Seitenzuschnitt aufheben. Rückgabe: betroffene Seiten (0-basiert).
-
-    Der Ausschnitt wird direkt an der Seite gleich der ganzen Seite gesetzt (``set_cropbox`` scheitert bei
-    Seiten, deren Nullpunkt verschoben ist; ein Eintrag an der Seite hat Vorrang vor einem geerbten)."""
-    pages = []
-    for page in pdf:
-        if is_cropped(page):
-            pdf.xref_set_key(page.xref, "CropBox", "[%g %g %g %g]" % tuple(page.mediabox))
-            pages.append(page.number)
-    return pages
 
 
 _GLUED = re.compile(r"^([A-Za-zÄÖÜäöüß][\w\-.]*[A-Za-zäöüß]\.?:)(\w.*)$")
