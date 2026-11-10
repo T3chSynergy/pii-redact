@@ -209,6 +209,14 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
   Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
   Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
+- **Großschrift** (`PiiAnalyzer._upper_case`, seit 10.11.2026): Zeilen mit Wörtern in Großbuchstaben (ab 3
+  Buchstaben, `normal_case` – längenneutral) werden zusätzlich in normaler Schreibweise geprüft; übernommen nur
+  von `CASE_RECOGNIZERS` (NER, Anschrift, Name nach Anrede), nur mit mindestens einem solchen Wort, nur noch
+  nicht Abgedecktes. Messung 10.11.2026 (Soll-Funde in Großbuchstaben, Anteil vollständig geschwärzt): Gründlich
+  Personen 78 → 95 %, Orte 79 → 98 %; Schnell 12 → 65 %, 21 → 69 %; normale Texte unverändert; ganz in
+  Großbuchstaben: Gründlich 52 → 89 % / 71 → 98 %, Schnell 4 → 62 % / 2 → 58 %, je +5 Fehlalarme. NER-Treffer mit Ziffern
+  zählen dort nicht („Iban DE89 …“ gälte sonst als Ort und vergrößerte den IBAN-Fund). Abkürzungen als `_NER_STOPWORDS`.
+  Schwellen in `tests/test_erkennung.py`.
 - **Sonder-Leerzeichen** (seit 10.11.2026): `analyzer.plain_spaces` ersetzt U+00A0, U+202F, U+2007 und
   U+2000–U+200A längenneutral durch normale Leerzeichen – in `analyze()`, `find_terms()` und der Ausnahmeliste.
   `f.text` wird am Ende immer aus dem Original gesetzt (Wortlaut des Dokuments).

@@ -36,6 +36,16 @@
   Ordnerlauf. `--nur-anzeigen` und `--ohne-ocr` arbeiten wie bisher.
 
 **Erkennung**
+- **Namen und Orte in Großbuchstaben:** In Formularen und Adressfeldern stehen Namen oft in Großbuchstaben
+  („SCHNEIDER, ANNA“, „80331 MÜNCHEN“) – die Erkennung fand sie bisher kaum. Zeilen mit solchen Wörtern werden
+  jetzt zusätzlich in normaler Schreibweise geprüft. Gemessen an den Testtexten, wenn Namen und Orte dort in
+  Großbuchstaben stehen: „Gründlich“ Personen 78 % → 95 %, Orte 79 % → 98 %; „Schnell“ Personen 12 % → 65 %,
+  Orte 21 % → 69 %. Bei normal geschriebenen Texten ändert sich nichts (dieselben Funde, keine zusätzlichen
+  Fehlalarme). In Texten, die ganz in Großbuchstaben stehen, kommen einzelne Fehlalarme hinzu (gewöhnliche
+  Wörter wie „AULA“ als Ort; 5 in den Testtexten mit rund 3000 Wörtern).
+- Gängige Abkürzungen (DSGVO, BGB, IHK, AOK, TÜV, SEPA …) gelten nicht als Name oder Ort.
+
+**Erkennung**
 - **Geschützte und schmale Leerzeichen:** IBAN, Telefonnummern und andere Nummern wurden nicht erkannt, wenn
   statt normaler Leerzeichen geschützte standen („DE89 3704 …“ aus Satzprogrammen oder der Textverarbeitung).
   Solche Leerzeichen zählen jetzt wie normale – auch in Sperr- und Ausnahmeliste.

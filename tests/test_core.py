@@ -424,6 +424,35 @@ def test_broken_pdf_gives_clear_message(tmp_path, data):
         load_document(path)
 
 
+# ---------------------------------------------------------------- Namen und Orte in Großbuchstaben
+def test_normal_case_keeps_positions():
+    from pii_redact.core.analyzer import normal_case
+
+    text = "Herr MÜLLER-LÜDENSCHEID aus GROSSSTADT, IBAN DE89, EU, Maßstab STRAßE"
+    out, spans = normal_case(text)
+    assert out == "Herr Müller-Lüdenscheid aus Grossstadt, Iban DE89, EU, Maßstab Straße" and len(out) == len(text)
+    assert [text[s:e] for s, e in spans] == ["MÜLLER-LÜDENSCHEID", "GROSSSTADT", "IBAN", "STRAßE"]
+    assert normal_case("Kein Wort in Versalien.") == ("Kein Wort in Versalien.", [])
+
+
+@needs_model
+def test_upper_case_names_and_places_found(analyzer):
+    """Formulare und Adressfelder schreiben Namen und Orte oft in Großbuchstaben."""
+    text = "ANTRAGSTELLER: SCHNEIDER, ANNA, MUSTERWEG 7, 80331 MÜNCHEN\nTelefon 030 1234567"
+    hits = {f.text: f.entity_type for f in analyzer.analyze(text, Settings())}
+    assert {"SCHNEIDER", "ANNA", "80331 MÜNCHEN", "030 1234567"} <= set(hits), hits
+    assert hits["80331 MÜNCHEN"] == "DE_ADDRESS" and "ANTRAGSTELLER" not in hits
+    assert all(text[f.start:f.end] == f.text for f in analyzer.analyze(text, Settings()))
+
+
+@needs_model
+def test_upper_case_headings_and_abbreviations_stay(analyzer):
+    text = ("BETREFF: ANTRAG AUF KOSTENÜBERNAHME\nWICHTIG: Hinweise zur DSGVO und zum BGB beachten.\n"
+            "Die AOK, der TÜV und die IHK haben zugestimmt. Zahlung per SEPA, IBAN und BIC siehe unten.\n"
+            "ANLAGE 1: KOPIE DES BESCHEIDS\nMIT FREUNDLICHEN GRÜSSEN\nSEITE 1 VON 3 – VERTRAULICH")
+    assert [(f.text, f.entity_type) for f in analyzer.analyze(text, Settings())] == []
+
+
 # ---------------------------------------------------------------- Helfer für erzeugte PDFs
 def _find(doc, needle: str, typ: str = "PERSON") -> Finding:
     s = doc.text.index(needle)
