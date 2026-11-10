@@ -22,6 +22,9 @@
 - **Einstellungsdatei mit unpassenden Werten:** In einer von Hand bearbeiteten `settings.json` oder
   `defaults.json` werden Werte der falschen Art (etwa Text statt Zahl) übergangen; dafür gilt die Vorgabe der IT
   bzw. die Voreinstellung. Bisher konnte das Programm damit später an unerwarteter Stelle abbrechen.
+- **Text-Export: verständliche Meldung, wenn das Speichern scheitert** (Ziel schreibgeschützt, Netzlaufwerk
+  getrennt, Datenträger voll). Bisher erschien das allgemeine Fenster „Unerwarteter Fehler“; beim PDF-Export gab
+  es die Meldung „Export fehlgeschlagen“ schon. Verloren ging dabei nichts.
 - **Kommandozeile:** `--schwelle` nimmt nur noch Werte von 0 bis 1 an (sonst Aufruffehler, Rückgabewert 1).
 
 ## 0.8.5 – 10.11.2026
