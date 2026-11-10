@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.6 – 10.11.2026
 
 **Kontrolle vor dem Speichern**
 - **Nachname allein:** Ist ein Personenname aus mehreren Wörtern geschwärzt („Max Mustermann“), schlägt die
@@ -29,6 +29,13 @@
   getrennt, Datenträger voll). Bisher erschien das allgemeine Fenster „Unerwarteter Fehler“; beim PDF-Export gab
   es die Meldung „Export fehlgeschlagen“ schon. Verloren ging dabei nichts.
 - **Kommandozeile:** `--schwelle` nimmt nur noch Werte von 0 bis 1 an (sonst Aufruffehler, Rückgabewert 1).
+
+**Intern**
+- Deutlich mehr automatische Tests der Oberfläche (Export, Ordnerbearbeitung, Bearbeiten, Einstellungen,
+  KI-Nachprüfung, Selbsttest, Programmstart): 61 neue Tests, der Code wird jetzt zu 89 % von Tests durchlaufen
+  (vorher 81 %). Zwei der Korrekturen oben sind dabei aufgefallen.
+- Strengere Stilprüfung mit ruff (Regeln in `pyproject.toml`), Code entsprechend bereinigt – ohne geändertes
+  Verhalten.
 
 ## 0.8.5 – 10.11.2026
 
