@@ -14,7 +14,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 214 Tests (Stand 10.11.2026, `dev` nach 0.8.5: kleine Korrekturen, Nachname allein, noch unveröffentlicht; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 231 Tests (Stand 10.11.2026, `dev` nach 0.8.5: kleine Korrekturen, Nachname allein, strengere ruff-Regeln, Oberflächentests Export – noch unveröffentlicht; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -230,6 +230,12 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   `f.text` wird am Ende immer aus dem Original gesetzt (Wortlaut des Dokuments).
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
+- **Oberflächentests vor einem Refactoring** (Plan 10.11.2026; Messung mit `coverage run --branch`: gesamt 81 %,
+  Kern 94–96 %, Oberfläche teils 55–60 %): erst Lücken schließen, dann je Modul umbauen. Teil 1 erledigt:
+  `tests/test_ui_export.py` (Export/Speichern, `window_export.py` 55 → 99 %). Offen: Teil 2 Ordnerbearbeitung
+  (`window_batch.py`), Teil 3 Bearbeiten, Einstellungen, KI-Fehlerwege, `--selftest`. Fixture `window` liegt in
+  `tests/conftest.py`; Klasse `Dialogs` in `test_ui_export.py` ersetzt Dateidialog und Meldungsfenster und klickt in
+  Rückfragen die voreingestellte oder eine benannte Schaltfläche (so läuft der echte Dialogcode).
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
 - **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen

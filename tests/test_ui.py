@@ -23,21 +23,6 @@ def _wait(ms: int) -> None:
     loop.exec()
 
 
-@pytest.fixture()
-def window(tmp_path, monkeypatch):
-    monkeypatch.setenv("APPDATA", str(tmp_path))
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _app = QApplication.instance() or QApplication([])  # Referenz halten, sonst räumt Python die App ab
-    from pii_redact.ui.main_window import MainWindow
-
-    w = MainWindow()
-    w.show()
-    yield w
-    if w.session:
-        w.session.dirty = False
-    w.close()
-
-
 def _open(window, path: Path) -> None:
     window.open_file(path)
     t = time.time()

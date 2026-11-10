@@ -35,3 +35,21 @@ def _release_main_windows():
             w.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     gc.collect()
+
+
+@pytest.fixture()
+def window(tmp_path, monkeypatch):
+    """Hauptfenster ohne Bildschirm; Einstellungen und Arbeitsstand liegen im Testordner."""
+    from PySide6.QtWidgets import QApplication
+
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _app = QApplication.instance() or QApplication([])  # Referenz halten, sonst räumt Python die App ab
+    from pii_redact.ui.main_window import MainWindow
+
+    w = MainWindow()
+    w.show()
+    yield w
+    if w.session:
+        w.session.dirty = False
+    w.close()
