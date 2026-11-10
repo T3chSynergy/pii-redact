@@ -4,13 +4,14 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
-Paket-Update, Sicherheitsupdate filelock, Ober-/Untergrenzen in `pyproject.toml`); davor v0.8.2 (Silbentrennung und
+**Stand:** v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
+Schwärzung trifft bei engem Zeilenabstand nur noch die eigene Zeile; Hilfe zur Textansicht); davor v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
+Paket-Update, Sicherheitsupdate filelock, Ober-/Untergrenzen in `pyproject.toml`); v0.8.2 (Silbentrennung und
 Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); v0.8.1 (Sicherheitsupdate pillow 13/certifi,
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 123 Tests (Stand 26.10.2026). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 169 Tests (Stand 10.11.2026; Stand von PR #58 vom Nutzer getestet, `build.bat` mit 0.8.4 noch nicht). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -77,6 +78,11 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 123 Tests (Stand 26.10.2026). `run.b
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,
   Lesezeichen löschen, Formularfelder backen), `verify_pdf` prüft alles nach. OCR (RapidOCR 3.9.2) nur als
   Rückfallebene.
+- **Programmsymbol:** selbst gezeichnet aus Grundformen (blaues abgerundetes Quadrat, weißes Blatt, zwei schwarze
+  Balken, zwei graue Linien; keine Schrift, keine fremde Grafik). Erzeugt mit `tools/make_icon.py` (Pillow, ohne
+  Kantenglättung; ICO mit den Pillow-Standardgrößen 16–256), pixelgenau wie die Dateien vom 26.09.2026 – deren
+  Entstehung war vorher nicht dokumentiert (auch im alten Chat nicht). `tests/test_icon.py` prüft Gleichheit.
+  Änderungen am Symbol nur über das Skript.
 - **Verteilung:** Build liefert den **Programmordner** `dist\pii-redact` (PyInstaller onedir) und daraus
   `dist\pii-redact-<version>.zip`; das Installationspaket (MSI) erstellt die IT mit eigenen Werkzeugen.
   WiX/MSI wurde aus dem Projekt entfernt.
@@ -159,6 +165,30 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - PyMuPDF `scrub()` entfernt keine Kommentare/Lesezeichen; `reset_fields` löscht Formularwerte.
 - PyMuPDF-Schwärzung: `LINE_ART_REMOVE_IF_COVERED` greift bei Bézierkurven oft nicht → TOUCHED +
   Kollateral-Wiederherstellung.
+- **Nicht angezeigter PDF-Inhalt** (gefunden 10.11.2026, `core/pdf_hidden.py`): `get_text` liest weder Inhalt
+  außerhalb des Seitenbereichs (CropBox, auch außerhalb der MediaBox) noch ausgeblendete Ebenen (OCG) – beides
+  blieb ungeprüft im Ergebnis. **Entscheidung des Nutzers: entfernen statt einblenden** (wie Metadaten/Lesezeichen;
+  das Ergebnis enthält, was die Ansicht zeigt). `remove_hidden_content` läuft beim Laden nach `strip_pdf_extras`:
+  - Außerhalb: `get_bboxlog`/`get_texttrace` liefern auch nicht Angezeigtes (ungedrehte Koordinaten → vorher
+    `set_rotation(0)`). Entfernt mit vier Schwärzungsrechtecken rund um `page.rect` (Annotationen außerhalb der
+    Seite funktionieren), Grafik nur `REMOVE_IF_COVERED`, Bilder `IMAGE_PIXELS`; Zuschnitt bleibt.
+  - Ebenen: PyMuPDF kann Ebenen-Inhalt nicht löschen → `_LayerStripper` zerlegt die Inhaltsströme (`_instructions`)
+    und entfernt zwischen `/OC … BDC` und `EMC` sowie bei XObjects mit `/OC` nur die zeichnenden Anweisungen;
+    danach `OCProperties` löschen (wirkt erst nach `tobytes` + Öffnen). Prüfung: `_snapshot` (Zeichenschritte +
+    Seitenbild) muss gleich dem Stand vorher sein.
+  - Rückfall, wenn die Prüfung scheitert: einblenden (Ebenen sichtbar bzw. CropBox = MediaBox per `xref_set_key`;
+    `set_cropbox` scheitert bei versetztem Nullpunkt) + kritischer Hinweis `layers_shown`/`cropped`/`outside_left`.
+    OCMD (zusammengesetzte Sichtbarkeit) geht immer in den Rückfall – MuPDF wertet sie anders aus als die Norm.
+  - Bewusst **nicht**: unsichtbaren Text *auf* der Seite (weiß auf weiß, verdeckt) erkennen oder entfernen, auch
+    kein Hinweis dazu (unzuverlässig) – er wird wie normaler Text geprüft; Hilfe `#textansicht` erklärt es.
+  - `verify_pdf` meldet Ebenen und Inhalt außerhalb (`has_outside_content(leftover=True)`).
+- **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
+  (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
+  und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen
+  (`text_removal_rects`: mittlere 30 % der Zeichenhöhe, `TEXT_INSET`; ohne gemeinsames Band – gemischte Größen,
+  senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
+  Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
+  Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.

@@ -56,7 +56,8 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
   <tr><th width="28%">Wo</th><th>Was</th></tr>
   <tr><td><b>Orange Zeile</b> über dem Dokument</td><td>Nur <b>kritische</b> Hinweise, die die Sicherheit des
-      Ergebnisses betreffen: per Texterkennung gelesene Seiten, Seiten ohne Text. Mit <b>✕</b> blenden Sie die
+      Ergebnisses betreffen: per Texterkennung gelesene Seiten, Seiten ohne Text, verborgener Inhalt, der sich
+      nicht entfernen ließ. Mit <b>✕</b> blenden Sie die
       Zeile für dieses Dokument aus; beim nächsten betroffenen Dokument erscheint sie wieder.</td></tr>
   <tr><td><b>Hinweis-Zähler</b> unten in der Statusleiste</td><td>„ⓘ 2 Hinweise“ bzw. „⚠ …“ (orange, wenn ein
       kritischer dabei ist). Ein Klick zeigt alle Hinweise mit Erklärung und springt auf Wunsch zur Seite.</td></tr>
@@ -67,6 +68,15 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
 Zähler und im Protokoll. Der Hinweis „Bild“ erscheint bei Bildern, die Inhalte tragen könnten (Foto,
 Unterschrift, eingefügter Scan); Logos, die auf mehreren Seiten wiederkehren, und kleine Symbole werden
 übergangen. Prüfen Sie markierte Bilder und schwärzen Sie sie bei Bedarf mit einem Rahmen.</p>
+<p><a name="verborgen"></a><b>Verborgener Inhalt:</b> Ein PDF kann Inhalt enthalten, den kein PDF-Programm
+anzeigt – auf einer ausgeblendeten Ebene, im abgeschnittenen Teil einer zugeschnittenen Seite oder neben dem Blatt.
+Er steckt trotzdem in der Datei und lässt sich wieder hervorholen. pii-redact <b>entfernt</b> ihn schon beim
+Öffnen, so wie Kommentare und Lesezeichen: Das Ergebnis enthält, was Sie in der Ansicht sehen, und sonst nichts.
+Die Seite sieht dabei aus wie vorher; im Hinweis-Zähler steht, auf welchen Seiten etwas entfernt wurde.</p>
+<p>Lässt sich solcher Inhalt ausnahmsweise nicht sicher entfernen, wird er stattdessen <b>eingeblendet</b>
+(Ebenen sichtbar, Zuschnitt aufgehoben) und wie alles andere geprüft. Dann erscheint ein kritischer Hinweis mit
+den betroffenen Seiten: Prüfen Sie den hinzugekommenen Inhalt und schwärzen Sie, was nicht ins Ergebnis gehört
+(bei Bedarf mit einem Rahmen).</p>
 <p class="tipp"><b>Für häufige Nutzung:</b> Mit <i>Einstellungen → Kompakte Hinweise</i> entfällt auch die orange
 Zeile; es bleiben Zähler und Seitensymbol. Die Rückfrage vor dem Export von Seiten aus der Texterkennung bleibt
 immer.</p>
@@ -96,6 +106,22 @@ sobald ein Fund gewählt ist. So können Sie auch ohne eingeblendetes Original p
 </ul>
 <p>Abgewählte Funde bleiben in der Vorschau <b>grau gestrichelt</b> sichtbar und lassen sich jederzeit wieder
 aktivieren.</p>
+
+<h3><a name="textansicht"></a>Bei PDFs auch den Reiter <i>Text</i> lesen</h3>
+<p>Der Reiter <i>Seiten</i> zeigt, was man sieht. Der Reiter <i>Text</i> zeigt, was das Programm aus dem PDF
+<b>gelesen</b> hat – und das kann mehr sein: Text in weißer Schrift auf weißem Grund, Text unter einem Bild oder
+einer Fläche (etwa unter einem nur darübergelegten schwarzen Balken), winzige oder fast durchsichtige Schrift.
+Solcher Text liegt mitten auf der Seite, ist dort aber nicht zu erkennen.</p>
+<p class="hinweis"><b>Auch dieser Text wird geprüft.</b> Die automatische Erkennung und – falls eingeschaltet –
+die KI-Nachprüfung arbeiten auf dem gelesenen Text, nicht auf dem Seitenbild. Ein Name in unsichtbarer Schrift
+wird also genauso gefunden und geschwärzt wie ein sichtbarer.</p>
+<p>Der Unterschied liegt bei <b>Ihrer</b> Prüfung: Was die Erkennung übersieht, können Sie in der Seitenansicht
+nur finden, wenn es zu sehen ist. Wer sicher gehen will, liest deshalb bei PDFs auch den Reiter <i>Text</i>
+durch. Dort steht jeder gelesene Text, und Sie können ihn wie gewohnt markieren und schwärzen.</p>
+<p class="klein">Das Programm entfernt solchen Text nicht von sich aus: Ob eine Schrift für das Auge sichtbar
+ist, lässt sich nicht zuverlässig feststellen, und gewollter Inhalt (helle Schrift auf farbigem Grund) ginge
+sonst verloren. Anders bei Inhalt, den ein PDF-Programm gar nicht anzeigt – siehe
+<a href="#verborgen">Verborgener Inhalt</a>.</p>
 
 <h3>Etwas zusätzlich schwärzen</h3>
 <ul>
@@ -243,11 +269,13 @@ nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>
   <li><b>Lesezeichen</b> (Inhaltsverzeichnis in der Seitenleiste des PDF-Programms)</li>
   <li><b>Metadaten</b> (z. B. Autor, Titel, Erstelldatum), <b>Links</b>, <b>Dateianhänge</b>, Skripte und
       unsichtbaren Text</li>
+  <li><b>Nicht angezeigten Inhalt</b>: was auf ausgeblendeten Ebenen liegt, von einer zugeschnittenen Seite
+      abgeschnitten ist oder neben dem Blatt steht (siehe <a href="#verborgen">Verborgener Inhalt</a>)</li>
 </ul>
 <p><b>Formularfelder</b> werden in normalen Seiteninhalt umgewandelt: Ihre Inhalte werden wie Text geprüft und
 gezielt geschwärzt, die Felder sind im Ergebnis aber nicht mehr ausfüllbar.</p>
 <p>Nach dem Speichern wird das Ergebnis <b>automatisch kontrolliert</b> – der Seitentext ebenso wie Kommentare,
-Formularfelder, Lesezeichen und Metadaten. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
+Formularfelder, Lesezeichen, Metadaten, Ebenen und Inhalt außerhalb des sichtbaren Seitenbereichs. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
 PDF steckt), erhalten Sie eine Warnung. Ist alles in Ordnung, erscheint nur eine kurze Meldung in der
 Statusleiste – mit Link <i>Ordner öffnen</i>; Details zeigt der Tooltip.</p>
 <p>Das Original wird nie überschrieben.</p>
@@ -477,6 +505,9 @@ Einstellungen, die Ihre IT fest vorgibt, sind ausgegraut („Von der IT festgele
   <li><b>Zeilenumbrüche</b> werden berücksichtigt: Bei Silbentrennung („Muster-<br>mann“) werden beide Wortteile
       geschwärzt, ebenso Nummern, die über zwei Zeilen gehen (z. B. eine umbrochene IBAN oder Telefonnummer).
       Ungewöhnliche Schreibweisen werden dagegen mitunter nicht erkannt.</li>
+  <li><b>Unsichtbarer Text auf der Seite</b> (weiß auf weiß, verdeckt, winzig) wird wie jeder Text geprüft
+      und geschwärzt, aber nicht von sich aus entfernt. Was die Erkennung dort übersieht, sehen Sie nur im
+      Reiter <i>Text</i> (<a href="#textansicht">Kapitel 3</a>).</li>
   <li>Die Vorschau zeigt das erwartete Ergebnis. Die endgültige Schwärzung entsteht beim Export und wird danach
       automatisch kontrolliert.</li>
   <li>Bereinigte Dateien können trotzdem Rückschlüsse zulassen (z. B. Funktion + Abteilung). Achten Sie auf den

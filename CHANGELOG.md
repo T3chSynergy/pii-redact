@@ -1,5 +1,40 @@
 # Änderungen
 
+## 0.8.4 – 10.11.2026
+
+**Sicherheit des Ergebnisses**
+- **Nicht angezeigter Inhalt wird entfernt:** Ein PDF kann Inhalt tragen, den kein PDF-Programm anzeigt – im
+  abgeschnittenen Teil einer zugeschnittenen Seite, neben dem Blatt oder auf einer ausgeblendeten Ebene. Bisher
+  wurde er weder geprüft noch entfernt: Er blieb im Ergebnis und ließ sich wieder hervorholen, die Kontrolle
+  bemerkte das nicht. pii-redact entfernt ihn jetzt schon beim Öffnen, wie Kommentare und Lesezeichen. Die Seite
+  sieht aus wie vorher (Zuschnitt und Drehung bleiben); der Hinweis-Zähler nennt die Seiten.
+  - Außerhalb des Seitenbereichs: Text, Bilder und ganz außerhalb liegende Linien/Flächen werden entfernt. Ragt
+    ein Bild über den Rand, werden seine Bildpunkte außerhalb geleert. Linien und Flächen, die über den Rand
+    ragen (Hintergründe, Rahmen), bleiben unverändert.
+  - Ausgeblendete Ebenen: Text, Bilder, Zeichnungen und eingebettete Seiten der Ebene werden aus dem Seiteninhalt
+    entfernt, danach werden alle Ebenen aufgelöst.
+  - Jeder Schritt wird nachgeprüft. Gelingt das Entfernen nicht nachweislich (z. B. Ebenen mit zusammengesetzter
+    Sichtbarkeit), wird der Inhalt stattdessen eingeblendet und geprüft – mit kritischem Hinweis.
+- Die Kontrolle nach dem Export meldet zusätzlich Ebenen und Inhalt außerhalb des sichtbaren Seitenbereichs.
+- Hilfe: neuer Abschnitt „Bei PDFs auch den Reiter Text lesen“ – unsichtbarer Text auf der Seite (weiß auf weiß,
+  verdeckt, winzig) wird wie jeder Text geprüft und geschwärzt; was die Erkennung dort übersieht, zeigt nur die
+  Textansicht.
+
+**Fehlerbehebung**
+- **Enger Zeilenabstand:** Beim Schwärzen einer Textstelle verschwand bei engem Zeilenabstand auch Text aus der
+  Zeile darüber und darunter – ohne Hinweis, die Vorschau zeigte es nicht. Der Text wird jetzt mit einem schmalen
+  Band durch die Zeilenmitte entfernt, das nur die eigene Zeile trifft; der Balken und das Entfernen der
+  Bildpunkte (gescannte Seiten) bleiben in voller Höhe. Die Ergebnisse aller Beispieldateien sind unverändert
+  (Text und Seitenbild, beide Modi).
+- Auf Seiten mit frei gezogenen Bereichen entfernen nur noch die Bereiche selbst berührte Vektorgrafik, nicht
+  mehr die Textstellen derselben Seite (wie auf allen anderen Seiten).
+
+**Intern**
+- Neues Skript `tools/make_icon.py`: zeichnet das Programmsymbol (`packaging/pii-redact.ico`,
+  `src/pii_redact/resources/icon.png`) aus Grundformen – pixelgenau wie die bisherigen Dateien. Damit ist
+  dokumentiert, dass das Symbol selbst erstellt ist, und es lässt sich leicht anpassen. Ein Test prüft, dass Skript
+  und Dateien übereinstimmen.
+
 ## 0.8.3 – 26.10.2026
 
 **Datenschutz**
