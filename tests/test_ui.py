@@ -544,3 +544,46 @@ def test_check_before_saving_pdf_save_anyway(window, tmp_path, monkeypatch):
     assert [f.text for f in s.findings if f.source == "kontrolle" and not f.active] == ["kaya"]
     text = pymupdf.open(target)[0].get_text()
     assert "Deniz" in text and "Kaya" not in text and "antrag_kaya.pdf" in text
+
+
+def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path, monkeypatch):
+    """„Ungeprüfte Dateien exportieren“: Was die Kontrolle beanstandet, bleibt zur Prüfung stehen."""
+    import shutil
+
+    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
+    import pii_redact.ui.window_batch as wb
+    from pii_redact.ui.main_window import MainWindow
+
+    src = tmp_path / "akten"
+    src.mkdir()
+    (src / "a_antrag.txt").write_text("Antrag von Herrn Kaya.\nAnhang: antrag_kaya.pdf\n", encoding="utf-8")
+    shutil.copy(SAMPLES / "beispiel.txt", src / "b_brief.txt")
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    monkeypatch.setattr(wb, "confirm_auto_export", lambda *a: True)
+
+    def idle():
+        t = time.time()
+        while window.runner.running and time.time() - t < 120:
+            _wait(100)
+        _wait(200)
+
+    window._activate_batch(Workspace.create(src, tmp_path / "ziel"))
+    idle()
+    window.export_unreviewed()
+    idle()
+    ws = window.batch
+    assert ws.entries["b_brief.txt"].status == Status.AUTO and (tmp_path / "ziel" / "b_brief_anonymisiert.txt").is_file()
+    held = ws.entries["a_antrag.txt"]
+    assert held.status == Status.TO_REVIEW and held.note == CHECK_NOT_AUTO
+    assert not (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").exists()
+    assert "hält die Kontrolle" in window.status_label.text()
+    # die offene Datei zeigt den Vorschlag in der Fundliste; mit Häkchen und „Geprüft & weiter“ wird exportiert
+    assert window.batch_rel == "a_antrag.txt"
+    suggestion = next(f for f in window.session.findings if f.source == "kontrolle")
+    window.session.set_active([suggestion.id], True)
+    monkeypatch.setattr(MainWindow, "_ask_further", lambda self, new: pytest.fail("keine Rückfrage erwartet"))
+    window.confirm_and_next()
+    assert ws.entries["a_antrag.txt"].status == Status.REVIEWED
+    assert "kaya" not in (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").read_text(encoding="utf-8").casefold()
+    window.close_batch()

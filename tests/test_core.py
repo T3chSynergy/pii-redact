@@ -513,6 +513,9 @@ def test_further_occurrences_become_inactive_suggestions():
     # Satzzeichen am Rand eines Fundes gehören nicht zum gesuchten Text
     assert [f.text for f in further_occurrences("Fragen an Herrn KAYA. Anhang: antrag_kaya.pdf",
                                                 [Finding(16, 21, "PERSON", "KAYA.")])] == ["kaya"]
+    # Anrede und Titel ebenso wenig („Herrn Dr. Kaya“ → „kaya“)
+    assert [f.text for f in further_occurrences("Antrag von Herrn Dr. Kaya. Anhang: antrag_kaya.pdf",
+                                                [Finding(11, 25, "PERSON", "Herrn Dr. Kaya")])] == ["kaya"]
     new = further_occurrences(text, findings)
     # im Dateinamen, in Großbuchstaben und im Gruß – nicht „Kayala“, „Wochenende“, „14711“
     assert [(f.text, text[max(f.start - 7, 0):f.start]) for f in new] == [("kaya", "antrag_"), ("KAYA", "gen an "), ("Kaya", " Deniz ")]

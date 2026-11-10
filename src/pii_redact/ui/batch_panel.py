@@ -348,6 +348,8 @@ def confirm_auto_export(parent, count: int, waiting: int, ocr_skipped: int = 0) 
            "sie müssen einzeln gründlich geprüft werden." if ocr_skipped else "")
         + ("</p><p>Auch Dateien, bei denen erst die Analyse Texterkennung ergibt, bleiben zur Prüfung stehen."
            if waiting else "")
+        + "</p><p>Ebenso bleiben Dateien stehen, in denen ein geschwärzter Text noch an anderer, nicht markierter "
+        "Stelle steht – die Stellen finden Sie dann als Vorschläge der Kontrolle in der Fundliste."
         + "</p><p>Automatische Erkennung ist nicht vollständig. Die Dateien werden im Protokoll als "
         "<b>„automatisch exportiert (nicht geprüft)“</b> vermerkt und können später noch geprüft werden.</p>"
         "<p>Fortfahren?</p>"

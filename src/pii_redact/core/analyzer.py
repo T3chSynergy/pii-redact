@@ -354,12 +354,18 @@ def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> 
     return out
 
 
+_SALUTATIONS = {"herr", "herrn", "frau", "dr", "prof", "med"}
+
+
 def word_pattern(text: str) -> re.Pattern | None:
     """Suchmuster für den Text eines Fundes: Leerraum beliebig, und nicht als Teil eines längeren Wortes bzw.
     einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“).
     None bei Texten unter drei Zeichen."""
     # Satzzeichen am Rand gehören nicht zum gesuchten Text („KAYA.“ am Satzende → „kaya“ im Dateinamen)
     words = join_hyphenated(plain_spaces(text)).strip(_TRIM_CHARS + ".!?").split()
+    # Anrede und Titel gehören nicht zum Namen („Herrn Kaya“ → „kaya“ im Dateinamen)
+    while len(words) > 1 and words[0].casefold().rstrip(".") in _SALUTATIONS:
+        words = words[1:]
     if not words or len("".join(words)) < 3:
         return None
     core = r"\s*".join(re.escape(w) for w in words)

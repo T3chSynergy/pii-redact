@@ -121,6 +121,9 @@ lesbar.</p>
   <li>Ein Vorschlag, den Sie ohne Häkchen lassen, gilt als entschieden – beim nächsten Export wird nicht noch
       einmal danach gefragt.</li>
 </ul>
+<p><b>Ohne Rückfrage</b> – beim automatischen Export ungeprüfter Dateien und in der Kommandozeile – werden solche
+Dateien nicht exportiert. Sie bleiben in der Arbeitsliste auf „zu prüfen“ stehen, mit einem Vermerk im
+Protokoll; beim Öffnen stehen die Vorschläge der Kontrolle schon in der Fundliste.</p>
 <p class="klein">Gesucht wird der Text als eigenes Wort bzw. eigene Nummer, ohne Rücksicht auf Groß- und
 Kleinschreibung. Teile längerer Wörter zählen nicht („Ende“ in „Wochenende“).</p>
 
@@ -557,8 +560,7 @@ Modus „Schnell“ (findet weniger Namen und Orte – besonders sorgfältig pr�
 <ul>
   <li><b>„an anderer Stelle noch lesbar“</b> (mit Seite): Der Text wurde geschwärzt, kommt aber im Ergebnis noch
       einmal vor. Im Dokumenttext fängt das schon die <a href="#vorkontrolle">Kontrolle vor dem Speichern</a>
-      ab; die Meldung erscheint danach nur noch, wenn der Text außerhalb davon steckt oder das Ergebnis ohne
-      Rückfrage entstanden ist (Ordner automatisch exportiert, Kommandozeile).</li>
+      ab; die Meldung erscheint danach nur noch, wenn der Text außerhalb davon steckt (etwa in Metadaten).</li>
   <li><b>„an der geschwärzten Stelle noch vorhanden“:</b> Die Schwärzung selbst hat an dieser Stelle nicht
       gewirkt. Geben Sie das Ergebnis nicht weiter und wenden Sie sich an die IT.</li>
 </ul>
@@ -575,8 +577,9 @@ Status in der Arbeitsliste halten.</p>
 <h2><a name="kommandozeile"></a>14. Kommandozeile</h2>
 <p class="klein">Für Fortgeschrittene und die IT.</p>
 <p>Für die Stapelverarbeitung ohne Oberfläche gibt es <code>pii-redact-cli</code>. Ergebnisse gelten als
-<b>nicht geprüft</b>; bereits in der Oberfläche geprüfte Dateien bleiben unangetastet. Dateien mit
-Texterkennung werden nicht exportiert (Rückgabewert 3) und müssen in der Oberfläche geprüft werden.</p>
+<b>nicht geprüft</b>; bereits in der Oberfläche geprüfte Dateien bleiben unangetastet. Nicht exportiert
+werden (Rückgabewert 3) Dateien mit Texterkennung und Dateien, in denen ein geschwärzter Text noch an anderer
+Stelle steht – sie müssen in der Oberfläche geprüft werden.</p>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
   <tr><th width="50%">Aufruf</th><th>Wirkung</th></tr>
   <tr><td><code>pii-redact-cli brief.pdf</code></td><td>Erzeugt <code>brief_geschwaerzt.pdf</code></td></tr>
@@ -596,8 +599,8 @@ Texterkennung werden nicht exportiert (Rückgabewert 3) und müssen in der Oberf
 </table>
 <p>Die normale Ausgabe nennt nur <b>Anzahl und Datenart</b> der Funde, nicht die Daten selbst. Leiten Sie
 Ausgaben von <code>--nur-anzeigen</code> und <code>--details</code> nicht in Protokolldateien um.</p>
-<p class="klein">Rückgabewerte: 0 = in Ordnung, 1 = Fehler, 2 = Reste im Ergebnis gefunden, 3 = Datei mit
-Texterkennung nicht exportiert, 4 = mit „Schnell“ statt „Gründlich“ bearbeitet (Modell fehlt). Bei mehreren
+<p class="klein">Rückgabewerte: 0 = in Ordnung, 1 = Fehler, 2 = Reste im Ergebnis gefunden, 3 = Datei nicht
+exportiert, bitte in der Oberfläche prüfen (Texterkennung oder Kontrolle), 4 = mit „Schnell“ statt „Gründlich“ bearbeitet (Modell fehlt). Bei mehreren
 Dateien gilt der schwerwiegendste Wert (2 vor 1 vor 3 vor 4).</p>
 
 <h2><a name="komponenten"></a>15. Über pii-redact und verwendete Open-Source-Software</h2>

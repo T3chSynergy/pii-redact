@@ -142,7 +142,8 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 169 Tests (Stand 10.11.2026; Stand v
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
 - **Kommandozeile** (`cli.py`, echte Konsole ohne Qt): Ausgabe ohne Klartext (nur Anzahl/Datenart; Klartext nur
   `--nur-anzeigen`/`--details`), kein stilles Überschreiben (`--ueberschreiben`), Rückgabewert = schwerwiegendster
-  (2 Reste > 1 Fehler > 3 OCR nicht exportiert – einzelne Dateien wie Ordner > 4 „Schnell“ statt „Gründlich“, weil
+  (2 Reste > 1 Fehler > 3 nicht automatisch exportiert, in der Oberfläche prüfen – Texterkennung oder Kontrolle
+  vor dem Speichern, einzelne Dateien wie Ordner > 4 „Schnell“ statt „Gründlich“, weil
   das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
@@ -197,7 +198,10 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   Entscheidung und wird nicht erneut vorgeschlagen). `ExportMixin._confirm_further` (PDF-/Text-Export,
   „Geprüft & weiter“): Vorschläge in die Fundliste, ersten wählen, Rückfrage `_ask_further` (in Tests ersetzen).
   Nach „Trotzdem speichern“ blendet die Oberfläche die Meldungen „an anderer Stelle noch lesbar“ der Kontrolle
-  nach dem Export aus. Automatischer Export und Kommandozeile fragen nicht.
+  nach dem Export aus. **Ohne Rückfrage wird zurückgehalten** (Entscheidung des Nutzers): `batch.held_for_check`
+  in `window_batch._export_auto` und `cli` – nicht exportieren, Vermerk `CHECK_NOT_AUTO`, Vorschläge im
+  Arbeitsstand, Rückgabewert 3; auch ein vorhandener, unbestätigter Vorschlag hält zurück. Anrede/Titel und
+  Satzzeichen am Rand zählen bei der Suche nicht (`word_pattern`).
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen

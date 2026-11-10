@@ -10,7 +10,8 @@ Die Ausgabe nennt nur Anzahl und Datenart der Funde – den gefundenen Klartext 
 und --details (Vorsicht beim Umleiten in Log-Dateien).
 
 Rückgabewerte: 0 = OK, 1 = Fehler (auch falsche Aufrufparameter), 2 = Kontrolle fand Reste im Ergebnis,
-               3 = Dateien mit Texterkennung (OCR) wurden nicht automatisch exportiert,
+               3 = Dateien wurden nicht automatisch exportiert und müssen in der Oberfläche geprüft werden
+                   (Texterkennung/OCR, oder geschwärzter Text steht noch an anderer Stelle),
                4 = mit dem Modus „Schnell“ bearbeitet, obwohl „Gründlich“ eingestellt ist (Modell fehlt).
 Bei mehreren Dateien gilt der schwerwiegendste Wert: 2 vor 1 vor 3 vor 4 vor 0.
 """
@@ -36,7 +37,7 @@ from .core import (
     load_document,
 )
 from . import __version__
-from .core.batch import export_document
+from .core.batch import CHECK_NOT_AUTO, export_document, held_for_check
 from .core.entities import info
 from .settings_store import defaults_path, settings_path
 
@@ -167,6 +168,9 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
         print(f"  ! {path}: Texterkennung (OCR, Seiten {pages}) – nicht automatisch exportiert, bitte in der "
               "Oberfläche prüfen", file=sys.stderr)
         return OCR_SKIPPED
+    if held_for_check(doc.text, findings) is not None:
+        print(f"  ! {path}: {CHECK_NOT_AUTO}", file=sys.stderr)
+        return OCR_SKIPPED
 
     target = target_for(path, doc, args)
     if target.exists() and not args.ueberschreiben:
@@ -230,6 +234,13 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
                 res = analyze_file(path, analyzer, settings)
                 ws.set_analysis_result(e.rel, res)
                 findings = res["findings"]
+            held = held_for_check(doc.text, findings)
+            if held is not None:
+                ws.hold_for_check(e.rel, held)
+                print(f"  ! {e.rel}: {CHECK_NOT_AUTO}")
+                rc = worst(rc, OCR_SKIPPED)
+                ws.save()
+                continue
             out = ws.out(e.rel)
             leftovers = export_document(doc, findings, settings, out)
             ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)

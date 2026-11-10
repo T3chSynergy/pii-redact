@@ -147,3 +147,39 @@ def test_single_file_with_ocr_pages_is_not_exported(work, capsys):
     assert cli.main([str(work / "scan.pdf"), "--schnell", "--nur-anzeigen"]) == cli.OK
     assert cli.main([str(work / "scan.pdf"), "--schnell", "--ohne-ocr"]) == cli.OK      # ohne Texterkennung: wie bisher
     assert (work / "scan_geschwaerzt.pdf").is_file()
+
+
+_FURTHER = "Antrag von Herrn Kaya.\nAnhang: antrag_kaya.pdf\nMit freundlichen Grüßen\n"
+
+
+@needs_model
+def test_file_with_further_occurrences_is_held_back(work, capsys):
+    """Geschwärzter Text steht noch an anderer Stelle: ohne Rückfrage wird nicht exportiert (Rückgabewert 3)."""
+    (work / "antrag.txt").write_text(_FURTHER, encoding="utf-8")
+    assert cli.main([str(work / "antrag.txt"), "--schnell"]) == cli.OCR_SKIPPED
+    assert "steht noch an anderer Stelle" in capsys.readouterr().err
+    assert not (work / "antrag_anonymisiert.txt").exists()
+    assert cli.main([str(work / "antrag.txt"), "--schnell", "--nur-anzeigen"]) == cli.OK
+    assert cli.main([str(work / "brief.txt"), "--schnell"]) == cli.OK          # ohne weitere Vorkommen wie bisher
+
+
+@needs_model
+def test_folder_holds_back_and_keeps_suggestions(work, capsys):
+    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
+
+    source = work / "ordner"
+    source.mkdir()
+    (source / "antrag.txt").write_text(_FURTHER, encoding="utf-8")
+    shutil.copy(SAMPLES / "beispiel.txt", source / "brief.txt")
+    args = [str(source), "-o", str(work / "aus"), "--schnell"]
+    assert cli.main(args) == cli.OCR_SKIPPED
+    assert (work / "aus" / "brief_anonymisiert.txt").is_file() and not (work / "aus" / "antrag_anonymisiert.txt").exists()
+    entry = Workspace.load(work / "aus").entries["antrag.txt"]
+    assert entry.status == Status.TO_REVIEW and entry.note == CHECK_NOT_AUTO
+    # der Vorschlag der Kontrolle steht (ohne Klartext) im Arbeitsstand und erscheint beim Öffnen in der Fundliste
+    assert [(f["src"], f["a"]) for f in entry.findings if f["src"] == "kontrolle"] == [("kontrolle", False)]
+    protocol = (work / "aus" / "pii-redact-protokoll.csv").read_text(encoding="utf-8-sig")
+    assert "nicht automatisch exportiert" in protocol and "kaya" not in protocol.casefold().replace("antrag.txt", "")
+    # ein zweiter Lauf exportiert nicht etwa deshalb, weil der Vorschlag nun schon in der Liste steht
+    assert cli.main(args) == cli.OCR_SKIPPED
+    assert not (work / "aus" / "antrag_anonymisiert.txt").exists()
