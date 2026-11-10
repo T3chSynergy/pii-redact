@@ -2,6 +2,27 @@
 
 ## Unveröffentlicht
 
+**Sicherheit des Ergebnisses**
+- **Zugeschnittene Seiten:** War eine PDF-Seite zugeschnitten, wurde der abgeschnittene Teil weder geprüft noch
+  entfernt – er blieb im Ergebnis und ließ sich im PDF-Programm wieder hervorholen; die Kontrolle bemerkte das
+  nicht. pii-redact hebt den Zuschnitt jetzt beim Öffnen auf: Die ganze Seite wird angezeigt, geprüft und
+  geschwärzt. Ein kritischer Hinweis nennt die betroffenen Seiten.
+- **Ausgeblendete Ebenen:** Dasselbe galt für Text auf ausgeblendeten Ebenen. Alle Ebenen werden jetzt
+  eingeblendet und aufgelöst; ihr Inhalt wird geprüft und steht sichtbar im Ergebnis (kritischer Hinweis).
+- Die Kontrolle nach dem Export meldet zusätzlich, wenn das Ergebnis noch Ebenen oder zugeschnittene Seiten
+  enthält.
+- Nicht behoben: Inhalt, der ganz außerhalb des Blattes liegt (außerhalb der MediaBox), wird weiterhin nicht
+  gelesen.
+
+**Fehlerbehebung**
+- **Enger Zeilenabstand:** Beim Schwärzen einer Textstelle verschwand bei engem Zeilenabstand auch Text aus der
+  Zeile darüber und darunter – ohne Hinweis, die Vorschau zeigte es nicht. Der Text wird jetzt mit einem schmalen
+  Band durch die Zeilenmitte entfernt, das nur die eigene Zeile trifft; der Balken und das Entfernen der
+  Bildpunkte (gescannte Seiten) bleiben in voller Höhe. Die Ergebnisse aller Beispieldateien sind unverändert
+  (Text und Seitenbild, beide Modi).
+- Auf Seiten mit frei gezogenen Bereichen entfernen nur noch die Bereiche selbst berührte Vektorgrafik, nicht
+  mehr die Textstellen derselben Seite (wie auf allen anderen Seiten).
+
 **Intern**
 - Neues Skript `tools/make_icon.py`: zeichnet das Programmsymbol (`packaging/pii-redact.ico`,
   `src/pii_redact/resources/icon.png`) aus Grundformen – pixelgenau wie die bisherigen Dateien. Damit ist

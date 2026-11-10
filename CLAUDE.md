@@ -164,6 +164,19 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - PyMuPDF `scrub()` entfernt keine Kommentare/Lesezeichen; `reset_fields` löscht Formularwerte.
 - PyMuPDF-Schwärzung: `LINE_ART_REMOVE_IF_COVERED` greift bei Bézierkurven oft nicht → TOUCHED +
   Kollateral-Wiederherstellung.
+- **Nicht angezeigter PDF-Inhalt** (gefunden 10.11.2026): `get_text` liest weder Text außerhalb der CropBox noch
+  auf ausgeblendeten Ebenen (OCG) – beides blieb ungeprüft im Ergebnis. `strip_pdf_extras` setzt deshalb die
+  CropBox je Seite gleich der MediaBox (per `xref_set_key`; `set_cropbox(mediabox)` scheitert bei versetztem
+  Nullpunkt, ein Eintrag an der Seite schlägt einen geerbten) und löscht `OCProperties` aus dem Katalog (ohne
+  Ebenenverzeichnis ist alles sichtbar). Beides wirkt erst nach `tobytes` + erneutem Öffnen. Kritische Hinweise
+  `cropped`/`layers`; `verify_pdf` meldet beides. Offen: Inhalt außerhalb der MediaBox liest MuPDF gar nicht.
+- **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
+  (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
+  und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen
+  (`text_removal_rects`: mittlere 30 % der Zeichenhöhe, `TEXT_INSET`; ohne gemeinsames Band – gemischte Größen,
+  senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
+  Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
+  Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.

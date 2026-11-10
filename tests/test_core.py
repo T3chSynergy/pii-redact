@@ -372,3 +372,160 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     for rest in ("DE89", "3704", "0044", "0532", "0130", "040", "55512345", "170839", "J"):
         assert rest not in words, rest
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
+
+
+# ---------------------------------------------------------------- nicht angezeigter Inhalt: Zuschnitt, Ebenen
+def _find(doc, needle: str, typ: str = "PERSON") -> Finding:
+    s = doc.text.index(needle)
+    return Finding(s, s + len(needle), typ, needle)
+
+
+def _load_bytes(tmp_path, data: bytes, name: str = "test.pdf"):
+    path = tmp_path / name
+    path.write_bytes(data)
+    return load_document(path, ocr=False)
+
+
+@pytest.mark.parametrize("offset", [False, True], ids=["Nullpunkt", "versetzte Seite"])
+@pytest.mark.parametrize("inherited", [False, True], ids=["an der Seite", "geerbt"])
+def test_cropped_page_is_uncropped_checked_and_redacted(tmp_path, offset, inherited):
+    """Der abgeschnittene Teil einer Seite steckt weiter in der Datei – er muss geprüft und geschwärzt werden."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=595, height=842)
+    page.insert_text((72, 100), "Sichtbar: Frau Zofia Jaeger")
+    page.insert_text((72, 700), "Abgeschnitten: Herr Karl Bergenthaler")
+    if offset:
+        pdf.xref_set_key(page.xref, "MediaBox", "[10 20 605 862]")
+    holder = int(pdf.xref_get_key(page.xref, "Parent")[1].split()[0]) if inherited else page.xref
+    pdf.xref_set_key(holder, "CropBox", "[10 462 605 862]" if offset else "[0 442 595 842]")   # nur obere Hälfte
+    original = pdf.tobytes()
+    assert "Bergenthaler" not in pymupdf.open(stream=original)[0].get_text()   # Ausgangslage: nicht angezeigt
+
+    doc = _load_bytes(tmp_path, original)
+    assert "Karl Bergenthaler" in doc.text
+    notice = {n.kind: n for n in doc.notices}["cropped"]
+    assert notice.critical and notice.pages == [0]
+
+    findings = [_find(doc, "Zofia Jaeger"), _find(doc, "Karl Bergenthaler")]
+    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
+    assert verify_pdf(out, findings) == []
+    result = pymupdf.open(stream=out)
+    assert result[0].cropbox.height == pytest.approx(result[0].mediabox.height)
+    text = result[0].get_text()
+    assert "Abgeschnitten: Herr" in text and "Bergenthaler" not in text and "Jaeger" not in text
+    # die Kontrolle erkennt ein zugeschnittenes Ergebnis
+    assert any("Zugeschnittene Seiten" in p for p in verify_pdf(original, []))
+
+
+def test_hidden_layer_is_shown_checked_and_redacted(tmp_path):
+    """Text auf einer ausgeblendeten Ebene lässt sich im PDF-Programm wieder einblenden."""
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((72, 100), "Sichtbar: Frau Zofia Jaeger")
+    layer = pdf.add_ocg("Intern", on=False)
+    page.insert_text((72, 200), "Intern: Herr Karl Bergenthaler", oc=layer)
+    original = pdf.tobytes()
+    assert "Bergenthaler" not in pymupdf.open(stream=original)[0].get_text()
+
+    doc = _load_bytes(tmp_path, original)
+    assert "Karl Bergenthaler" in doc.text
+    notice = {n.kind: n for n in doc.notices}["layers"]
+    assert notice.critical and "1 ausgeblendete Ebene" in notice.short
+
+    findings = [_find(doc, "Karl Bergenthaler")]
+    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
+    assert verify_pdf(out, findings) == []
+    result = pymupdf.open(stream=out)
+    assert result.get_ocgs() == {}
+    assert b"Bergenthaler" not in b"".join(result.xref_stream(x) or b"" for x in range(1, result.xref_length()))
+    assert "Intern: Herr" in result[0].get_text()
+    assert "Ebenen noch vorhanden" in verify_pdf(original, [])
+
+
+def test_visible_layers_give_no_notice(tmp_path):
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((72, 100), "Text auf einer Ebene", oc=pdf.add_ocg("Entwurf", on=True))
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    assert "Text auf einer Ebene" in doc.text and not doc.notices
+    assert pymupdf.open(stream=doc.pdf_bytes).get_ocgs() == {}
+
+
+# ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile
+_NEIGHBOURS = ("Die Bearbeitung liegt bei der Abteilung Finanzen im Haus (Äpfel, Übung, gyp).",
+               "Zuständig ist dort Frau Zofia Jaeger aus dem zweiten Stock, Telefon 030 1234567.",
+               "Bitte beachten Sie die neuen Zeiten und die Regeln der Übergabe im Haus (ÄÖÜ).")
+
+
+def _squash(text: str) -> str:
+    return "".join(text.split())
+
+
+@pytest.mark.parametrize("font", ["helv", "tiro", "cour"])
+@pytest.mark.parametrize("leading", [0.85, 1.0, 1.15, 1.4])
+@pytest.mark.parametrize("mode", [ReplaceMode.BLACKOUT, ReplaceMode.NUMBERED])
+def test_tight_line_spacing_keeps_neighbour_lines(tmp_path, font, leading, mode):
+    """Bei engem Zeilenabstand ragen die Zeichenrahmen in die Nachbarzeilen – dort darf nichts verschwinden."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=700, height=300)
+    for i, line in enumerate(_NEIGHBOURS):
+        page.insert_text((40, 80 + i * 11 * leading), line, fontsize=11, fontname=font)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    findings = [_find(doc, "Zofia Jaeger"), _find(doc, "030 1234567", "PHONE_NUMBER")]
+    out = redact_pdf(doc, findings, mode)
+    assert verify_pdf(out, findings) == []
+    got = pymupdf.open(stream=out)[0].get_text()
+    for token in ("[PERSON_1]", "[TELEFON_1]"):
+        got = got.replace(token, "")
+    expected = doc.text.replace("Zofia Jaeger", "").replace("030 1234567", "")
+    assert _squash(got) == _squash(expected)
+
+
+def test_mixed_sizes_and_vertical_text_are_removed(tmp_path):
+    """Kein gemeinsames Band (Schriftgrößen gemischt, hochgestellt, senkrecht): jedes Zeichen einzeln."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=600, height=400)
+    page.insert_text((40, 69), "Zeile darüber mit Text über die ganze Breite der Seite", fontsize=11)
+    x = 40.0
+    for part, size, dy in (("Vermerk ", 11, 0), ("Zofia", 11, 0), ("Jaeger", 7, 0), ("2", 6, -5), (" Rest der Zeile", 11, 0)):
+        page.insert_text((x, 80 + dy), part, fontsize=size)
+        x += pymupdf.get_text_length(part, fontsize=size)
+    page.insert_text((40, 91), "Zeile darunter mit Text über die ganze Breite der Seite", fontsize=11)
+    page.insert_text((300, 380), "Senkrecht Zofia Jaeger hier", fontsize=11, rotate=90)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    import re
+
+    findings = [Finding(m.start(), m.end(), "PERSON", m.group()) for m in re.finditer(r"Zofia\s*Jaeger\s*2?", doc.text)]
+    assert len(findings) == 2
+    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
+    assert verify_pdf(out, findings) == []
+    expected = doc.text
+    for f in findings:
+        expected = expected.replace(f.text, "")
+    assert _squash(pymupdf.open(stream=out)[0].get_text()) == _squash(expected)
+
+
+def test_scan_with_text_layer_loses_pixels_in_full_height(tmp_path):
+    """Gescannte Seite mit unsichtbarer Textebene: Der Text wird mit dem schmalen Band entfernt, die
+    Bildpunkte darunter aber im ganzen Balken."""
+    src = pymupdf.open()
+    page = src.new_page(width=400, height=120)
+    page.insert_text((20, 60), "Frau Zofia Jaeger", fontsize=22)
+    pix = page.get_pixmap(dpi=150)
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=400, height=120)
+    page.insert_image(page.rect, pixmap=pix)
+    page.insert_text((20, 60), "Frau Zofia Jaeger", fontsize=22, render_mode=3)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    finding = _find(doc, "Zofia Jaeger")
+    from pii_redact.core.redactor import finding_rects
+
+    ((_, rect),) = finding_rects(doc, finding.start, finding.end)
+    result = pymupdf.open(stream=redact_pdf(doc, [finding], ReplaceMode.BLACKOUT))
+    assert "Zofia" not in result[0].get_text(flags=0)
+    image = pymupdf.Pixmap(result, result[0].get_images()[0][0])
+    sx, sy = image.width / 400, image.height / 120
+    inside = {image.pixel(x, y)
+              for x in range(int(rect.x0 * sx) + 2, int(rect.x1 * sx) - 2, 3)
+              for y in range(int(rect.y0 * sy) + 2, int(rect.y1 * sy) - 2)}
+    assert len(inside) == 1   # einheitlich gefüllt – keine Reste der Buchstaben am oberen/unteren Rand

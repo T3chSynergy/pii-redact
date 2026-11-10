@@ -56,7 +56,8 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
   <tr><th width="28%">Wo</th><th>Was</th></tr>
   <tr><td><b>Orange Zeile</b> über dem Dokument</td><td>Nur <b>kritische</b> Hinweise, die die Sicherheit des
-      Ergebnisses betreffen: per Texterkennung gelesene Seiten, Seiten ohne Text. Mit <b>✕</b> blenden Sie die
+      Ergebnisses betreffen: per Texterkennung gelesene Seiten, Seiten ohne Text, eingeblendete Ebenen und
+      aufgehobener Seitenzuschnitt. Mit <b>✕</b> blenden Sie die
       Zeile für dieses Dokument aus; beim nächsten betroffenen Dokument erscheint sie wieder.</td></tr>
   <tr><td><b>Hinweis-Zähler</b> unten in der Statusleiste</td><td>„ⓘ 2 Hinweise“ bzw. „⚠ …“ (orange, wenn ein
       kritischer dabei ist). Ein Klick zeigt alle Hinweise mit Erklärung und springt auf Wunsch zur Seite.</td></tr>
@@ -67,6 +68,12 @@ weitergeben. Die Verantwortung für das Ergebnis liegt bei Ihnen.</p>
 Zähler und im Protokoll. Der Hinweis „Bild“ erscheint bei Bildern, die Inhalte tragen könnten (Foto,
 Unterschrift, eingefügter Scan); Logos, die auf mehreren Seiten wiederkehren, und kleine Symbole werden
 übergangen. Prüfen Sie markierte Bilder und schwärzen Sie sie bei Bedarf mit einem Rahmen.</p>
+<p><b>Ausgeblendete Ebenen und zugeschnittene Seiten:</b> Ein PDF kann Inhalt enthalten, den das PDF-Programm
+nicht anzeigt – auf einer ausgeblendeten Ebene oder außerhalb des Seitenausschnitts, wenn eine Seite zugeschnitten
+wurde. Er steckt trotzdem in der Datei und lässt sich wieder hervorholen. pii-redact blendet deshalb alle Ebenen
+ein und hebt den Zuschnitt auf: Sie sehen die ganze Seite, sie wird vollständig geprüft, und so steht sie auch im
+Ergebnis. Der Hinweis nennt die betroffenen Seiten – prüfen Sie den hinzugekommenen Inhalt und schwärzen Sie, was
+nicht ins Ergebnis gehört (bei Bedarf mit einem Rahmen).</p>
 <p class="tipp"><b>Für häufige Nutzung:</b> Mit <i>Einstellungen → Kompakte Hinweise</i> entfällt auch die orange
 Zeile; es bleiben Zähler und Seitensymbol. Die Rückfrage vor dem Export von Seiten aus der Texterkennung bleibt
 immer.</p>
@@ -243,11 +250,13 @@ nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>
   <li><b>Lesezeichen</b> (Inhaltsverzeichnis in der Seitenleiste des PDF-Programms)</li>
   <li><b>Metadaten</b> (z. B. Autor, Titel, Erstelldatum), <b>Links</b>, <b>Dateianhänge</b>, Skripte und
       unsichtbaren Text</li>
+  <li><b>Ebenen</b> und <b>Seitenzuschnitt</b>: Das Ergebnis enthält keinen Inhalt mehr, der nur ausgeblendet
+      oder abgeschnitten ist (siehe <a href="#hinweise">Hinweise zum Dokument</a>)</li>
 </ul>
 <p><b>Formularfelder</b> werden in normalen Seiteninhalt umgewandelt: Ihre Inhalte werden wie Text geprüft und
 gezielt geschwärzt, die Felder sind im Ergebnis aber nicht mehr ausfüllbar.</p>
 <p>Nach dem Speichern wird das Ergebnis <b>automatisch kontrolliert</b> – der Seitentext ebenso wie Kommentare,
-Formularfelder, Lesezeichen und Metadaten. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
+Formularfelder, Lesezeichen, Metadaten, Ebenen und Seitenzuschnitt. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
 PDF steckt), erhalten Sie eine Warnung. Ist alles in Ordnung, erscheint nur eine kurze Meldung in der
 Statusleiste – mit Link <i>Ordner öffnen</i>; Details zeigt der Tooltip.</p>
 <p>Das Original wird nie überschrieben.</p>
