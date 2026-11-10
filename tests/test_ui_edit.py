@@ -202,6 +202,9 @@ def test_selection_menu_actions_and_lists(editor):
     _action(menu, "Schwärzen als", "Organisation").trigger()
     assert [(f.text, f.entity_type) for f in s.findings if f.source == "manuell"] == [("Projekt Falke", "ORGANIZATION")]
     assert window.status_label.text() == "1 Stelle(n) hinzugefügt."
+    # der neue Fund ist auch in der Fundliste ausgewählt, die Detailzeile darunter zeigt ihn
+    new = next(f for f in s.findings if f.source == "manuell")
+    assert window.findings.selected_ids() == [new.id] and "Projekt Falke" in window.findings.detail.text()
 
     _action(window.build_finding_menu([], ranges), "Immer schwärzen (Sperrliste)").trigger()
     assert window.settings.deny_list == ["Projekt Falke"]
@@ -231,6 +234,7 @@ def test_mark_selection_uses_marked_text_or_explains(editor, monkeypatch):
     _in_menu(["Schwärzen als", "Benutzerdefiniert"])
     window._mark_selection(True)                                          # alle Vorkommen
     assert sum(f.text == "Projekt Falke" for f in s.findings) == 2
+    assert sorted(window.findings.selected_ids()) == sorted(f.id for f in s.findings if f.text == "Projekt Falke")
 
     _select(window.right.text, 0, 0)
     _in_menu(None)                                                        # Menü ohne Auswahl geschlossen
@@ -324,7 +328,7 @@ def test_area_menu_with_text_adds_text_and_area(window):
     assert len(area) == 1 and area[0].entity_type == "AREA_SIGNATURE"
     assert [f.text for f in s.findings if not f.is_area] == ["Bergmann"]          # Text im Bereich gehört dazu
     assert window.status_label.text() == "Bereich auf Seite 1 wird geschwärzt (Unterschrift)."
-    assert window.selected_ids == {s.findings[0].id}                     # der neue Bereich ist hervorgehoben
+    assert window.findings.selected_ids() == [area[0].id]                 # auch in der Fundliste ausgewählt
 
     # Menü zu einem Bereich: abwählen, Typ ändern, löschen
     aid = [area[0].id]

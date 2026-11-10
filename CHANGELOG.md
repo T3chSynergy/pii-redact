@@ -22,6 +22,9 @@
 - **Einstellungsdatei mit unpassenden Werten:** In einer von Hand bearbeiteten `settings.json` oder
   `defaults.json` werden Werte der falschen Art (etwa Text statt Zahl) übergangen; dafür gilt die Vorgabe der IT
   bzw. die Voreinstellung. Bisher konnte das Programm damit später an unerwarteter Stelle abbrechen.
+- **Von Hand hinzugefügte Schwärzung ist in der Fundliste ausgewählt:** Nach „Schwärzen als“, „Alle Vorkommen
+  schwärzen“ oder einem aufgezogenen Bereich war der neue Fund nur im Text hervorgehoben; in der Fundliste war
+  nichts ausgewählt, die Detailzeile darunter blieb leer. Jetzt steht die Auswahl auf dem neuen Eintrag.
 - **Text-Export: verständliche Meldung, wenn das Speichern scheitert** (Ziel schreibgeschützt, Netzlaufwerk
   getrennt, Datenträger voll). Bisher erschien das allgemeine Fenster „Unerwarteter Fehler“; beim PDF-Export gab
   es die Meldung „Export fehlgeschlagen“ schon. Verloren ging dabei nichts.
