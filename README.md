@@ -240,8 +240,10 @@ pii-redact-cli --version
 - `--einstellungen DATEI` verwendet eine eigene Einstellungsdatei statt `%APPDATA%\pii-redact\settings.json`,
   z. B. für geplante Aufgaben unter einem Dienstkonto; zentrale Vorgaben (`defaults.json`) gelten weiterhin.
 - Rückgabewerte: `0` OK · `1` Fehler (auch falscher Aufruf) · `2` Kontrolle fand Reste im Ergebnis ·
-  `3` Datei mit Texterkennung nicht automatisch exportiert (Ordner). Bei mehreren Dateien gilt der
-  schwerwiegendste Wert (2 vor 1 vor 3 vor 0). Warnungen und Fehler stehen in der Fehlerausgabe (stderr).
+  `3` Datei mit Texterkennung nicht automatisch exportiert (einzelne Dateien wie Ordner) · `4` mit „Schnell“
+  bearbeitet, obwohl „Gründlich“ eingestellt ist (Transformer-Modell fehlt; bewusst wählen mit `--schnell`).
+  Bei mehreren Dateien gilt der schwerwiegendste Wert (2 vor 1 vor 3 vor 4 vor 0). Warnungen und Fehler stehen
+  in der Fehlerausgabe (stderr).
 
 ## Aufbau
 

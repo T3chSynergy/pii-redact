@@ -156,7 +156,7 @@ def test_cli_folder(folder, tmp_path, monkeypatch):
     from pii_redact.cli import main
 
     target = tmp_path / "ergebnis"
-    assert main([str(folder), "-o", str(target)]) == 0
+    assert main([str(folder), "-o", str(target), "--schnell"]) == 0
     assert (target / "Verträge" / "akte_geschwaerzt.pdf").is_file()
     assert (target / "protokoll_anonymisiert.md").is_file()
     ws = Workspace.load(target)

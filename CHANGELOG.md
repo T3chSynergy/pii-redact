@@ -2,6 +2,25 @@
 
 ## Unveröffentlicht
 
+**Kontrolle nach dem Export**
+- **Jede geschwärzte Stelle wird einzeln geprüft:** Die Kontrolle sieht jetzt an jeder Schwärzung nach, ob dort
+  noch Text steht. Bisher suchte sie nur den Wortlaut im ganzen Dokument – und übersprang einen Text ganz, sobald
+  er an anderer Stelle bewusst abgewählt war.
+- **Weniger Fehlalarme:** Ein geschwärzter Begriff gilt nicht mehr als „noch vorhanden“, nur weil er Teil eines
+  längeren Wortes ist („Ende“ in „Wochenende“, „4711“ in „14711“). Weiterhin gemeldet wird er als eigenes Wort an
+  einer nicht markierten Stelle, etwa in einem Dateinamen („akte_ende.pdf“); bewusst abgewählte Vorkommen zählen
+  dabei nicht.
+- Die Meldungen sagen, was gefunden wurde: „an der geschwärzten Stelle noch vorhanden“ oder „an anderer Stelle
+  noch lesbar“, jeweils mit Seite. Erklärung in der Hilfe unter „Häufige Fragen“.
+
+**Kommandozeile**
+- **Fehlendes Modell für „Gründlich“ fällt auf:** Ist „Gründlich“ eingestellt und das Transformer-Modell fehlt,
+  wird wie bisher mit „Schnell“ bearbeitet – aber mit dem neuen **Rückgabewert 4** statt 0. Wer „Schnell“ will,
+  wählt es mit `--schnell` oder in den Einstellungen (dann 0). Reihenfolge bei mehreren Dateien: 2 vor 1 vor 3
+  vor 4 vor 0.
+- **Einzelne Dateien mit Texterkennung** werden nicht mehr automatisch exportiert (Rückgabewert 3), wie schon im
+  Ordnerlauf. `--nur-anzeigen` und `--ohne-ocr` arbeiten wie bisher.
+
 **Erkennung**
 - **Geschützte und schmale Leerzeichen:** IBAN, Telefonnummern und andere Nummern wurden nicht erkannt, wenn
   statt normaler Leerzeichen geschützte standen („DE89 3704 …“ aus Satzprogrammen oder der Textverarbeitung).

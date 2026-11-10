@@ -261,7 +261,7 @@ def test_verify_pdf_reports_extras(tmp_path):
     joined = " | ".join(problems)
     for what in ("Kommentare/Markierungen", "Formularfelder", "Lesezeichen", "Dateianhänge", "Metadaten"):
         assert what in joined
-    assert "Erika Musterfrau" in problems  # steht im Kommentartext
+    assert any(p.startswith("Erika Musterfrau – an anderer Stelle") for p in problems)  # steht im Kommentartext
 
 
 def test_to_original_end_expands_partial_placeholder():
@@ -434,6 +434,69 @@ def _load_bytes(tmp_path, data: bytes, name: str = "test.pdf"):
     path = tmp_path / name
     path.write_bytes(data)
     return load_document(path, ocr=False)
+
+
+# ---------------------------------------------------------------- Kontrolle nach dem Export
+def _two_lines(tmp_path, first: str, second: str):
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((72, 100), first)
+    page.insert_text((72, 200), second)
+    pdf.new_page().insert_text((72, 100), "Seite zwei ohne Besonderheiten")
+    return _load_bytes(tmp_path, pdf.tobytes())
+
+
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
+def test_verify_checks_each_redacted_spot(tmp_path, mode):
+    """Geprüft wird die geschwärzte Stelle selbst – auch wenn derselbe Text anderswo bewusst stehen bleibt."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt.", "Briefkopf: Zofia Jaeger")
+    first = _find(doc, "Zofia Jaeger")
+    second = Finding(doc.text.rindex("Zofia Jaeger"), doc.text.rindex("Zofia Jaeger") + 12, "PERSON", "Zofia Jaeger",
+                     active=False)
+    findings = [first, second]
+    assert verify_pdf(redact_pdf(doc, findings, mode), findings, None, doc, mode) == []
+    # Schwärzung ohne Wirkung (unverändertes PDF): früher unbemerkt, weil der Text abgewählt noch einmal vorkommt
+    assert verify_pdf(doc.pdf_bytes, findings, None, doc, mode) == [
+        "Zofia Jaeger – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+
+def test_verify_reports_other_occurrences_but_not_parts_of_words(tmp_path):
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Anhang: akte_ende.pdf, Tel. 4711, Nr. 14711")
+    findings = [_find(doc, "Ende"), _find(doc, "4711", "PHONE_NUMBER")]
+    out = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER)
+    # „Wochenende“ und „14711“ zählen nicht, der Dateiname schon
+    assert verify_pdf(out, findings, None, doc) == ["Ende – an anderer Stelle noch lesbar (Seite 1)"]
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Ohne weiteren Treffer, Nr. 14711")
+    findings = [_find(doc, "Ende")]
+    assert verify_pdf(redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER), findings, None, doc) == []
+
+
+def test_verify_counts_deselected_occurrences(tmp_path):
+    """Drei Vorkommen, eines geschwärzt, eines abgewählt, eines nie markiert → das dritte wird gemeldet."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt an Zofia Jaeger.", "Gruß, Zofia Jaeger")
+    spots = [m.start() for m in __import__("re").finditer("Zofia Jaeger", doc.text)]
+    findings = [Finding(spots[0], spots[0] + 12, "PERSON", "Zofia Jaeger"),
+                Finding(spots[1], spots[1] + 12, "PERSON", "Zofia Jaeger", active=False)]
+    out = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER)
+    assert verify_pdf(out, findings, None, doc) == ["Zofia Jaeger – an anderer Stelle noch lesbar (Seite 1)"]
+    findings.append(Finding(spots[2], spots[2] + 12, "PERSON", "Zofia Jaeger", active=False))
+    assert verify_pdf(out, findings, None, doc) == []
+
+
+def test_verify_area_and_tight_lines(tmp_path):
+    """Frei gezogener Bereich: aller Text darin muss weg sein. Enge Zeilen: Nachbarzeilen zählen nicht."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=700, height=300)
+    for i, line in enumerate(_NEIGHBOURS):
+        page.insert_text((40, 80 + i * 11 * 0.85), line, fontsize=11)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    findings = [_find(doc, "Zofia Jaeger"),
+                Finding(0, 0, "AREA", "", source="manuell", area=(0, 30, 60, 300, 100))]
+    out = redact_pdf(doc, findings, ReplaceMode.NUMBERED)
+    assert verify_pdf(out, findings, None, doc, ReplaceMode.NUMBERED) == []
+    problems = verify_pdf(doc.pdf_bytes, findings, None, doc, ReplaceMode.NUMBERED)
+    assert problems == ["Zofia Jaeger – an der geschwärzten Stelle noch vorhanden (Seite 1)",
+                        "Bereich – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
 
 
 # ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile

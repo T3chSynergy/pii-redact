@@ -83,8 +83,9 @@ class ExportMixin:
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",
-                "Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden "
-                "(z. B. doppelt im PDF enthaltener Text):\n\n• " + "\n• ".join(leftovers[:20]),
+                "Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden:\n\n• "
+                + "\n• ".join(leftovers[:20])
+                + "\n\nWas die Meldungen bedeuten, steht in der Hilfe unter „Häufige Fragen“.",
             )
         else:
             # Erfolg: keine Rückfrage, nur eine Meldung in der Statusleiste (Details im Tooltip)

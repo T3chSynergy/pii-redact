@@ -119,3 +119,31 @@ def test_broken_pdf_is_reported_and_run_continues(work, capsys):
     assert (work / "aus" / "b_brief_anonymisiert.txt").is_file()
     protocol = (work / "aus" / "pii-redact-protokoll.csv").read_text(encoding="utf-8-sig")
     assert "a_defekt.pdf;Fehler" in protocol and "beschädigt" in protocol
+
+
+@needs_model
+def test_missing_thorough_model_is_not_silent(work, capsys, monkeypatch):
+    """„Gründlich“ eingestellt, Modell fehlt: Bearbeitung mit „Schnell“, aber eigener Rückgabewert."""
+    from pii_redact import paths
+
+    monkeypatch.setattr(paths, "find_ner_model", lambda name="": None)
+    assert cli.main([str(work / "brief.txt")]) == cli.FAST_FALLBACK
+    assert "Rückgabewert 4" in capsys.readouterr().err and (work / "brief_anonymisiert.txt").is_file()
+    assert cli.main([str(work / "brief.txt"), "--schnell", "--ueberschreiben"]) == cli.OK       # bewusst gewählt
+    assert cli.worst(cli.FAST_FALLBACK, cli.OK) == cli.FAST_FALLBACK
+    assert cli.worst(cli.FAST_FALLBACK, cli.OCR_SKIPPED) == cli.OCR_SKIPPED
+
+
+@needs_model
+def test_single_file_with_ocr_pages_is_not_exported(work, capsys):
+    from pii_redact.core import ocr
+
+    if not ocr.is_available():
+        pytest.skip("RapidOCR nicht installiert")
+    shutil.copy(SAMPLES / "scan.pdf", work / "scan.pdf")
+    assert cli.main([str(work / "scan.pdf"), "--schnell"]) == cli.OCR_SKIPPED
+    assert "nicht automatisch exportiert" in capsys.readouterr().err
+    assert not (work / "scan_geschwaerzt.pdf").exists()
+    assert cli.main([str(work / "scan.pdf"), "--schnell", "--nur-anzeigen"]) == cli.OK
+    assert cli.main([str(work / "scan.pdf"), "--schnell", "--ohne-ocr"]) == cli.OK      # ohne Texterkennung: wie bisher
+    assert (work / "scan_geschwaerzt.pdf").is_file()
