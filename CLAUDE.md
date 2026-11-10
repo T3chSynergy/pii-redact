@@ -246,7 +246,8 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   Rückfragen die voreingestellte oder eine benannte Schaltfläche (so läuft der echte Dialogcode).
 - **Refactoring** (Plan 10.11.2026, Entscheidungen des Nutzers: Komplexitätsgrenze **12**, mypy später und
   getrennt, Aufbau der Oberfläche gehört dazu). Nur Struktur, kein geändertes Verhalten, je Schritt ein PR:
-  0 Vergleichswerkzeug (erledigt) · 1 Kommandozeile (`main`, `process_folder`, `process_file`) · 2 Laden
+  0 Vergleichswerkzeug (erledigt) · 1 Kommandozeile (erledigt: `build_parser`, `load_settings`,
+  `apply_output_options`, `print_findings`, `open_workspace`, `export_entry`) · 2 Laden
   (`_build_notices`, `_load_pdf`) · 3 Kontrolle (`verify_pdf`, `further_occurrences`) · 4 `pdf_hidden`
   (`has_outside_content`, `_strip`) · 5 Oberfläche Logik (`findings_panel.data`, `export_pdf`,
   `export_unreviewed`, `_refresh_views`; Klicktest des Nutzers) · 6 Oberfläche Aufbau (`_build_ui`,

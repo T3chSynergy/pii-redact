@@ -71,7 +71,7 @@ def summary(findings) -> str:
     return f"{len(findings)} Funde" + (f" ({parts})" if parts else "")
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> _Parser:
     p = _Parser(prog="pii-redact-cli", description="Personenbezogene Daten erkennen und entfernen.")
     p.add_argument("dateien", nargs="*", type=Path, help="PDF-, TXT- oder Markdown-Dateien oder Ordner")
     p.add_argument("--ohne-unterordner", action="store_true", help="bei Ordnern nur die oberste Ebene")
@@ -94,11 +94,12 @@ def main(argv: list[str] | None = None) -> int:
                         "zentrale Vorgaben aus defaults.json gelten weiterhin")
     p.add_argument("--version", action="version", version=f"pii-redact {__version__}")
     p.add_argument("--ohne-ocr", action="store_true", help="gescannte PDF-Seiten nicht per Texterkennung lesen")
-    args = p.parse_args(argv)
-    for stream in (sys.stdout, sys.stderr):
-        with contextlib.suppress(AttributeError, ValueError):
-            stream.reconfigure(encoding="utf-8", errors="replace")
+    return p
 
+
+def load_settings(args, p: _Parser) -> tuple[Settings, bool]:
+    """Einstellungen laden und die Schalter für Texterkennung und Analyse-Modus anwenden. Zweiter Wert: Es wird
+    mit „Schnell“ gearbeitet, obwohl „Gründlich“ eingestellt ist (Modell fehlt)."""
     if args.einstellungen is not None and not args.einstellungen.is_file():
         p.error(f"Einstellungsdatei nicht gefunden: {args.einstellungen}")
     settings = Settings.load(args.einstellungen or settings_path(), defaults_path())
@@ -108,21 +109,22 @@ def main(argv: list[str] | None = None) -> int:
         settings.analysis_mode = AnalysisMode.THOROUGH
     if args.schnell:
         settings.analysis_mode = AnalysisMode.FAST
-    fallback = False
-    if not args.gruendlich and settings.analysis_mode == AnalysisMode.THOROUGH:
-        from .paths import find_ner_model
+    if args.gruendlich or settings.analysis_mode != AnalysisMode.THOROUGH:
+        return settings, False
+    from .paths import find_ner_model
 
-        if find_ner_model(settings.ner_model) is None:
-            # Weniger Treffer als eingestellt – nicht stillschweigend: eigener Rückgabewert, damit Skripte es
-            # bemerken. Wer „Schnell“ will, sagt es mit --schnell oder in den Einstellungen.
-            print("⚠ Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – bearbeitet wird mit „Schnell“ "
-                  f"(weniger Treffer, Rückgabewert {FAST_FALLBACK}). Bewusst wählen mit --schnell.", file=sys.stderr)
-            settings.analysis_mode = AnalysisMode.FAST
-            fallback = True
-    if args.selftest:
-        return selftest(settings)
-    if not args.dateien:
-        p.error("Bitte mindestens eine Datei angeben.")
+    if find_ner_model(settings.ner_model) is not None:
+        return settings, False
+    # Weniger Treffer als eingestellt – nicht stillschweigend: eigener Rückgabewert, damit Skripte es
+    # bemerken. Wer „Schnell“ will, sagt es mit --schnell oder in den Einstellungen.
+    print("⚠ Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – bearbeitet wird mit „Schnell“ "
+          f"(weniger Treffer, Rückgabewert {FAST_FALLBACK}). Bewusst wählen mit --schnell.", file=sys.stderr)
+    settings.analysis_mode = AnalysisMode.FAST
+    return settings, True
+
+
+def apply_output_options(args, settings: Settings, p: _Parser) -> None:
+    """Ersetzungsart und Schwelle aus dem Aufruf übernehmen."""
     if args.modus:
         settings.replace_mode = args.modus
     if args.schwelle is not None:
@@ -130,13 +132,26 @@ def main(argv: list[str] | None = None) -> int:
             p.error("--schwelle erwartet einen Wert zwischen 0 und 1 (zum Beispiel 0.45).")
         settings.threshold = args.schwelle
 
+
+def main(argv: list[str] | None = None) -> int:
+    p = build_parser()
+    args = p.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+    settings, fallback = load_settings(args, p)
+    if args.selftest:
+        return selftest(settings)
+    if not args.dateien:
+        p.error("Bitte mindestens eine Datei angeben.")
+    apply_output_options(args, settings, p)
+
     analyzer = PiiAnalyzer.for_settings(settings)
     rc = FAST_FALLBACK if fallback else OK
     for path in args.dateien:
-        if path.is_dir():
-            rc = worst(rc, process_folder(path, args, settings, analyzer))
-        else:
-            rc = worst(rc, process_file(path, args, settings, analyzer))
+        process = process_folder if path.is_dir() else process_file
+        rc = worst(rc, process(path, args, settings, analyzer))
     return rc
 
 
@@ -145,6 +160,14 @@ def target_for(path: Path, doc, args) -> Path:
     if doc.is_pdf and not args.als_text:
         return out_dir / f"{path.stem}_geschwaerzt.pdf"
     return out_dir / f"{path.stem}_anonymisiert{'.txt' if doc.is_pdf else path.suffix}"
+
+
+def print_findings(doc, findings) -> None:
+    """Funde mit Klartext auflisten: Seite bzw. Zeile, Datenart, Sicherheit, Text."""
+    for f in findings:
+        page = doc.page_of(f.start)
+        where = f"S. {page + 1}" if page is not None else f"Z. {doc.text.count(chr(10), 0, f.start) + 1}"
+        print(f"  {where:>7}  {info(f.entity_type).label:<22} {f.score:.2f}  {f.text!r}")
 
 
 def process_file(path: Path, args, settings: Settings, analyzer) -> int:
@@ -159,10 +182,7 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
         print(f"  ⚠ {path.name}: {w}", file=sys.stderr)
     print(f"{path}: {summary(findings)}")
     if args.nur_anzeigen or args.details:
-        for f in findings:
-            page = doc.page_of(f.start)
-            where = f"S. {page + 1}" if page is not None else f"Z. {doc.text.count(chr(10), 0, f.start) + 1}"
-            print(f"  {where:>7}  {info(f.entity_type).label:<22} {f.score:.2f}  {f.text!r}")
+        print_findings(doc, findings)
     if args.nur_anzeigen:
         return OK
     if doc.has_ocr:
@@ -192,23 +212,63 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
     return OK
 
 
-def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
-    """Ordner vollautomatisch bearbeiten. Bereits in der Oberfläche geprüfte Dateien bleiben
-    unangetastet; alle anderen werden als „automatisch (nicht geprüft)“ protokolliert."""
-    from .core.batch import Status, Workspace, analyze_file
+def open_workspace(source: Path, target: Path, recursive: bool):
+    """Arbeitsstand im Zielordner fortsetzen oder neu anlegen und mit dem Quellordner abgleichen.
+    None (mit Meldung), wenn das nicht geht."""
+    from .core.batch import Workspace
 
-    target = args.ausgabe or source.with_name(source.name + "_geschwaerzt")
     try:
         if Workspace.exists_in(target):
             ws = Workspace.load(target)
             if ws.source != source.resolve():
                 print(f"✗ {target} enthält einen Arbeitsstand für {ws.source}", file=sys.stderr)
-                return ERROR
+                return None
         else:
-            ws = Workspace.create(source, target, recursive=not args.ohne_unterordner)
+            ws = Workspace.create(source, target, recursive=recursive)
         ws.sync_with_disk()
     except (OSError, ValueError) as exc:
         print(f"✗ {source}: {exc}", file=sys.stderr)
+        return None
+    return ws
+
+
+def export_entry(ws, e, settings: Settings, analyzer) -> int:
+    """Eine analysierte Datei des Ordners exportieren – oder zur Prüfung stehen lassen (Texterkennung, Kontrolle
+    vor dem Speichern). Rückgabewert für diese Datei."""
+    from .core.batch import analyze_file
+
+    if e.has_ocr:
+        e.note = "Texterkennung (OCR) – nicht automatisch exportiert, bitte in der Oberfläche prüfen"
+        print(f"  ! {e.rel}: Texterkennung (OCR, Seiten {', '.join(map(str, e.ocr_pages))}) – "
+              "nicht automatisch exportiert, bitte in der Oberfläche prüfen")
+        return OCR_SKIPPED
+    path = ws.abs(e.rel)
+    doc = load_document(path, ocr=settings.ocr)
+    findings = ws.restore_findings(e.rel, doc)
+    if findings is None:
+        res = analyze_file(path, analyzer, settings)
+        ws.set_analysis_result(e.rel, res)
+        findings = res["findings"]
+    held = held_for_check(doc.text, findings)
+    if held is not None:
+        ws.hold_for_check(e.rel, held)
+        print(f"  ! {e.rel}: {CHECK_NOT_AUTO}")
+        return OCR_SKIPPED
+    out = ws.out(e.rel)
+    leftovers = export_document(doc, findings, settings, out)
+    ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)
+    print(f"  → {e.rel}: {e.active_count} Stellen geschwärzt" + (" ⚠ Reste im PDF" if leftovers else ""))
+    return LEFTOVERS if leftovers else OK
+
+
+def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
+    """Ordner vollautomatisch bearbeiten. Bereits in der Oberfläche geprüfte Dateien bleiben
+    unangetastet; alle anderen werden als „automatisch (nicht geprüft)“ protokolliert."""
+    from .core.batch import Status, analyze_file
+
+    target = args.ausgabe or source.with_name(source.name + "_geschwaerzt")
+    ws = open_workspace(source, target, recursive=not args.ohne_unterordner)
+    if ws is None:
         return ERROR
     print(f"Ordner {ws.source} → {ws.target} ({len(ws.entries)} Dateien)")
     rc = OK
@@ -216,40 +276,13 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
         if e.status in (*Status.DONE, Status.MISSING):
             print(f"  = {e.rel}: {Status.LABELS[e.status]}")
             continue
-        path = ws.abs(e.rel)
         try:
             if not e.analyzed:
-                res = analyze_file(path, analyzer, settings)
-                ws.set_analysis_result(e.rel, res)
+                ws.set_analysis_result(e.rel, analyze_file(ws.abs(e.rel), analyzer, settings))
             if args.nur_anzeigen:
                 print(f"  • {e.rel}: {e.active_count} Funde" + (" (Texterkennung)" if e.has_ocr else ""))
                 continue
-            if e.has_ocr:
-                e.note = "Texterkennung (OCR) – nicht automatisch exportiert, bitte in der Oberfläche prüfen"
-                print(f"  ! {e.rel}: Texterkennung (OCR, Seiten {', '.join(map(str, e.ocr_pages))}) – "
-                      "nicht automatisch exportiert, bitte in der Oberfläche prüfen")
-                rc = worst(rc, OCR_SKIPPED)
-                ws.save()
-                continue
-            doc = load_document(path, ocr=settings.ocr)
-            findings = ws.restore_findings(e.rel, doc)
-            if findings is None:
-                res = analyze_file(path, analyzer, settings)
-                ws.set_analysis_result(e.rel, res)
-                findings = res["findings"]
-            held = held_for_check(doc.text, findings)
-            if held is not None:
-                ws.hold_for_check(e.rel, held)
-                print(f"  ! {e.rel}: {CHECK_NOT_AUTO}")
-                rc = worst(rc, OCR_SKIPPED)
-                ws.save()
-                continue
-            out = ws.out(e.rel)
-            leftovers = export_document(doc, findings, settings, out)
-            ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)
-            print(f"  → {e.rel}: {e.active_count} Stellen geschwärzt" + (" ⚠ Reste im PDF" if leftovers else ""))
-            if leftovers:
-                rc = worst(rc, LEFTOVERS)
+            rc = worst(rc, export_entry(ws, e, settings, analyzer))
         except FILE_ERRORS as exc:
             ws.set_error(e.rel, str(exc))
             print(f"  ✗ {e.rel}: {exc}", file=sys.stderr)
