@@ -470,9 +470,12 @@ def surname(text: str) -> str | None:
 
 
 #: Wörter, nach denen ein großgeschriebenes Wort ein gewöhnliches Hauptwort ist und kein allein stehender Nachname
-_NOUN_MARKERS = frozenset("""der die das den dem des ein eine einen einem einer eines kein keine keinen im am vom
-    zum zur beim ins ans aufs mein meine dein deine sein seine ihr ihre unser unsere dieser diese dieses diesen
-    diesem jeder jede jedes jeden jedem""".split())
+_NOUN_MARKERS = frozenset({
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines", "kein", "keine",
+    "keinen", "im", "am", "vom", "zum", "zur", "beim", "ins", "ans", "aufs", "mein", "meine", "dein", "deine", "sein",
+    "seine", "ihr", "ihre", "unser", "unsere", "dieser", "diese", "dieses", "diesen", "diesem", "jeder", "jede",
+    "jedes", "jeden", "jedem",
+})
 
 #: Zeichen, die ein kleingeschriebenes Wort als Teil eines Dateinamens, einer Adresse oder Kennung ausweisen
 _JOINERS = "_-./\\@"
