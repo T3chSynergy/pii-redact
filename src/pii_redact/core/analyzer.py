@@ -130,6 +130,7 @@ class PiiAnalyzer:
         raw = clean_ner(raw, text)
         raw.extend(find_terms(text, settings.all_deny))
         raw.extend(self._cross_line(text, entities, settings.threshold, raw))
+        raw.extend(self._upper_case(text, entities, settings.threshold, raw))
         findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
         for f in findings:
             if hmap:
@@ -157,6 +158,45 @@ class PiiAnalyzer:
         if progress:
             progress(len(chunks), len(chunks))
         return raw
+
+    def _upper_case(self, text: str, entities: list[str], threshold: float, found: list[Finding]) -> list[Finding]:
+        """Namen und Orte in Großbuchstaben („SCHNEIDER, ANNA“, „80331 MÜNCHEN“ – Formulare, Adressfelder).
+
+        Die Namenserkennung und die Muster für Anschriften stützen sich auf die übliche Schreibweise. Zeilen mit
+        Wörtern in Großbuchstaben werden deshalb zusätzlich in normaler Schreibweise geprüft („Schneider, Anna“).
+        Übernommen wird nur, was mindestens ein solches Wort enthält und noch nicht gefunden war – und nur von
+        Erkennern, die auf die Schreibweise angewiesen sind (Namenserkennung, Anschrift, Name nach Anrede);
+        Nummern, E-Mail usw. findet schon der normale Durchgang."""
+        probe_text, upper = normal_case(text)
+        if not upper:
+            return []
+        # nur die betroffenen Zeilen prüfen (Absatz als Trenner, damit nichts über Zeilen hinweg passt)
+        lines, parts, starts, pos = [], [], [], 0
+        for m in re.finditer(r"[^\n]+", text):
+            if any(m.start() <= s < m.end() for s, _e in upper):
+                lines.append((m.start(), m.end()))
+                starts.append(pos)
+                parts.append(probe_text[m.start():m.end()])
+                pos += m.end() - m.start() + 2
+        covered = bytearray(len(text))
+        for f in found:
+            covered[f.start:f.end] = b"\x01" * (f.end - f.start)
+        out = []
+        probe = "\n\n".join(parts)
+        for f in clean_ner(self._run(probe, entities, threshold), probe):
+            k = bisect.bisect_right(starts, f.start) - 1
+            a, b = lines[k]
+            s, e = f.start - starts[k] + a, f.end - starts[k] + a
+            if f.recognizer not in CASE_RECOGNIZERS:
+                continue
+            if f.recognizer in NER_RECOGNIZERS and any(c.isdigit() for c in f.text):
+                continue   # Namen und Orte enthalten keine Ziffern („Iban DE89 …“ hält die Namenserkennung für einen Ort)
+            if e > b or not any(s < ue and us < e for us, ue in upper):
+                continue
+            if all(covered[i] or text[i].isspace() for i in range(s, e)):
+                continue
+            out.append(Finding(s, e, f.entity_type, text[s:e], f.score, recognizer=f.recognizer))
+        return out
 
     def _cross_line(self, text: str, entities: list[str], threshold: float, found: list[Finding]) -> list[Finding]:
         """Nummern über eine Zeilengrenze hinweg (IBAN, Telefon …, z. B. „DE89 3704 0044⏎0532 0130 00“).
@@ -206,6 +246,31 @@ class PiiAnalyzer:
 _SPACES = dict.fromkeys([0x00A0, 0x202F, 0x2007, *range(0x2000, 0x200B)], " ")
 
 
+#: Wörter in Großbuchstaben (ab drei Buchstaben, auch mit Bindestrich: „MÜLLER-LÜDENSCHEID“)
+_UPPER_WORD = re.compile(r"(?<![^\W\d_])[A-ZÄÖÜ][A-ZÄÖÜẞß]{2,}(?:-[A-ZÄÖÜ][A-ZÄÖÜẞß]+)*(?![^\W\d_])")
+
+
+def normal_case(text: str) -> tuple[str, list[tuple[int, int]]]:
+    """Wörter in Großbuchstaben in normaler Schreibweise („SCHNEIDER“ → „Schneider“) – Zeichen für Zeichen,
+    alle Positionen bleiben gleich. Rückgabe: Text und die Bereiche der geänderten Wörter."""
+    chars = None
+    spans = []
+    for m in _UPPER_WORD.finditer(text):
+        if chars is None:
+            chars = list(text)
+        spans.append((m.start(), m.end()))
+        start = True
+        for i in range(m.start(), m.end()):
+            if chars[i] == "-":
+                start = True
+                continue
+            if not start:
+                low = chars[i].lower()
+                chars[i] = low if len(low) == 1 else chars[i]
+            start = False
+    return ("".join(chars) if chars else text), spans
+
+
 def plain_spaces(text: str) -> str:
     """Sonder-Leerzeichen durch normale ersetzen – Zeichen für Zeichen, alle Positionen bleiben gleich."""
     return text.translate(_SPACES)
@@ -247,6 +312,8 @@ def _chunks(text: str, size: int) -> Iterable[tuple[int, int]]:
 
 
 NER_RECOGNIZERS = {"SpacyRecognizer", "OnnxNerRecognizer"}
+#: Erkenner, die auf Groß-/Kleinschreibung angewiesen sind – nur sie zählen im Durchgang für Großschrift
+CASE_RECOGNIZERS = NER_RECOGNIZERS | {"DeAddressRecognizer", "DeTitledPersonRecognizer"}
 
 # Typische Feldbezeichnungen, die spaCy gern als Name/Ort mitnimmt („Berlin\nTelefon“).
 _NER_STOPWORDS = {
@@ -255,6 +322,9 @@ _NER_STOPWORDS = {
     "betreff", "anlage", "anlagen", "seite", "herr", "frau", "hallo", "liebe", "lieber",
     "sehr", "geehrte", "geehrter", "mit", "freundlichen", "grüßen", "grüße", "gruß", "viele",
     "beste", "herzliche", "steuer-id", "personalnr", "personalnummer", "kundennr", "kundennummer", "postfach",
+    # Abkürzungen, die in normaler Schreibweise („Dsgvo“) wie Namen aussehen – siehe PiiAnalyzer._upper_case
+    "geb", "geb.", "dr.", "prof.", "tel.", "mailto", "dsgvo", "bdsg", "bgb", "sgb", "stgb", "hgb", "ihk", "hwk", "aok", "tüv", "adac", "drk",
+    "dhl", "ups", "sepa", "gmbh",
 }
 _NER_SPLIT = re.compile(r"[\n\[\]()<>|*_#=/\\@:;]+")
 

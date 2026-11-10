@@ -52,3 +52,44 @@ def test_recognition_thorough():
     assert r["LOCATION"]["recall"] >= 0.90, r["misses"]
     assert r["PERSON"]["precision"] >= 0.93, r["false_pos"]
     assert len(r["false_pos"]) <= 12, r["false_pos"]
+
+
+def _upper(text: str) -> str:
+    return "".join(c.upper() if len(c.upper()) == 1 else c for c in text)   # längenneutral („ß“ bleibt)
+
+
+def _covered_share(mode: str) -> tuple[float, float]:
+    """Anteil der Soll-Funde (Personen, Orte), die vollständig geschwärzt würden, wenn sie in
+    Großbuchstaben stehen („SCHNEIDER, Anna“) – gleich welche Datenart der Fund trägt."""
+    from pii_redact.core import PiiAnalyzer, Settings
+
+    docs, gold, _neutral = bm.load_gold()
+    settings = Settings(analysis_mode=mode)
+    analyzer = PiiAnalyzer.for_settings(settings)
+    hit = {"PERSON": 0, "LOCATION": 0}
+    total = {"PERSON": 0, "LOCATION": 0}
+    for name, text in docs.items():
+        chars = list(text)
+        for s, e, _typ in gold[name]:
+            chars[s:e] = _upper(text[s:e])
+        text = "".join(chars)
+        covered = bytearray(len(text))
+        for f in analyzer.analyze(text, settings):
+            covered[f.start:f.end] = b"\x01" * (f.end - f.start)
+        for s, e, typ in gold[name]:
+            total[typ] += 1
+            hit[typ] += all(covered[i] or text[i].isspace() for i in range(s, e))
+    return hit["PERSON"] / total["PERSON"], hit["LOCATION"] / total["LOCATION"]
+
+
+def test_recognition_upper_case_fast():
+    """Stand 10.11.2026: Personen 65 %, Orte 69 % (ohne den Durchgang für Großschrift: 12 % und 21 %)."""
+    persons, places = _covered_share("schnell")
+    assert persons >= 0.55 and places >= 0.60, (persons, places)
+
+
+@pytest.mark.skipif(find_ner_model() is None, reason="Transformer-Modell für „Gründlich“ nicht installiert")
+def test_recognition_upper_case_thorough():
+    """Stand 10.11.2026: Personen 95 %, Orte 98 % (ohne den Durchgang für Großschrift: 78 % und 79 %)."""
+    persons, places = _covered_share("gruendlich")
+    assert persons >= 0.90 and places >= 0.90, (persons, places)
