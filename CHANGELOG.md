@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.4 – 10.11.2026
 
 **Sicherheit des Ergebnisses**
 - **Nicht angezeigter Inhalt wird entfernt:** Ein PDF kann Inhalt tragen, den kein PDF-Programm anzeigt – im
