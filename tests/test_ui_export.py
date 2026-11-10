@@ -132,6 +132,21 @@ def test_text_export_with_free_edit_skips_the_check_and_writes_the_edited_text(w
     assert all(f.source != "kontrolle" for f in window.session.findings)
 
 
+def test_text_export_failure_is_reported_and_leaves_no_file(window, tmp_path, monkeypatch):
+    """Scheitert das Schreiben (Ziel schreibgeschützt, Netzlaufwerk getrennt), erscheint eine verständliche
+    Fehlermeldung statt „Unerwarteter Fehler“; das Dokument gilt weiter als ungespeichert."""
+    _text_file(window, tmp_path, "Frau Erika Beispiel wohnt in Musterstadt.")
+    window.session.dirty = True
+    target = tmp_path / "gibt" / "es" / "nicht" / "out.txt"
+    d = Dialogs(monkeypatch, target=target)
+    window.export_text()
+    kind, title, text = d.shown[0]
+    assert (kind, title) == ("critical", "Export fehlgeschlagen") and len(d.shown) == 1
+    assert str(target) in text and "konnte nicht gespeichert werden" in text
+    assert window.session.dirty and not target.exists() and "gespeichert" not in window.status_label.text()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["brief.txt"]      # auch keine .tmp-Datei
+
+
 # ------------------------------------------------------------------ Rückfrage „Kontrolle vor dem Speichern“
 def test_question_before_saving_default_goes_back(window, tmp_path, monkeypatch):
     """Die echte Rückfrage: Voreinstellung ist „Zurück zur Prüfung“ – ein Druck auf die Eingabetaste speichert

@@ -48,7 +48,12 @@ class ExportMixin:
         if Path(path).resolve() == doc.path.resolve():
             QMessageBox.warning(self, "Export", "Das Original darf nicht überschrieben werden.")
             return
-        write_text_safely(Path(path), self.session.output_text())
+        try:
+            write_text_safely(Path(path), self.session.output_text())
+        except OSError as exc:   # Ziel schreibgeschützt, Netzlaufwerk getrennt, Datenträger voll
+            QMessageBox.critical(self, "Export fehlgeschlagen",
+                                 f"Die Datei konnte nicht gespeichert werden:\n{path}\n\n{exc.strerror or exc}")
+            return
         self.session.dirty = False
         self._update_title()
         self._show_saved(Path(path), "Text gespeichert")

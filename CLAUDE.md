@@ -14,7 +14,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 231 Tests (Stand 10.11.2026, `dev` nach 0.8.5: kleine Korrekturen, Nachname allein, strengere ruff-Regeln, Oberflächentests Export – noch unveröffentlicht; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 232 Tests (Stand 10.11.2026, `dev` nach 0.8.5: kleine Korrekturen, Nachname allein, strengere ruff-Regeln, Oberflächentests Export – noch unveröffentlicht; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
