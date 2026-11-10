@@ -107,6 +107,23 @@ sobald ein Fund gewählt ist. So können Sie auch ohne eingeblendetes Original p
 <p>Abgewählte Funde bleiben in der Vorschau <b>grau gestrichelt</b> sichtbar und lassen sich jederzeit wieder
 aktivieren.</p>
 
+<h3><a name="vorkontrolle"></a>Kontrolle vor dem Speichern</h3>
+<p>Beim Exportieren prüft das Programm zuerst, ob ein Text, den Sie schwärzen, noch an einer <b>anderen,
+nicht markierten Stelle</b> steht – zum Beispiel ein Name, der auch in einem Dateinamen vorkommt
+(„antrag_mustermann.pdf“) oder einmal in Großbuchstaben geschrieben ist. Solche Stellen blieben im Ergebnis
+lesbar.</p>
+<ul>
+  <li>Die Stellen kommen als <b>Vorschläge</b> in die Fundliste: Herkunft <i>Kontrolle</i>, noch ohne Häkchen.
+      Der erste ist gleich ausgewählt und wird im Dokument gezeigt.</li>
+  <li>Eine Rückfrage nennt die Stellen. <i>Zurück zur Prüfung</i> (Vorgabe) speichert nichts: Setzen Sie das
+      Häkchen, wo geschwärzt werden soll, und exportieren Sie erneut. <i>Trotzdem speichern</i> lässt die Stellen
+      stehen.</li>
+  <li>Ein Vorschlag, den Sie ohne Häkchen lassen, gilt als entschieden – beim nächsten Export wird nicht noch
+      einmal danach gefragt.</li>
+</ul>
+<p class="klein">Gesucht wird der Text als eigenes Wort bzw. eigene Nummer, ohne Rücksicht auf Groß- und
+Kleinschreibung. Teile längerer Wörter zählen nicht („Ende“ in „Wochenende“).</p>
+
 <h3><a name="textansicht"></a>Bei PDFs auch den Reiter <i>Text</i> lesen</h3>
 <p>Der Reiter <i>Seiten</i> zeigt, was man sieht. Der Reiter <i>Text</i> zeigt, was das Programm aus dem PDF
 <b>gelesen</b> hat – und das kann mehr sein: Text in weißer Schrift auf weißem Grund, Text unter einem Bild oder
@@ -539,11 +556,9 @@ Modus „Schnell“ (findet weniger Namen und Orte – besonders sorgfältig pr�
 <p>Die Kontrolle nennt zu jedem Begriff, was sie gefunden hat:</p>
 <ul>
   <li><b>„an anderer Stelle noch lesbar“</b> (mit Seite): Der Text wurde geschwärzt, kommt aber im Ergebnis noch
-      einmal vor – an einer Stelle, die nicht als Fund markiert war, etwa in einem Dateinamen
-      („antrag_mustermann.pdf“) oder in anderer Schreibweise. Suchen Sie den Begriff auf der genannten Seite,
-      schwärzen Sie die Stelle (am einfachsten mit <i>Alle Vorkommen schwärzen als …</i>) und exportieren Sie
-      erneut. Vorkommen, die Sie bewusst abgewählt haben, werden nicht gemeldet; Teile längerer Wörter auch
-      nicht („Ende“ in „Wochenende“).</li>
+      einmal vor. Im Dokumenttext fängt das schon die <a href="#vorkontrolle">Kontrolle vor dem Speichern</a>
+      ab; die Meldung erscheint danach nur noch, wenn der Text außerhalb davon steckt oder das Ergebnis ohne
+      Rückfrage entstanden ist (Ordner automatisch exportiert, Kommandozeile).</li>
   <li><b>„an der geschwärzten Stelle noch vorhanden“:</b> Die Schwärzung selbst hat an dieser Stelle nicht
       gewirkt. Geben Sie das Ergebnis nicht weiter und wenden Sie sich an die IT.</li>
 </ul>

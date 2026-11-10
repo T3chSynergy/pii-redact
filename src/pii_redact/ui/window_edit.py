@@ -94,6 +94,8 @@ class EditMixin:
                 lines.append(f"{info(f.entity_type).label}: {f.text}  ({state}){ocr}")
                 if f.source == "ki":
                     lines.append(f"  Vorschlag der {f.recognizer}" if f.recognizer else "  Vorschlag der KI-Nachprüfung")
+                elif f.source == "kontrolle":
+                    lines.append("  Vorschlag der Kontrolle: Dieser Text wird an anderer Stelle geschwärzt")
         return "\n".join(lines)
 
     def _redacted_tooltip(self, offset: int) -> str:

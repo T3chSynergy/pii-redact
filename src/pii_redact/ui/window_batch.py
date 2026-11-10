@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressD
 from ..core import UnsupportedFileError
 from ..core.batch import Status, Workspace, export_document
 from .batch_panel import NewBatchDialog, confirm_auto_export, status_style
+from .window_export import ELSEWHERE
 
 OCR_NOT_AUTO = "Texterkennung (OCR) – wird nicht automatisch exportiert, bitte einzeln prüfen"
 
@@ -251,6 +252,10 @@ class BatchMixin:
         rel = self.batch_rel
         if not self._confirm_ocr(self.session.doc):
             return
+        accepted = self._confirm_further()
+        if accepted is None:
+            self._store_batch_session()   # Vorschläge der Kontrolle im Arbeitsstand festhalten
+            return
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             leftovers = self._export_entry(rel, True, self.session.findings, self.session.doc)
@@ -261,6 +266,8 @@ class BatchMixin:
         QApplication.restoreOverrideCursor()
         self.session.dirty = False
         self._save_batch()
+        if accepted:   # vor dem Speichern gezeigt und bewusst belassen – nicht erneut melden
+            leftovers = [x for x in leftovers if ELSEWHERE not in x]
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",

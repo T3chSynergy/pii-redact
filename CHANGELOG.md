@@ -13,6 +13,14 @@
 - Die Meldungen sagen, was gefunden wurde: „an der geschwärzten Stelle noch vorhanden“ oder „an anderer Stelle
   noch lesbar“, jeweils mit Seite. Erklärung in der Hilfe unter „Häufige Fragen“.
 
+- **Kontrolle vor dem Speichern:** Steht ein geschwärzter Text noch an einer nicht markierten Stelle (etwa ein
+  Name im Dateinamen „antrag_mustermann.pdf“ oder in Großbuchstaben), fragt das Programm jetzt **vor** dem
+  Speichern nach, statt danach zu warnen. Die Stellen kommen als Vorschläge in die Fundliste (Herkunft
+  „Kontrolle“, ohne Häkchen), der erste wird gleich gezeigt. „Zurück zur Prüfung“ speichert nichts, „Trotzdem
+  speichern“ lässt sie stehen; ein Vorschlag ohne Häkchen gilt als entschieden. Gilt für PDF- und Text-Export
+  und für „Geprüft & weiter“ im Ordner. Der automatische Export und die Kommandozeile fragen nicht – dort meldet
+  weiterhin die Kontrolle nach dem Export.
+
 **Kommandozeile**
 - **Fehlendes Modell für „Gründlich“ fällt auf:** Ist „Gründlich“ eingestellt und das Transformer-Modell fehlt,
   wird wie bisher mit „Schnell“ bearbeitet – aber mit dem neuen **Rückgabewert 4** statt 0. Wer „Schnell“ will,

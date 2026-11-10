@@ -11,6 +11,7 @@ from pathlib import Path
 import pymupdf as fitz  # PyMuPDF
 
 from .entities import info
+from .analyzer import word_pattern
 from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
 from .pdf_hidden import has_layers, has_outside_content
@@ -523,19 +524,6 @@ def _squash(text: str) -> str:
     return re.sub(r"\s+", "", text).casefold()
 
 
-def _word_pattern(text: str) -> re.Pattern | None:
-    """Suchmuster für den Text eines Fundes: Leerraum beliebig, und nicht als Teil eines längeren Wortes bzw.
-    einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“)."""
-    words = join_hyphenated(text).split()
-    if not words or len("".join(words)) < 3:
-        return None
-    core = r"\s*".join(re.escape(w) for w in words)
-    first, last = words[0][0], words[-1][-1]
-    before = r"(?<![^\W\d_])" if first.isalpha() else r"(?<!\d)" if first.isdigit() else ""
-    after = r"(?![^\W\d_])" if last.isalpha() else r"(?!\d)" if last.isdigit() else ""
-    return re.compile(before + core + after, re.IGNORECASE)
-
-
 def _other_occurrences(findings: list[Finding], page_texts: list[str], other: list[str], reported: set[str]) -> list[str]:
     """Texte aktiver Funde, die im Ergebnis noch vorkommen – auf den Seiten öfter, als sie bewusst abgewählt
     wurden, oder in Kommentaren, Formularfeldern, Lesezeichen und Metadaten."""
@@ -550,7 +538,7 @@ def _other_occurrences(findings: list[Finding], page_texts: list[str], other: li
     for f in findings:
         if not f.active or f.area is not None or f.text in reported:
             continue
-        pattern = _word_pattern(f.text)
+        pattern = word_pattern(f.text)
         if pattern is None:
             continue
         hits = [pno for pno, text in enumerate(pages) for _ in pattern.finditer(text)]

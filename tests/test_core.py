@@ -499,6 +499,46 @@ def test_verify_area_and_tight_lines(tmp_path):
                         "Bereich – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
 
 
+# ---------------------------------------------------------------- Kontrolle vor dem Speichern: weitere Vorkommen
+def test_further_occurrences_become_inactive_suggestions():
+    from pii_redact.core.analyzer import further_occurrences
+
+    text = ("Herr Deniz Kaya stellt den Antrag.\nAnhang: antrag_kaya.pdf, Rückfragen an KAYA oder Frau Kayala.\n"
+            "Am Wochenende war Herr Ende nicht erreichbar, Tel. 4711 (nicht 14711).\nGruß, Deniz Kaya")
+    def at(needle, typ, nth=0, active=True):
+        pos = [m.start() for m in __import__("re").finditer(needle, text)][nth]
+        return Finding(pos, pos + len(needle), typ, needle, active=active)
+
+    findings = [at("Kaya", "PERSON"), at("Ende", "PERSON"), at("4711", "PHONE_NUMBER")]
+    # Satzzeichen am Rand eines Fundes gehören nicht zum gesuchten Text
+    assert [f.text for f in further_occurrences("Fragen an Herrn KAYA. Anhang: antrag_kaya.pdf",
+                                                [Finding(16, 21, "PERSON", "KAYA.")])] == ["kaya"]
+    new = further_occurrences(text, findings)
+    # im Dateinamen, in Großbuchstaben und im Gruß – nicht „Kayala“, „Wochenende“, „14711“
+    assert [(f.text, text[max(f.start - 7, 0):f.start]) for f in new] == [("kaya", "antrag_"), ("KAYA", "gen an "), ("Kaya", " Deniz ")]
+    assert all(f.source == "kontrolle" and not f.active and f.entity_type == "PERSON" for f in new)
+    assert all(text[f.start:f.end] == f.text for f in new)
+    # mit den Vorschlägen in der Liste (auch unbestätigt) wird nichts erneut vorgeschlagen
+    assert further_occurrences(text, findings + new) == []
+    # eine abgewählte Stelle ist eine Entscheidung; ein abgewählter Fund löst selbst keine Suche aus
+    kept = at("Kaya", "PERSON", nth=2, active=False)   # das „Kaya“ im Gruß
+    assert [f.text for f in further_occurrences(text, findings + [kept])] == ["kaya", "KAYA"]
+    assert further_occurrences(text, [at("Kaya", "PERSON", active=False)]) == []
+
+
+def test_further_occurrences_across_hyphenation_and_special_spaces():
+    from pii_redact.core.analyzer import further_occurrences
+
+    text = "Frau Zofia Jaeger wohnt in Bergenthal.\nUnterlagen von Zofia\u00a0Jaeger aus Bergen-\nthal liegen vor."
+    findings = [_find_text(text, "Zofia Jaeger"), _find_text(text, "Bergenthal", "LOCATION")]
+    assert [f.text for f in further_occurrences(text, findings)] == ["Zofia\u00a0Jaeger", "Bergen-\nthal"]
+
+
+def _find_text(text: str, needle: str, typ: str = "PERSON") -> Finding:
+    s = text.index(needle)
+    return Finding(s, s + len(needle), typ, needle)
+
+
 # ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile
 _NEIGHBOURS = ("Die Bearbeitung liegt bei der Abteilung Finanzen im Haus (Äpfel, Übung, gyp).",
                "Zuständig ist dort Frau Zofia Jaeger aus dem zweiten Stock, Telefon 030 1234567.",

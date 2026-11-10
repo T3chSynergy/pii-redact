@@ -191,6 +191,13 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   abgewählt → „an anderer Stelle noch lesbar“. (3) ist gewollt: `samples/mail_mit_scan.pdf` meldet so „Kaya“
   (steht noch im Dateinamen `antrag_kaya.pdf`) und „Anwohnerparkausweis“ (einmal fälschlich als Person
   geschwärzt, einmal nicht). Ohne `doc` läuft nur (1) und (3).
+- **Kontrolle vor dem Speichern** (seit 10.11.2026, Wunsch des Nutzers): `analyzer.further_occurrences` sucht den
+  Wortlaut aktiver Funde im Dokumenttext an Stellen, die kein Fund berührt → nicht aktivierte Vorschläge
+  `source="kontrolle"` (bleiben wie `ki` bei neuer Analyse erhalten; ein abgewählter Vorschlag ist eine
+  Entscheidung und wird nicht erneut vorgeschlagen). `ExportMixin._confirm_further` (PDF-/Text-Export,
+  „Geprüft & weiter“): Vorschläge in die Fundliste, ersten wählen, Rückfrage `_ask_further` (in Tests ersetzen).
+  Nach „Trotzdem speichern“ blendet die Oberfläche die Meldungen „an anderer Stelle noch lesbar“ der Kontrolle
+  nach dem Export aus. Automatischer Export und Kommandozeile fragen nicht.
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen
