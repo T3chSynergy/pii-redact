@@ -40,6 +40,9 @@ from .core.entities import info
 from .settings_store import defaults_path, settings_path
 
 OK, ERROR, LEFTOVERS, OCR_SKIPPED = 0, 1, 2, 3
+#: Fehler an einer einzelnen Datei – melden und mit der nächsten weitermachen. RuntimeError deckt Fehler der
+#: PDF-Bibliothek bei defekten Dateien ab (die Modell-Fehler sind ebenfalls RuntimeError).
+FILE_ERRORS = (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError, RuntimeError)
 _SEVERITY = {OK: 0, OCR_SKIPPED: 1, ERROR: 2, LEFTOVERS: 3}
 
 
@@ -138,7 +141,7 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
     try:
         doc = load_document(path, ocr=settings.ocr)
         findings = analyzer.analyze(doc.text, settings)
-    except (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError) as exc:
+    except FILE_ERRORS as exc:
         print(f"✗ {path}: {exc}", file=sys.stderr)
         return ERROR
 
@@ -160,7 +163,7 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
         return ERROR
     try:
         rest = export_document(doc, findings, settings, target, as_text=args.als_text)
-    except OSError as exc:
+    except FILE_ERRORS as exc:
         print(f"✗ {path}: {exc}", file=sys.stderr)
         return ERROR
     print(f"  → {target}")
@@ -221,7 +224,7 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
             print(f"  → {e.rel}: {e.active_count} Stellen geschwärzt" + (" ⚠ Reste im PDF" if leftovers else ""))
             if leftovers:
                 rc = worst(rc, LEFTOVERS)
-        except (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError) as exc:
+        except FILE_ERRORS as exc:
             ws.set_error(e.rel, str(exc))
             print(f"  ✗ {e.rel}: {exc}", file=sys.stderr)
             rc = worst(rc, ERROR)

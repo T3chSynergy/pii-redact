@@ -98,3 +98,24 @@ def test_return_code_keeps_most_severe(work, monkeypatch):
     assert cli.main([missing, str(work / "brief.txt"), "--schnell"]) == cli.ERROR
     monkeypatch.setattr(cli, "export_document", lambda *a, **k: ["Text „Muster“ auf Seite 1"])
     assert cli.main([missing, str(work / "brief.txt"), "--schnell", "--ueberschreiben"]) == cli.LEFTOVERS
+
+
+@needs_model
+def test_broken_pdf_is_reported_and_run_continues(work, capsys):
+    """Ein defektes PDF beendet den Lauf nicht – weder bei einzelnen Dateien noch im Ordner."""
+    (work / "defekt.pdf").write_bytes(b"%PDF-1.4\nkaputt")
+    (work / "leer.pdf").write_bytes(b"")
+    rc = cli.main([str(work / "defekt.pdf"), str(work / "leer.pdf"), str(work / "brief.txt"), "--schnell"])
+    err = capsys.readouterr().err
+    assert rc == cli.ERROR and err.count("beschädigt oder kein gültiges PDF") == 2
+    assert (work / "brief_anonymisiert.txt").is_file()
+
+    source = work / "ordner"
+    source.mkdir()
+    (source / "a_defekt.pdf").write_bytes(b"%PDF-1.4\nkaputt")
+    shutil.copy(SAMPLES / "beispiel.txt", source / "b_brief.txt")
+    rc = cli.main([str(source), "-o", str(work / "aus"), "--schnell"])
+    assert rc == cli.ERROR
+    assert (work / "aus" / "b_brief_anonymisiert.txt").is_file()
+    protocol = (work / "aus" / "pii-redact-protokoll.csv").read_text(encoding="utf-8-sig")
+    assert "a_defekt.pdf;Fehler" in protocol and "beschädigt" in protocol

@@ -1,5 +1,31 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Erkennung**
+- **Geschützte und schmale Leerzeichen:** IBAN, Telefonnummern und andere Nummern wurden nicht erkannt, wenn
+  statt normaler Leerzeichen geschützte standen („DE89 3704 …“ aus Satzprogrammen oder der Textverarbeitung).
+  Solche Leerzeichen zählen jetzt wie normale – auch in Sperr- und Ausnahmeliste.
+- **Geburtsdatum mit Stern:** „*17.11.1984“ und „† 12.01.2020“ werden ohne Kontextwort als Datum erkannt
+  (nicht bei Markdown-Hervorhebung wie „*12.03.2024*“).
+- **Postfach:** „Postfach 10 20 30“ wird als Adresse erkannt. Die Wörter „Postfach“, „Personalnr“ und „Kundennr“
+  allein gelten nicht mehr als Ort.
+
+**Fehlerbehebung**
+- **Kommandozeile:** Ein defektes oder leeres PDF beendete den ganzen Lauf mit einer Fehlerausgabe des
+  Programms; im Ordnerlauf blieben die folgenden Dateien unbearbeitet. Jetzt wird die Datei gemeldet
+  („beschädigt oder kein gültiges PDF“, Rückgabewert 1) und der Lauf geht weiter.
+- **Protokoll:** Dateinamen, die mit `=`, `+`, `-` oder `@` beginnen, las Excel im Protokoll als Formel. Solche
+  Zellen beginnen jetzt mit einem Hochkomma und bleiben Text.
+
+**KI-Nachprüfung**
+- Die Einstellungen warnen bei einer unverschlüsselten Server-Adresse (`http://`, außer zum eigenen Rechner).
+
+**Intern**
+- GitHub Actions sind in den Workflows per Commit-SHA festgelegt; `.github/dependabot.yml` hält sie mit
+  Pull Requests gegen `dev` aktuell (nur Actions, keine Python-Pakete).
+- `pyproject.toml`: Python ab 3.12 (getestet werden 3.12 bis 3.14).
+
 ## 0.8.4 – 10.11.2026
 
 **Sicherheit des Ergebnisses**

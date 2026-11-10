@@ -146,7 +146,8 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 169 Tests (Stand 10.11.2026; Stand v
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
   (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
-  `pytest`. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
+  `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
+  PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
   (`PII_REDACT_PYTHON=python`, `QT_QPA_PLATFORM=offscreen`) bei Release, bei PRs, die Build-Dateien ändern,
   und auf Knopfdruck; ZIP als Artefakt, bei Release als Anhang + Herkunftsnachweis (Attestation, nur bei
@@ -189,6 +190,9 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
   Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
   Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
+- **Sonder-Leerzeichen** (seit 10.11.2026): `analyzer.plain_spaces` ersetzt U+00A0, U+202F, U+2007 und
+  U+2000–U+200A längenneutral durch normale Leerzeichen – in `analyze()`, `find_terms()` und der Ausnahmeliste.
+  `f.text` wird am Ende immer aus dem Original gesetzt (Wortlaut des Dokuments).
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.

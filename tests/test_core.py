@@ -6,7 +6,9 @@ import pymupdf
 import pytest
 import spacy
 
-from pii_redact.core import Finding, PiiAnalyzer, ReplaceMode, Settings, load_document, redact_pdf, redact_text, verify_pdf
+from pii_redact.core import (
+    Finding, PiiAnalyzer, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, redact_text, verify_pdf,
+)
 from pii_redact.core.analyzer import apply_allow_list, clean_ner, find_terms, merge_overlaps
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
@@ -372,6 +374,54 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     for rest in ("DE89", "3704", "0044", "0532", "0130", "040", "55512345", "170839", "J"):
         assert rest not in words, rest
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
+
+
+# ---------------------------------------------------------------- Sonder-Leerzeichen, Stern-Datum, Postfach
+def test_plain_spaces_keeps_positions():
+    from pii_redact.core.analyzer import plain_spaces
+
+    text = "DE89\u00a03704\u202f0044\u20070532\u2009x"
+    assert plain_spaces(text) == "DE89 3704 0044 0532 x" and len(plain_spaces(text)) == len(text)
+
+
+@needs_model
+def test_special_spaces_do_not_hide_numbers(analyzer):
+    """Geschützte und schmale Leerzeichen (Satzprogramme, Textverarbeitung) in IBAN und Telefonnummer."""
+    text = "Frau Zofia\u00a0Jaeger, IBAN DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000, Tel.\u202f030\u202f1234567"
+    found = {f.entity_type: f for f in analyzer.analyze(text, Settings())}
+    assert found["IBAN_CODE"].text == "DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000"     # Wortlaut des Dokuments
+    assert found["PHONE_NUMBER"].text == "030\u202f1234567"
+    assert all(text[f.start:f.end] == f.text for f in found.values())
+    lists = Settings(deny_list=["Projekt Adler"], allow_list=["Zofia Jaeger"])
+    hits = analyzer.analyze("Frau Zofia\u00a0Jaeger leitet Projekt\u00a0Adler.", lists)
+    assert [(f.text, f.entity_type) for f in hits] == [("Projekt\u00a0Adler", "CUSTOM")]
+
+
+@needs_model
+@pytest.mark.parametrize("text, dates", [
+    ("Yılmaz, Ayşe, *17.11.1984, Köln", ["17.11.1984"]),
+    ("Jaeger, Zofia (* 3.5.62, † 12.01.2020)", ["3.5.62", "12.01.2020"]),
+    ("Termin am *12.03.2024* und **13.03.2024**, Fußnote* 14.03.2024, Faktor 5*15.03.2024", []),
+    ("Der Unfall ereignete sich am 03.05.2024 gegen 14 Uhr.", []),
+])
+def test_birth_date_with_star(analyzer, text, dates):
+    assert [f.text for f in analyzer.analyze(text, Settings()) if f.entity_type == "DATE_TIME"] == dates
+
+
+@needs_model
+def test_post_office_box_and_field_labels(analyzer):
+    text = "Postfach 10 20 30, 10117 Berlin. Bitte ans Postfach senden. Personalnr. und Kundennr. angeben."
+    hits = [(f.text, f.entity_type) for f in analyzer.analyze(text, Settings())]
+    assert ("Postfach 10 20 30", "DE_ADDRESS") in hits
+    assert not any(t in ("Postfach", "Personalnr", "Kundennr") for t, _ in hits), hits
+
+
+@pytest.mark.parametrize("data", [b"%PDF-1.4\nkaputt", b""], ids=["defekt", "leer"])
+def test_broken_pdf_gives_clear_message(tmp_path, data):
+    path = tmp_path / "defekt.pdf"
+    path.write_bytes(data)
+    with pytest.raises(UnsupportedFileError, match="beschädigt oder kein gültiges PDF"):
+        load_document(path)
 
 
 # ---------------------------------------------------------------- Helfer für erzeugte PDFs

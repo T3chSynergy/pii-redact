@@ -239,7 +239,10 @@ def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key, text_rects: 
 
 def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     data = path.read_bytes()
-    doc = fitz.open(stream=data, filetype="pdf")
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except (fitz.FileDataError, fitz.EmptyFileError) as exc:
+        raise UnsupportedFileError("Die Datei ist beschädigt oder kein gültiges PDF.") from exc
     if doc.needs_pass:
         raise UnsupportedFileError("Das PDF ist passwortgeschützt.")
 

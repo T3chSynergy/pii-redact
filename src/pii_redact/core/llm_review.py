@@ -140,6 +140,12 @@ def host_of(settings: Settings) -> str:
     return urlparse(endpoint(settings)).netloc or "?"
 
 
+def is_unencrypted(url: str) -> bool:
+    """Ginge die Anfrage unverschlüsselt über das Netz? (``http://`` – außer zum eigenen Rechner)"""
+    parts = urlparse((url or "").strip())
+    return parts.scheme.lower() == "http" and (parts.hostname or "") not in ("localhost", "127.0.0.1", "::1")
+
+
 def is_configured(settings: Settings) -> bool:
     return bool(settings.llm_enabled and endpoint(settings) and (settings.llm_model or "").strip())
 

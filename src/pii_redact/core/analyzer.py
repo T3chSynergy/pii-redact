@@ -124,17 +124,17 @@ class PiiAnalyzer:
         # Silbentrennung am Zeilenende aufheben („Bergen-⏎thaler“): Erkennung auf dem zusammengefügten Text,
         # die Funde werden am Ende auf den Originaltext zurückgerechnet und decken dann beide Zeilen ab.
         original = text
-        text, hmap = dehyphenate(original)
+        text, hmap = dehyphenate(plain_spaces(original))
         entities = [e for e in settings.entities if e != "CUSTOM"]
         raw = self._run(text, entities, settings.threshold, progress)
         raw = clean_ner(raw, text)
         raw.extend(find_terms(text, settings.all_deny))
         raw.extend(self._cross_line(text, entities, settings.threshold, raw))
         findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
-        if hmap:
-            for f in findings:
+        for f in findings:
+            if hmap:
                 f.start, f.end = hmap.span(f.start, f.end)
-                f.text = original[f.start:f.end]
+            f.text = original[f.start:f.end]   # Wortlaut des Dokuments (mit Trennung und Sonder-Leerzeichen)
         return findings
 
     def _run(self, text: str, entities: list[str], threshold: float,
@@ -200,6 +200,17 @@ class PiiAnalyzer:
 
 
 # ---------------------------------------------------------------------- Helfer
+# Leerzeichen-Varianten, wie sie Satzprogramme und Textverarbeitung setzen: geschützt (U+00A0), schmal
+# geschützt (U+202F), Ziffernbreite (U+2007) und die festen Breiten U+2000–U+200A. Die Muster für IBAN,
+# Telefon usw. kennen nur das normale Leerzeichen („DE89 3704 …“ mit geschützten Leerzeichen blieb unerkannt).
+_SPACES = dict.fromkeys([0x00A0, 0x202F, 0x2007, *range(0x2000, 0x200B)], " ")
+
+
+def plain_spaces(text: str) -> str:
+    """Sonder-Leerzeichen durch normale ersetzen – Zeichen für Zeichen, alle Positionen bleiben gleich."""
+    return text.translate(_SPACES)
+
+
 # Zeilenende mit Ziffer/Buchstabe, nächste Zeile (im selben Absatz) beginnt mit einer Ziffer, „+“ (Vorwahl)
 # oder einem einzelnen Großbuchstaben vor einer Ziffer (Rentenversicherungsnummer „65 170839⏎J 00 3“)
 _NUMBER_BREAK = re.compile(r"(?<=[0-9A-Za-z])[ \t]*\n(?=[ \t]*(?:[0-9+]|[A-Z][ \t]?\d))")
@@ -243,7 +254,7 @@ _NER_STOPWORDS = {
     "datum", "ort", "name", "vorname", "nachname", "iban", "bic", "straße", "strasse", "plz",
     "betreff", "anlage", "anlagen", "seite", "herr", "frau", "hallo", "liebe", "lieber",
     "sehr", "geehrte", "geehrter", "mit", "freundlichen", "grüßen", "grüße", "gruß", "viele",
-    "beste", "herzliche", "steuer-id",
+    "beste", "herzliche", "steuer-id", "personalnr", "personalnummer", "kundennr", "kundennummer", "postfach",
 }
 _NER_SPLIT = re.compile(r"[\n\[\]()<>|*_#=/\\@:;]+")
 
@@ -330,10 +341,10 @@ def merge_overlaps(findings: list[Finding], text: str) -> list[Finding]:
 def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> list[Finding]:
     """Alle Vorkommen der Begriffe (ohne Groß-/Kleinschreibung, ganze Wörter) – auch über eine
     Silbentrennung am Zeilenende hinweg („Bergen-⏎thaler“ für „Bergenthaler“)."""
-    joined, hmap = dehyphenate(text)
+    joined, hmap = dehyphenate(plain_spaces(text))
     out = []
     for term in terms:
-        term = join_hyphenated(term.strip())
+        term = join_hyphenated(plain_spaces(term).strip())
         if not term:
             continue
         pattern = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
@@ -344,7 +355,7 @@ def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> 
 
 
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
-    allowed = {join_hyphenated(a.strip()).casefold() for a in allow_list if a.strip()}
+    allowed = {join_hyphenated(plain_spaces(a).strip()).casefold() for a in allow_list if a.strip()}
     if not allowed:
         return findings
-    return [f for f in findings if join_hyphenated(f.text.strip()).casefold() not in allowed]
+    return [f for f in findings if join_hyphenated(plain_spaces(f.text).strip()).casefold() not in allowed]
