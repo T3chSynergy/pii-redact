@@ -13,6 +13,7 @@ import pymupdf as fitz  # PyMuPDF
 from .entities import info
 from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
+from .pdf_hidden import has_layers, has_outside_content
 from .models import Finding, ReplaceMode, Settings
 
 BLACK_CHAR = "█"
@@ -148,17 +149,41 @@ def finding_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int, 
     cache = doc.__dict__.setdefault("_rect_cache", {})
     if (start, end) not in cache:
         cache[(start, end)] = _compute_rects(doc, start, end)
-    return [(page, fitz.Rect(rect)) for page, rect in cache[(start, end)]]
+    return [(page, fitz.Rect(rect)) for page, rect, _core in cache[(start, end)]]
+
+
+def text_removal_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int, fitz.Rect]]:
+    """Wie :func:`finding_rects`, aber in der Höhe auf die Zeilenmitte verkleinert – zum Entfernen des Textes.
+
+    MuPDF entfernt jedes Zeichen, dessen Rahmen (ohne etwa ein Zehntel oben und unten, gemessen mit
+    PyMuPDF 1.28) das Schwärzungsrechteck überlappt. Die Zeichenrahmen reichen über Ober- und Unterlänge der
+    Schrift; bei engem Zeilenabstand ragen sie in die Nachbarzeilen, und ein Rechteck in voller Höhe nähme dort
+    Text mit. Ein schmales Band durch die Mitte der Zeichen trifft nur die eigene Zeile."""
+    finding_rects(doc, start, end)  # füllt den Zwischenspeicher
+    return [(page, fitz.Rect(core)) for page, _rect, cores in doc.__dict__["_rect_cache"].get((start, end), [])
+            for core in cores]
 
 
 #: Zusätzlicher Rand (pt) um Schwärzungen in per OCR gelesenem Text – dessen Positionen sind
 #: nur angenähert (Wortrahmen, gleichmäßig auf die Buchstaben verteilt).
 OCR_PAD_X = 2.5
 OCR_PAD_Y = 1.5
+#: Anteil der Zeichenhöhe, um den das Rechteck zum Entfernen des Textes oben und unten verkleinert wird.
+TEXT_INSET = 0.35
+#: Haben die Zeichen einer Zeile kein gemeinsames Band von mindestens dieser Höhe (pt) – gemischte
+#: Schriftgrößen, hochgestellte Zeichen, senkrechter Text –, bekommt jedes Zeichen sein eigenes.
+MIN_CORE_HEIGHT = 1.0
 
 
-def _compute_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int, fitz.Rect]]:
+def _core(r: fitz.Rect) -> fitz.Rect:
+    return fitz.Rect(r.x0, r.y0 + TEXT_INSET * r.height, r.x1, r.y1 - TEXT_INSET * r.height)
+
+
+def _compute_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int, fitz.Rect, list[fitz.Rect]]]:
+    """(Seite, Rechteck, Kern-Rechtecke) je Zeile. Der Kern ist das Band, das alle Zeichen der Zeile in ihrer
+    Mitte schneidet (siehe :func:`text_removal_rects`)."""
     groups: dict[tuple[int, int], fitz.Rect] = {}
+    chars: dict[tuple[int, int], list[fitz.Rect]] = {}
     ocr_groups: set[tuple[int, int]] = set()
     for i in range(max(start, 0), min(end, len(doc.char_boxes))):
         box = doc.char_boxes[i]
@@ -170,15 +195,23 @@ def _compute_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int,
         key = (box.page, box.line)
         if box.ocr:
             ocr_groups.add(key)
+        chars.setdefault(key, []).append(_core(r))
         if key in groups:
             groups[key] |= r
         else:
             groups[key] = r
     out = []
     for key, rect in groups.items():
+        top, bottom = max(c.y0 for c in chars[key]), min(c.y1 for c in chars[key])
         if key in ocr_groups:
+            # Positionen aus der Texterkennung sind nur angenähert – großzügig und in voller Höhe
             rect = fitz.Rect(rect.x0 - OCR_PAD_X, rect.y0 - OCR_PAD_Y, rect.x1 + OCR_PAD_X, rect.y1 + OCR_PAD_Y)
-        out.append((key[0], rect))
+            cores = [fitz.Rect(rect)]
+        elif bottom - top >= MIN_CORE_HEIGHT or len(chars[key]) == 1:
+            cores = [fitz.Rect(rect.x0, top, rect.x1, bottom)]
+        else:
+            cores = chars[key]
+        out.append((key[0], rect, cores))
     return out
 
 
@@ -187,6 +220,11 @@ def pdf_redaction_plan(
 ) -> list[tuple[int, fitz.Rect, str | None, list[int]]]:
     """Liste von (Seite, Rechteck, Beschriftung, Fund-IDs) – genutzt für Export UND Vorschau,
     damit beide garantiert übereinstimmen."""
+    return _text_plan(doc, findings, mode, labels) + _area_plan(doc, findings, mode, labels)
+
+
+def _text_plan(doc: LoadedDocument, findings: list[Finding], mode: str, labels: bool) -> list:
+    """Textstellen: (Seite, Rechteck, Beschriftung, Fund-IDs)."""
     groups = active_groups(findings)
     tokens = replacement_tokens([g[0] for g in groups], mode)
     plan = []
@@ -198,12 +236,32 @@ def pdf_redaction_plan(
             if labels and mode != ReplaceMode.BLACKOUT and i == 0:
                 label = tokens[g[0].id]
             plan.append((page, rect, label, ids))
+    return plan
+
+
+def _area_plan(doc: LoadedDocument, findings: list[Finding], mode: str, labels: bool) -> list:
+    """Frei gezogene Bereiche: (Seite, Rechteck, Beschriftung, Fund-IDs)."""
+    plan = []
     for f in findings:
         if f.active and f.area is not None and 0 <= int(f.area[0]) < max(doc.page_count, 1):
             page, rect = area_rect(f)
             label = f"[{info(f.entity_type).token}]" if labels and mode != ReplaceMode.BLACKOUT else None
             plan.append((page, rect, label, [f.id]))
     return plan
+
+
+def _add_bars(pdf: fitz.Document, plan: list) -> dict[int, list[fitz.Rect]]:
+    """Schwärzungsbalken (mit Beschriftung) als Schwärzungs-Annotationen anlegen. Rückgabe: Rechtecke je Seite."""
+    pages: dict[int, list[fitz.Rect]] = {}
+    for page_no, rect, label, _ids in plan:
+        kwargs = {"fill": (0, 0, 0)}
+        if label:
+            fs = label_fontsize(rect, label)
+            if fs:
+                kwargs.update(text=label, fontname="helv", fontsize=fs, text_color=(1, 1, 1), align=fitz.TEXT_ALIGN_CENTER)
+        pdf[page_no].add_redact_annot(rect, **kwargs)
+        pages.setdefault(page_no, []).append(rect)
+    return pages
 
 
 def area_rect(f: Finding) -> tuple[int, fitz.Rect]:
@@ -235,29 +293,28 @@ def redact_pdf(doc: LoadedDocument, findings: list[Finding], mode: str, labels: 
     # Beim Laden bereits geschehen – hier nur zur Sicherheit (muss VOR den Schwärzungen laufen,
     # da diese selbst Annotationen sind).
     strip_pdf_extras(pdf)
-    touched: set[int] = set()
-    # Seiten mit frei gezogenen Bereichen: dort auch Vektorgrafik entfernen (z. B. eine als Linien
-    # gezeichnete Unterschrift). Auf anderen Seiten bleibt Grafik unangetastet.
-    area_pages = {int(f.area[0]) for f in findings if f.active and f.area is not None}
-    plan = pdf_redaction_plan(doc, findings, mode, labels)
-    for page_no, rect, label, _ids in plan:
+    # 1. Text der Fundstellen entfernen – mit in der Höhe verkleinerten Rechtecken, damit bei engem
+    #    Zeilenabstand kein Text der Nachbarzeilen verschwindet (siehe text_removal_rects). Noch ohne Balken.
+    text_pages: set[int] = set()
+    for g in active_groups(findings):
+        for page_no, core in text_removal_rects(doc, g[0].start, max(f.end for f in g)):
+            pdf[page_no].add_redact_annot(core, fill=False)
+            text_pages.add(page_no)
+    for page_no in text_pages:
+        pdf[page_no].apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE, graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+                                      text=fitz.PDF_REDACT_TEXT_REMOVE)
+    # 2. Frei gezogene Bereiche: alles darin entfernen, auch Vektorgrafik (z. B. eine als Linien gezeichnete
+    #    Unterschrift). Grafik, die nur hineinragt (Tabellenrahmen …), wird danach wieder gezeichnet.
+    for page_no, rects in _add_bars(pdf, _area_plan(doc, findings, mode, labels)).items():
         page = pdf[page_no]
-        kwargs = {"fill": (0, 0, 0)}
-        if label:
-            fs = label_fontsize(rect, label)
-            if fs:
-                kwargs.update(text=label, fontname="helv", fontsize=fs, text_color=(1, 1, 1), align=fitz.TEXT_ALIGN_CENTER)
-        page.add_redact_annot(rect, **kwargs)
-        touched.add(page_no)
-    for page_no in touched:
-        page = pdf[page_no]
-        if page_no in area_pages:
-            rects = [r for p_no, r, _l, _i in plan if p_no == page_no]
-            keep = collateral_drawings(page, rects)
-            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_PIXELS, graphics=fitz.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED)
-            redraw_behind(page, keep)
-        else:
-            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_PIXELS, graphics=fitz.PDF_REDACT_LINE_ART_NONE)
+        keep = collateral_drawings(page, rects)
+        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_PIXELS, graphics=fitz.PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED)
+        redraw_behind(page, keep)
+    # 3. Balken der Textstellen in voller Höhe (wie in der Vorschau): Bildpunkte darunter werden entfernt
+    #    (gescannte Seiten), Text und Grafik daneben bleiben unangetastet.
+    for page_no in _add_bars(pdf, _text_plan(doc, findings, mode, labels)):
+        pdf[page_no].apply_redactions(images=fitz.PDF_REDACT_IMAGE_PIXELS, graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+                                      text=fitz.PDF_REDACT_TEXT_NONE)
     pdf.scrub(
         attached_files=True,
         clean_pages=True,
@@ -351,7 +408,8 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
 
     Prüft, ob Texte aktiver Funde noch extrahierbar sind – im Seitentext, in Kommentaren,
     Formularfeldern, Lesezeichen und Metadaten – und ob noch Kommentare, Formularfelder,
-    Lesezeichen, Links, Anhänge oder Metadaten vorhanden sind.
+    Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder Inhalt außerhalb des sichtbaren Seitenbereichs
+    vorhanden sind.
 
     Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per
     OCR gelesen.
@@ -367,8 +425,9 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
         for pno in ocr_pages:
             if 0 <= pno < pdf.page_count:
                 parts.append(ocr_mod.ocr_page_text(pdf[pno], key))
-    n_annots = n_widgets = n_links = 0
+    n_annots = n_widgets = n_links = n_outside = 0
     for page in pdf:
+        n_outside += has_outside_content(page, leftover=True)
         for a in page.annots():
             n_annots += 1
             parts += [a.info.get("content", ""), a.info.get("title", ""), a.info.get("subject", "")]
@@ -383,13 +442,16 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
     xml = pdf.get_xml_metadata() or ""
     parts.append(xml)
     n_files = pdf.embfile_count()
+    layers = has_layers(pdf)
     pdf.close()
 
     problems = []
     for n, what in ((n_annots, "Kommentare/Markierungen"), (n_widgets, "Formularfelder"), (len(toc), "Lesezeichen"),
-                    (n_links, "Links"), (n_files, "Dateianhänge")):
+                    (n_links, "Links"), (n_files, "Dateianhänge"), (n_outside, "Seiten mit Inhalt außerhalb des sichtbaren Bereichs")):
         if n:
             problems.append(f"{what} noch vorhanden: {n}")
+    if layers:
+        problems.append("Ebenen noch vorhanden")
     if meta or xml.strip():
         problems.append("Metadaten noch vorhanden: " + ", ".join(list(meta) + (["XMP"] if xml.strip() else [])))
 

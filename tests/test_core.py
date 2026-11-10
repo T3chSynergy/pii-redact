@@ -372,3 +372,95 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     for rest in ("DE89", "3704", "0044", "0532", "0130", "040", "55512345", "170839", "J"):
         assert rest not in words, rest
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
+
+
+# ---------------------------------------------------------------- Helfer für erzeugte PDFs
+def _find(doc, needle: str, typ: str = "PERSON") -> Finding:
+    s = doc.text.index(needle)
+    return Finding(s, s + len(needle), typ, needle)
+
+
+def _load_bytes(tmp_path, data: bytes, name: str = "test.pdf"):
+    path = tmp_path / name
+    path.write_bytes(data)
+    return load_document(path, ocr=False)
+
+
+# ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile
+_NEIGHBOURS = ("Die Bearbeitung liegt bei der Abteilung Finanzen im Haus (Äpfel, Übung, gyp).",
+               "Zuständig ist dort Frau Zofia Jaeger aus dem zweiten Stock, Telefon 030 1234567.",
+               "Bitte beachten Sie die neuen Zeiten und die Regeln der Übergabe im Haus (ÄÖÜ).")
+
+
+def _squash(text: str) -> str:
+    return "".join(text.split())
+
+
+@pytest.mark.parametrize("font", ["helv", "tiro", "cour"])
+@pytest.mark.parametrize("leading", [0.85, 1.0, 1.15, 1.4])
+@pytest.mark.parametrize("mode", [ReplaceMode.BLACKOUT, ReplaceMode.NUMBERED])
+def test_tight_line_spacing_keeps_neighbour_lines(tmp_path, font, leading, mode):
+    """Bei engem Zeilenabstand ragen die Zeichenrahmen in die Nachbarzeilen – dort darf nichts verschwinden."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=700, height=300)
+    for i, line in enumerate(_NEIGHBOURS):
+        page.insert_text((40, 80 + i * 11 * leading), line, fontsize=11, fontname=font)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    findings = [_find(doc, "Zofia Jaeger"), _find(doc, "030 1234567", "PHONE_NUMBER")]
+    out = redact_pdf(doc, findings, mode)
+    assert verify_pdf(out, findings) == []
+    got = pymupdf.open(stream=out)[0].get_text()
+    for token in ("[PERSON_1]", "[TELEFON_1]"):
+        got = got.replace(token, "")
+    expected = doc.text.replace("Zofia Jaeger", "").replace("030 1234567", "")
+    assert _squash(got) == _squash(expected)
+
+
+def test_mixed_sizes_and_vertical_text_are_removed(tmp_path):
+    """Kein gemeinsames Band (Schriftgrößen gemischt, hochgestellt, senkrecht): jedes Zeichen einzeln."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=600, height=400)
+    page.insert_text((40, 69), "Zeile darüber mit Text über die ganze Breite der Seite", fontsize=11)
+    x = 40.0
+    for part, size, dy in (("Vermerk ", 11, 0), ("Zofia", 11, 0), ("Jaeger", 7, 0), ("2", 6, -5), (" Rest der Zeile", 11, 0)):
+        page.insert_text((x, 80 + dy), part, fontsize=size)
+        x += pymupdf.get_text_length(part, fontsize=size)
+    page.insert_text((40, 91), "Zeile darunter mit Text über die ganze Breite der Seite", fontsize=11)
+    page.insert_text((300, 380), "Senkrecht Zofia Jaeger hier", fontsize=11, rotate=90)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    import re
+
+    findings = [Finding(m.start(), m.end(), "PERSON", m.group()) for m in re.finditer(r"Zofia\s*Jaeger\s*2?", doc.text)]
+    assert len(findings) == 2
+    out = redact_pdf(doc, findings, ReplaceMode.BLACKOUT)
+    assert verify_pdf(out, findings) == []
+    expected = doc.text
+    for f in findings:
+        expected = expected.replace(f.text, "")
+    assert _squash(pymupdf.open(stream=out)[0].get_text()) == _squash(expected)
+
+
+def test_scan_with_text_layer_loses_pixels_in_full_height(tmp_path):
+    """Gescannte Seite mit unsichtbarer Textebene: Der Text wird mit dem schmalen Band entfernt, die
+    Bildpunkte darunter aber im ganzen Balken."""
+    src = pymupdf.open()
+    page = src.new_page(width=400, height=120)
+    page.insert_text((20, 60), "Frau Zofia Jaeger", fontsize=22)
+    pix = page.get_pixmap(dpi=150)
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=400, height=120)
+    page.insert_image(page.rect, pixmap=pix)
+    page.insert_text((20, 60), "Frau Zofia Jaeger", fontsize=22, render_mode=3)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    finding = _find(doc, "Zofia Jaeger")
+    from pii_redact.core.redactor import finding_rects
+
+    ((_, rect),) = finding_rects(doc, finding.start, finding.end)
+    result = pymupdf.open(stream=redact_pdf(doc, [finding], ReplaceMode.BLACKOUT))
+    assert "Zofia" not in result[0].get_text(flags=0)
+    image = pymupdf.Pixmap(result, result[0].get_images()[0][0])
+    sx, sy = image.width / 400, image.height / 120
+    inside = {image.pixel(x, y)
+              for x in range(int(rect.x0 * sx) + 2, int(rect.x1 * sx) - 2, 3)
+              for y in range(int(rect.y0 * sy) + 2, int(rect.y1 * sy) - 2)}
+    assert len(inside) == 1   # einheitlich gefüllt – keine Reste der Buchstaben am oberen/unteren Rand
