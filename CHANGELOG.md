@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.5 – 10.11.2026
 
 **Kontrolle nach dem Export**
 - **Jede geschwärzte Stelle wird einzeln geprüft:** Die Kontrolle sieht jetzt an jeder Schwärzung nach, ob dort
