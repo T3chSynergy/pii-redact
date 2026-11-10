@@ -162,3 +162,20 @@ def test_cli_folder(folder, tmp_path, monkeypatch):
     ws = Workspace.load(target)
     assert {e.status for e in ws.entries.values()} == {Status.AUTO}
     assert "Bergmann" not in (target / "Verträge" / "brief_anonymisiert.txt").read_text(encoding="utf-8")
+
+
+def test_protocol_cells_are_not_read_as_formulas(tmp_path):
+    """Dateinamen, die mit =, +, - oder @ beginnen, liest eine Tabellenkalkulation sonst als Formel."""
+    from pii_redact.core.batch import csv_safe
+
+    assert csv_safe("=1+1.txt") == "'=1+1.txt" and csv_safe("@summe.txt") == "'@summe.txt"
+    assert csv_safe("brief.txt") == "brief.txt" and csv_safe(3) == 3 and csv_safe("") == ""
+    source, target = tmp_path / "quelle", tmp_path / "ziel"
+    source.mkdir()
+    for name in ("=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"):
+        (source / name).write_text("Text", encoding="utf-8")
+    ws = Workspace.create(source, target)
+    with open(ws.protocol_path, encoding="utf-8-sig", newline="") as fh:
+        names = [row[0] for row in csv.reader(fh, delimiter=";")][1:]
+    assert sorted(names) == sorted(["'=1+1.txt", "'+plus.txt", "'-minus.txt", "'@summe.txt", "normal.txt"])
+    assert set(ws.entries) == {"=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"}   # Arbeitsstand unverändert

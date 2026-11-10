@@ -105,6 +105,14 @@ def findings_from_compact(items: list[dict], text: str) -> list[Finding]:
     return out
 
 
+def csv_safe(value):
+    """Zelle für das Protokoll: Text, der mit ``=``, ``+``, ``-`` oder ``@`` beginnt, liest eine Tabellenkalkulation
+    als Formel (z. B. ein Dateiname „=Summe.pdf“). Ein vorangestelltes Hochkomma macht daraus reinen Text."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def ki_summary(review: dict | None) -> str:
     """„hoch – 3 Hinweise (Modell, Zeitpunkt)“ für Protokoll und Arbeitsliste."""
     if not review:
@@ -443,7 +451,7 @@ class Workspace:
                     hints.append(e.note)
                 if e.error:
                     hints.append(f"Fehler: {e.error.splitlines()[0]}")
-                w.writerow([
+                w.writerow(csv_safe(cell) for cell in [
                     e.rel,
                     Status.LABELS.get(e.status, e.status),
                     e.reviewed_by,

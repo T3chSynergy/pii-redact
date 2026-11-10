@@ -181,6 +181,11 @@ class SettingsDialog(QDialog):
         self.llm_enabled = QCheckBox("KI-Nachprüfung einschalten", checked=s.llm_enabled)
         self.llm_url = QLineEdit(s.llm_url)
         self.llm_url.setPlaceholderText("z. B. https://llm.intern.example/v1")
+        self.llm_url_warning = QLabel()
+        self.llm_url_warning.setWordWrap(True)
+        self.llm_url_warning.setStyleSheet("color:#e8590c;")
+        self.llm_url.textChanged.connect(self._check_llm_url)
+        self._check_llm_url(s.llm_url)
         self.llm_model = QLineEdit(s.llm_model)
         self.llm_model.setPlaceholderText("Modellname laut Server, z. B. qwen3-27b")
         self.llm_key = QLineEdit(s.llm_api_key)
@@ -200,6 +205,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
         form.addRow("", self.llm_enabled)
         form.addRow("Server-Adresse:", self.llm_url)
+        form.addRow("", self.llm_url_warning)
         form.addRow("Modell:", self.llm_model)
         form.addRow("API-Schlüssel:", self.llm_key)
         form.addRow("Zeitlimit je Anfrage:", self.llm_timeout)
@@ -213,6 +219,14 @@ class SettingsDialog(QDialog):
         lay.addLayout(row)
         lay.addStretch(1)
         return page
+
+    def _check_llm_url(self, text: str) -> None:
+        """Warnen, wenn die Verbindung unverschlüsselt wäre (außer zum eigenen Rechner)."""
+        warn = llm_review.is_unencrypted(text)
+        self.llm_url_warning.setText(
+            "⚠ Unverschlüsselte Verbindung (http://): Text und API-Schlüssel wären im Netz mitlesbar. "
+            "Bitte eine https://-Adresse verwenden." if warn else "")
+        self.llm_url_warning.setVisible(warn)
 
     def _ki_settings(self) -> Settings:
         s = copy.deepcopy(self._orig)

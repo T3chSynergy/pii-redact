@@ -1,0 +1,14 @@
+# Hält die in den Workflows per Commit-SHA festgelegten GitHub Actions aktuell: Dependabot stellt dafür
+# Pull Requests gegen dev (nichts wird automatisch übernommen). Wirkt aus dem Standard-Branch main.
+# Python-Pakete bleiben bewusst außen vor – siehe CLAUDE.md „Abhängigkeiten“ (Dependabot-Warnungen sind
+# in den Repository-Einstellungen eingeschaltet).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

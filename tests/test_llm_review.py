@@ -264,3 +264,10 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
 def test_parse_json_tolerates_fences_and_thinking():
     raw = '<think>erst überlegen {x}</think>\n```json\n{"risiko": "hoch", "hinweise": []}\n```'
     assert lr.parse_json(raw)["risiko"] == "hoch"
+
+
+def test_unencrypted_address_is_recognised():
+    assert lr.is_unencrypted("http://llm.intern.example/v1")
+    assert lr.is_unencrypted(" HTTP://10.0.0.5:8080/v1 ")
+    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080", "http://[::1]:8080/v1", ""):
+        assert not lr.is_unencrypted(url), url
