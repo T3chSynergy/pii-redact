@@ -421,6 +421,26 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
 
     Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per OCR gelesen."""
     pdf = fitz.open(stream=pdf_bytes, filetype="pdf")
+    page_texts, ocr_words = _texts_for_check(pdf, pdf_bytes, ocr_pages)
+    problems, other = _structure_problems(pdf)
+    failed = _unredacted_spots(pdf, doc, findings, mode, labels, ocr_words) if doc is not None else {}
+    pdf.close()
+    by_id = {f.id: f for f in findings}
+    reported: set[str] = set()
+    for fid, pages in failed.items():
+        f = by_id[fid]
+        label = f.text if f.text.strip() else info(f.entity_type).label
+        if label not in reported:
+            reported.add(label)
+            problems.append(f"{label} – an der geschwärzten Stelle noch vorhanden ({_pages(pages)})")
+    problems += _other_occurrences(findings, page_texts, other, reported)
+    return problems
+
+
+def _texts_for_check(pdf: fitz.Document, pdf_bytes: bytes,
+                     ocr_pages: list[int] | None) -> tuple[list[str], dict[int, list]]:
+    """Text je Seite; Seiten aus ``ocr_pages`` werden zusätzlich per Texterkennung gelesen (Rückgabe auch der
+    dort gelesenen Wörter je Seite)."""
     page_texts = [page.get_text() for page in pdf]
     ocr_words: dict[int, list] = {}
     if ocr_pages:
@@ -432,6 +452,12 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
                 lines = ocr_mod.ocr_page(pdf[pno], key)
                 ocr_words[pno] = [w for line in lines for w in line]
                 page_texts[pno] += "\n" + "\n".join(" ".join(w.text for w in line) for line in lines)
+    return page_texts, ocr_words
+
+
+def _structure_problems(pdf: fitz.Document) -> tuple[list[str], list[str]]:
+    """Aufbau des fertigen PDFs. Rückgabe: Beanstandungen und die Texte aus Kommentaren, Formularfeldern,
+    Lesezeichen und Metadaten (dort wird anschließend nach Fundtexten gesucht)."""
     other: list[str] = []
     n_annots = n_widgets = n_links = n_outside = 0
     for page in pdf:
@@ -462,21 +488,7 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
         problems.append("Ebenen noch vorhanden")
     if meta or xml.strip():
         problems.append("Metadaten noch vorhanden: " + ", ".join(list(meta) + (["XMP"] if xml.strip() else [])))
-
-    failed: dict[int, list[int]] = {}
-    if doc is not None:
-        failed = _unredacted_spots(pdf, doc, findings, mode, labels, ocr_words)
-    pdf.close()
-    by_id = {f.id: f for f in findings}
-    reported: set[str] = set()
-    for fid, pages in failed.items():
-        f = by_id[fid]
-        label = f.text if f.text.strip() else info(f.entity_type).label
-        if label not in reported:
-            reported.add(label)
-            problems.append(f"{label} – an der geschwärzten Stelle noch vorhanden ({_pages(pages)})")
-    problems += _other_occurrences(findings, page_texts, other, reported)
-    return problems
+    return problems, other
 
 
 def _pages(pages: list[int]) -> str:

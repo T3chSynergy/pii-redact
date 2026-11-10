@@ -505,44 +505,69 @@ def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
 
     Stellen, die ein vorhandener Fund berührt, zählen nicht: aktive werden geschwärzt, abgewählte sind eine
     bewusste Entscheidung (auch ein früher abgelehnter Vorschlag)."""
-    marked = bytearray(len(text))
-    for f in findings:
-        if f.area is None:
-            marked[f.start:f.end] = b"\x01" * (f.end - f.start)
-    joined, hmap = dehyphenate(plain_spaces(text))
-    out: list[Finding] = []
-
-    def collect(pattern: re.Pattern, entity_type: str, why: str, accept=None) -> None:
-        for m in pattern.finditer(joined):
-            if accept and not accept(joined, m.start(), m.end()):
-                continue
-            s, e = hmap.span(m.start(), m.end()) if hmap else (m.start(), m.end())
-            if any(marked[s:e]):
-                continue
-            marked[s:e] = b"\x01" * (e - s)
-            out.append(Finding(s, e, entity_type, text[s:e], 1.0, source=CHECK_SOURCE, active=False,
-                               recognizer=why))
-
+    spots = _FreeSpots(text, findings)
     active = [f for f in sorted(findings, key=lambda f: f.start) if f.active and f.area is None]
     seen: set[str] = set()
-    for f in active:                      # 1. der ganze Wortlaut
+    out: list[Finding] = []
+    for f, pattern in _whole_texts(active, seen):       # 1. der ganze Wortlaut
+        out += spots.find(pattern, f.entity_type, "Kontrolle: weiteres Vorkommen eines geschwärzten Textes")
+    for f, pattern in _surnames(active, seen):          # 2. danach der Nachname allein (der ganze Name hat Vorrang)
+        out += spots.find(pattern, f.entity_type, "Kontrolle: Nachname eines geschwärzten Namens steht allein",
+                          _surname_hit)
+    return sorted(out, key=lambda f: f.start)
+
+
+class _FreeSpots:
+    """Sucht Muster an Stellen des Dokumenttexts, die noch kein Fund berührt. Jede gefundene Stelle gilt danach
+    als vergeben – ein späteres Muster (etwa der Nachname allein) trifft sie nicht noch einmal."""
+
+    def __init__(self, text: str, findings: list[Finding]) -> None:
+        self.text = text
+        self.marked = bytearray(len(text))
+        for f in findings:
+            if f.area is None:
+                self.marked[f.start:f.end] = b"\x01" * (f.end - f.start)
+        self.joined, self.hmap = dehyphenate(plain_spaces(text))
+
+    def find(self, pattern: re.Pattern, entity_type: str, why: str, accept=None) -> list[Finding]:
+        """Vorschläge für alle freien Fundstellen des Musters; ``accept(text, start, end)`` kann Stellen
+        ausschließen."""
+        out = []
+        for m in pattern.finditer(self.joined):
+            if accept and not accept(self.joined, m.start(), m.end()):
+                continue
+            s, e = self.hmap.span(m.start(), m.end()) if self.hmap else (m.start(), m.end())
+            if any(self.marked[s:e]):
+                continue
+            self.marked[s:e] = b"\x01" * (e - s)
+            out.append(Finding(s, e, entity_type, self.text[s:e], 1.0, source=CHECK_SOURCE, active=False,
+                               recognizer=why))
+        return out
+
+
+def _whole_texts(active: list[Finding], seen: set[str]):
+    """Je unterschiedlichem Fundtext einmal: Fund und Suchmuster für den ganzen Wortlaut."""
+    for f in active:
         key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
         if key in seen:
             continue
         seen.add(key)
         pattern = word_pattern(f.text)
         if pattern is not None:
-            collect(pattern, f.entity_type, "Kontrolle: weiteres Vorkommen eines geschwärzten Textes")
-    for f in active:                      # 2. danach der Nachname allein (der ganze Name hat Vorrang)
+            yield f, pattern
+
+
+def _surnames(active: list[Finding], seen: set[str]):
+    """Je Nachname eines mehrteiligen Personennamens einmal: Fund und Suchmuster – sofern der Nachname nicht
+    schon als ganzer Fundtext gesucht wurde."""
+    for f in active:
         name = surname(f.text) if f.entity_type == "PERSON" else None
         if name is None or name.casefold() in seen:
             continue
         seen.add(name.casefold())
         pattern = word_pattern(name)
         if pattern is not None:
-            collect(pattern, f.entity_type, "Kontrolle: Nachname eines geschwärzten Namens steht allein",
-                    _surname_hit)
-    return sorted(out, key=lambda f: f.start)
+            yield f, pattern
 
 
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
