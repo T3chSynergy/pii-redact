@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 275 Tests (Stand 10.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 279 Tests (Stand 10.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -244,6 +244,27 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   (`worker.py`), Abbruch im Fortschrittsfenster. Fixture `window` liegt in
   `tests/conftest.py`; Klasse `Dialogs` in `test_ui_export.py` ersetzt Dateidialog und Meldungsfenster und klickt in
   Rückfragen die voreingestellte oder eine benannte Schaltfläche (so läuft der echte Dialogcode).
+- **Refactoring** (Plan 10.11.2026, Entscheidungen des Nutzers: Komplexitätsgrenze **12**, mypy später und
+  getrennt, Aufbau der Oberfläche gehört dazu). Nur Struktur, kein geändertes Verhalten, je Schritt ein PR:
+  0 Vergleichswerkzeug (erledigt) · 1 Kommandozeile (`main`, `process_folder`, `process_file`) · 2 Laden
+  (`_build_notices`, `_load_pdf`) · 3 Kontrolle (`verify_pdf`, `further_occurrences`) · 4 `pdf_hidden`
+  (`has_outside_content`, `_strip`) · 5 Oberfläche Logik (`findings_panel.data`, `export_pdf`,
+  `export_unreviewed`, `_refresh_views`; Klicktest des Nutzers) · 6 Oberfläche Aufbau (`_build_ui`,
+  `_build_actions`, Einstellungsdialog) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
+  für PDF-Inhaltsströme (`_instructions`, `_compound_end`) – begründete Ausnahme statt Umbau; Regel zur Parameterzahl.
+- **Ergebnisvergleich** `tools/ergebnis_vergleich.py` (seit 10.11.2026): `pruefen --basis <Git-Stand>` checkt die
+  Basis in einen eigenen Ordner aus, nimmt beide Stände auf und vergleicht (Rückgabewert 1 bei Abweichung). Aufnahme
+  = Beispieldateien + vier erzeugte Sonderfälle (enger Zeilenabstand, gemischte Größen, gedreht/zugeschnitten,
+  ausgeblendete Ebene) in
+  beiden Modi: geladener Text, Hinweise, Funde, Vorschläge der Kontrolle, geschwärzter Text, geschwärztes PDF (Text
+  Seitenbild und Zeichenschritte je Seite – letztere erfassen auch nicht Angezeigtes –, drei Varianten, eine mit
+  frei gezogenem Bereich), Kontrolle, Kommandozeile (Ordner und
+  einzelne Dateien, Ausgaben, Rückgabewerte, Ergebnisordner ohne Zeitangaben). `--ordner`/`--liste`: fremde PDFs nur
+  laden und bereinigen, nur Prüfsummen (für `pdf_hidden`; in der Cloud z. B. `--ordner /usr/share/texlive/texmf-dist`,
+  rund 350 PDFs). Dauer in der Cloud: gut 2 Minuten je Stand, mit Korpus 5 Minuten für beide. Zweimal derselbe
+  Stand ergibt keine Abweichung (geprüft). Ohne die Sonderfälle bliebe z. B. eine Änderung von `TEXT_INSET`
+  unbemerkt – die Beispieldateien haben normalen Zeilenabstand. Auch für Paket-Updates gedacht (Ablauf oben:
+  „Funde aller Beispieldateien vergleichen“), dann in zwei Schritten `aufnehmen` vor und nach dem Update.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
 - **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen
