@@ -34,7 +34,7 @@ def main(out: Path) -> None:
     labels = ["O", "B-PER", "I-PER", "B-LOC", "I-LOC", "B-ORG", "I-ORG", "B-MISC", "I-MISC"]
     cfg = BertConfig(vocab_size=tok.get_vocab_size(), hidden_size=32, num_hidden_layers=2,
                      num_attention_heads=2, intermediate_size=64, max_position_embeddings=128,
-                     id2label=dict(enumerate(labels)), label2id={l: i for i, l in enumerate(labels)})
+                     id2label=dict(enumerate(labels)), label2id={name: i for i, name in enumerate(labels)})
     BertForTokenClassification(cfg).save_pretrained(out)
     print("ok", out)
 

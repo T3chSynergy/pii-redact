@@ -83,7 +83,7 @@ def list_ner_models() -> list[Path]:
         if not ner.is_dir():
             continue
         for sub in sorted(ner.iterdir()):
-            if (sub / "model.onnx").is_file() and (sub / "tokenizer.json").is_file() and (sub / "config.json").is_file():
+            if all((sub / name).is_file() for name in ("model.onnx", "tokenizer.json", "config.json")):
                 found.append(sub)
     return found
 

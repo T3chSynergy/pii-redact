@@ -190,7 +190,8 @@ class PiiAnalyzer:
             if f.recognizer not in CASE_RECOGNIZERS:
                 continue
             if f.recognizer in NER_RECOGNIZERS and any(c.isdigit() for c in f.text):
-                continue   # Namen und Orte enthalten keine Ziffern („Iban DE89 …“ hält die Namenserkennung für einen Ort)
+                # Namen und Orte enthalten keine Ziffern („Iban DE89 …“ hält die Namenserkennung für einen Ort)
+                continue
             if e > b or not any(s < ue and us < e for us, ue in upper):
                 continue
             if all(covered[i] or text[i].isspace() for i in range(s, e)):
@@ -323,8 +324,8 @@ _NER_STOPWORDS = {
     "sehr", "geehrte", "geehrter", "mit", "freundlichen", "grüßen", "grüße", "gruß", "viele",
     "beste", "herzliche", "steuer-id", "personalnr", "personalnummer", "kundennr", "kundennummer", "postfach",
     # Abkürzungen, die in normaler Schreibweise („Dsgvo“) wie Namen aussehen – siehe PiiAnalyzer._upper_case
-    "geb", "geb.", "dr.", "prof.", "tel.", "mailto", "dsgvo", "bdsg", "bgb", "sgb", "stgb", "hgb", "ihk", "hwk", "aok", "tüv", "adac", "drk",
-    "dhl", "ups", "sepa", "gmbh",
+    "geb", "geb.", "dr.", "prof.", "tel.", "mailto", "dsgvo", "bdsg", "bgb", "sgb", "stgb", "hgb", "ihk", "hwk",
+    "aok", "tüv", "adac", "drk", "dhl", "ups", "sepa", "gmbh",
 }
 _NER_SPLIT = re.compile(r"[\n\[\]()<>|*_#=/\\@:;]+")
 

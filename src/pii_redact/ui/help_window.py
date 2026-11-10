@@ -11,7 +11,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut, QTextDocument
 from PySide6.QtWidgets import (
     QDialog,

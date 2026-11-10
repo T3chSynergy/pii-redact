@@ -29,10 +29,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core import AnalysisMode, ReplaceMode, Settings
-from ..core import llm_review
-from ..paths import list_ner_models, ner_model_info
+from ..core import AnalysisMode, ReplaceMode, Settings, llm_review
 from ..core.entities import all_keys, info
+from ..paths import list_ner_models, ner_model_info
 from .dialogs import german_buttons
 
 MODELS = [
@@ -52,7 +51,8 @@ class SettingsDialog(QDialog):
 
         # ---- Erkennung
         self.threshold = QDoubleSpinBox(minimum=0.05, maximum=1.0, singleStep=0.05, decimals=2, value=s.threshold)
-        self.threshold.setToolTip("Funde mit geringerer Sicherheit werden ignoriert. Niedriger = mehr Funde, mehr Fehlalarme.")
+        self.threshold.setToolTip(
+            "Funde mit geringerer Sicherheit werden ignoriert. Niedriger = mehr Funde, mehr Fehlalarme.")
         self.model = QComboBox(editable=True)
         for name, desc in MODELS:
             self.model.addItem(f"{name}", name)
@@ -72,7 +72,8 @@ class SettingsDialog(QDialog):
             meta = ner_model_info(m)
             self.ner_model.addItem(f"{m.name}  ({meta.get('source', '?')})", m.name)
             self.ner_model.setItemData(self.ner_model.count() - 1,
-                                       f"Lizenz: {meta.get('license') or 'unbekannt'} · {m}", Qt.ItemDataRole.ToolTipRole)
+                                       f"Lizenz: {meta.get('license') or 'unbekannt'} · {m}",
+                                       Qt.ItemDataRole.ToolTipRole)
         if not models:
             self.ner_model.addItem("(kein Modell installiert)", "")
             self.ner_model.setEnabled(False)

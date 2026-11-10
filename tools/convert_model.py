@@ -102,7 +102,7 @@ def main(argv=None) -> int:
             self.m = m
 
         def forward(self, *inputs):
-            kwargs = dict(zip(input_names, inputs))
+            kwargs = dict(zip(input_names, inputs, strict=True))
             return self.m(**kwargs).logits
 
     with torch.no_grad():

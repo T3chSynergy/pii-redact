@@ -64,7 +64,8 @@ COMPONENTS: list[tuple[str, list[Component]]] = [
                   "LGPL-3.0 (Qt-Bibliotheken als separate, austauschbare Dateien)", "https://www.qt.io"),
     ]),
     ("Grundlage", [
-        Component(f"Python {sys.version_info.major}.{sys.version_info.minor}", "Programmiersprache und Laufzeit", "PSF-2.0", "https://www.python.org"),
+        Component(f"Python {sys.version_info.major}.{sys.version_info.minor}", "Programmiersprache und Laufzeit",
+                  "PSF-2.0", "https://www.python.org"),
         Component("NumPy", "Numerik", "BSD-3-Clause", "https://numpy.org"),
         Component("pydantic", "Datenprüfung (von spaCy/Presidio genutzt)", "MIT", "https://docs.pydantic.dev"),
         Component("PyYAML", "Konfigurationsdateien", "MIT", "https://pyyaml.org"),
@@ -82,7 +83,8 @@ LICENSE = "GNU Affero General Public License, Version 3 oder später (AGPL-3.0-o
 SOURCE_URL = "https://github.com/T3chSynergy/pii-redact"
 
 NOTES = [
-    "pii-redact ist freie Software unter der GNU AGPL, Version 3 oder später: Sie dürfen es nutzen, weitergeben und verändern; "
+    "pii-redact ist freie Software unter der GNU AGPL, Version 3 oder später: Sie dürfen es nutzen, weitergeben und "
+    "verändern; "
     "wer es weitergibt, muss den Quellcode unter derselben Lizenz mitliefern bzw. zugänglich machen. Es gibt "
     "keine Gewährleistung. Die AGPL passt zu PyMuPDF, das ebenfalls unter der AGPL-3.0 steht.",
     "Das Transformer-Modell für den Modus „Gründlich“ steht unter der Academic Free License 3.0 (AFL-3.0); "

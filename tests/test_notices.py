@@ -64,7 +64,8 @@ def test_signature_sample_is_flagged():
 def test_locked_settings(tmp_path):
     defaults = tmp_path / "defaults.json"
     user = tmp_path / "settings.json"
-    defaults.write_text(json.dumps({"compact_notices": True, "ocr": True, "locked": ["compact_notices", "ocr", "fehlt"]}))
+    defaults.write_text(json.dumps({"compact_notices": True, "ocr": True,
+                                    "locked": ["compact_notices", "ocr", "fehlt"]}))
     user.write_text(json.dumps({"compact_notices": False, "ocr": False, "pdf_labels": False, "locked": []}))
     s = Settings.load(user, defaults)
     assert s.compact_notices is True and s.ocr is True and s.pdf_labels is False

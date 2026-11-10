@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 def test_variable_set_on_import():
     """Linux/macOS: Der Sende-Client lässt sich nur vor dem ersten Laden von onnxruntime abschalten."""
     env = {k: v for k, v in os.environ.items() if k != "ORT_DISABLE_TELEMETRY"}
-    out = subprocess.run([sys.executable, "-c", "import os, pii_redact; print(os.environ.get('ORT_DISABLE_TELEMETRY'))"],
+    code = "import os, pii_redact; print(os.environ.get('ORT_DISABLE_TELEMETRY'))"
+    out = subprocess.run([sys.executable, "-c", code],
                          env=env, capture_output=True, text=True, check=True).stdout
     assert out.strip() == "1"
     assert pii_redact  # Import oben setzt die Variable auch im Testprozess

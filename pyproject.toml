@@ -52,3 +52,28 @@ pii_redact = ["resources/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+# Stilprüfung (in der CI: `ruff check src tests tools samples`). Bewusst nur Regeln, die sich ohne Umbau einhalten
+# lassen; Komplexitätsregeln (C90, PLR) und Typprüfung gehören zu einem eigenen Refactoring.
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "F",    # Pyflakes: unbenutzte Namen, Tippfehler in Namen
+    "E",    # pycodestyle
+    "W",
+    "I",    # Reihenfolge der Importe
+    "B",    # fehleranfällige Muster (bugbear)
+    "UP",   # veraltete Schreibweisen
+    "SIM",  # Vereinfachungen
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Offline-Schalter müssen vor den Importen gesetzt sein, die Hugging-Face-Bibliotheken laden
+"src/pii_redact/cli.py" = ["E402"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Qt-Schreibweise für Modellklassen: `parent=QModelIndex()` – der Wert ist unveränderlich
+extend-immutable-calls = ["PySide6.QtCore.QModelIndex"]
