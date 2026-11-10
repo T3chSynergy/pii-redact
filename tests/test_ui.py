@@ -114,8 +114,8 @@ def test_free_edit_roundtrip(window, monkeypatch):
 def test_batch_review_flow(window, tmp_path, monkeypatch):
     import shutil
 
-    from pii_redact.core.batch import Status, Workspace
     import pii_redact.ui.window_batch as wb
+    from pii_redact.core.batch import Status, Workspace
 
     src = tmp_path / "akten"
     (src / "sub").mkdir(parents=True)
@@ -489,7 +489,8 @@ def test_check_before_saving_adds_suggestions_and_asks(window, tmp_path, monkeyp
     from pii_redact.ui.main_window import MainWindow
 
     source = tmp_path / "antrag.txt"
-    source.write_text("Antrag von Herrn Deniz Kaya.\nAnhang: antrag_kaya.pdf\nMit freundlichen Grüßen", encoding="utf-8")
+    source.write_text("Antrag von Herrn Deniz Kaya.\nAnhang: antrag_kaya.pdf\nMit freundlichen Grüßen",
+                      encoding="utf-8")
     _open(window, source)
     s = window.session
     start = s.doc.text.index("Kaya")
@@ -553,8 +554,8 @@ def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path,
     """„Ungeprüfte Dateien exportieren“: Was die Kontrolle beanstandet, bleibt zur Prüfung stehen."""
     import shutil
 
-    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
     import pii_redact.ui.window_batch as wb
+    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
     from pii_redact.ui.main_window import MainWindow
 
     src = tmp_path / "akten"
@@ -576,7 +577,8 @@ def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path,
     window.export_unreviewed()
     idle()
     ws = window.batch
-    assert ws.entries["b_brief.txt"].status == Status.AUTO and (tmp_path / "ziel" / "b_brief_anonymisiert.txt").is_file()
+    assert ws.entries["b_brief.txt"].status == Status.AUTO
+    assert (tmp_path / "ziel" / "b_brief_anonymisiert.txt").is_file()
     held = ws.entries["a_antrag.txt"]
     assert held.status == Status.TO_REVIEW and held.note == CHECK_NOT_AUTO
     assert not (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").exists()

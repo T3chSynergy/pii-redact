@@ -135,7 +135,8 @@ def test_only_redacted_text_is_sent_and_hints_map_to_original(server, tmp_path):
     assert res.unmatched == 2
 
     sugg = lr.suggestions(res, findings, doc.text)
-    assert {f.text for f in sugg} == {"Schwerbehindertenvertreterin im Einkauf am Standort Nord", "Personalnummer 48213"}
+    assert {f.text for f in sugg} == {"Schwerbehindertenvertreterin im Einkauf am Standort Nord",
+                                      "Personalnummer 48213"}
     assert all(f.source == "ki" and not f.active and f.recognizer.startswith("KI-Nachprüfung") for f in sugg)
     # bleiben im Arbeitsstand erhalten
     back = findings_from_compact(findings_to_compact(sugg), doc.text)
@@ -204,7 +205,7 @@ def test_chunks_cover_text_without_gaps(tmp_path):
     red = lr.reviewed_text(doc, [])
     parts = lr.chunks(doc, red, 2000)
     assert parts[0][0] == 0 and parts[-1][1] == len(red.text)
-    assert all(a[1] == b[0] for a, b in zip(parts, parts[1:]))
+    assert all(a[1] == b[0] for a, b in zip(parts, parts[1:], strict=False))
     assert all(e - s <= 2000 for s, e, _ in parts)
 
 
@@ -296,5 +297,6 @@ def test_parse_json_tolerates_fences_and_thinking():
 def test_unencrypted_address_is_recognised():
     assert lr.is_unencrypted("http://llm.intern.example/v1")
     assert lr.is_unencrypted(" HTTP://10.0.0.5:8080/v1 ")
-    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080", "http://[::1]:8080/v1", ""):
+    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080",
+                "http://[::1]:8080/v1", ""):
         assert not lr.is_unencrypted(url), url

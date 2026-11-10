@@ -40,7 +40,8 @@ class ExportMixin:
         if self.session.manual_text is None and self._confirm_further() is None:
             return
         suffix = ".md" if doc.kind == "md" else ".txt"
-        path, _ = QFileDialog.getSaveFileName(self, "Anonymisierten Text speichern", self._suggest(suffix, "anonymisiert"),
+        path, _ = QFileDialog.getSaveFileName(self, "Anonymisierten Text speichern",
+                                              self._suggest(suffix, "anonymisiert"),
                                               "Markdown (*.md);;Text (*.txt);;Alle Dateien (*)")
         if not path:
             return
@@ -69,7 +70,8 @@ class ExportMixin:
                 self, "Hinweis",
                 "Die freie Textbearbeitung wirkt nur auf den Text-Export. Das PDF wird aus den Funden erzeugt."
             )
-        path, _ = QFileDialog.getSaveFileName(self, "Geschwärztes PDF speichern", self._suggest(".pdf", "geschwaerzt"), "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self, "Geschwärztes PDF speichern",
+                                              self._suggest(".pdf", "geschwaerzt"), "PDF (*.pdf)")
         if not path:
             return
         if Path(path).resolve() == doc.path.resolve():
@@ -141,7 +143,8 @@ class ExportMixin:
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle("Kontrolle vor dem Speichern")
         n = len(new)
-        box.setText(f"<b>Geschwärzter Text steht noch an {'einer weiteren Stelle' if n == 1 else f'{n} weiteren Stellen'}.</b>")
+        where = "einer weiteren Stelle" if n == 1 else f"{n} weiteren Stellen"
+        box.setText(f"<b>Geschwärzter Text steht noch an {where}.</b>")
         box.setInformativeText(
             "Diese Stellen sind nicht als Fund markiert und blieben im Ergebnis lesbar:<br><br>" + "<br>".join(lines)
             + "<br><br>Sie stehen jetzt als Vorschläge in der Fundliste (Herkunft „Kontrolle“, noch ohne Häkchen). "

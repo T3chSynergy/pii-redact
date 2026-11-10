@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pymupdf as fitz  # PyMuPDF
 
-from .entities import info
 from .analyzer import word_pattern
+from .entities import info
 from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
-from .pdf_hidden import has_layers, has_outside_content
 from .models import Finding, ReplaceMode, Settings
+from .pdf_hidden import has_layers, has_outside_content
 
 BLACK_CHAR = "█"
 
@@ -259,7 +259,8 @@ def _add_bars(pdf: fitz.Document, plan: list) -> dict[int, list[fitz.Rect]]:
         if label:
             fs = label_fontsize(rect, label)
             if fs:
-                kwargs.update(text=label, fontname="helv", fontsize=fs, text_color=(1, 1, 1), align=fitz.TEXT_ALIGN_CENTER)
+                kwargs.update(text=label, fontname="helv", fontsize=fs, text_color=(1, 1, 1),
+                              align=fitz.TEXT_ALIGN_CENTER)
         pdf[page_no].add_redact_annot(rect, **kwargs)
         pages.setdefault(page_no, []).append(rect)
     return pages
@@ -405,7 +406,8 @@ def redraw_behind(page: fitz.Page, drawings: list[dict]) -> None:
 
 
 def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] | None = None,
-               doc: LoadedDocument | None = None, mode: str = ReplaceMode.PLACEHOLDER, labels: bool = True) -> list[str]:
+               doc: LoadedDocument | None = None, mode: str = ReplaceMode.PLACEHOLDER,
+               labels: bool = True) -> list[str]:
     """Kontrolle des fertigen PDFs. Liefert die Liste der Beanstandungen (leer = sauber).
 
     1. **Aufbau:** Sind noch Kommentare, Formularfelder, Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder
@@ -524,7 +526,8 @@ def _squash(text: str) -> str:
     return re.sub(r"\s+", "", text).casefold()
 
 
-def _other_occurrences(findings: list[Finding], page_texts: list[str], other: list[str], reported: set[str]) -> list[str]:
+def _other_occurrences(findings: list[Finding], page_texts: list[str], other: list[str],
+                       reported: set[str]) -> list[str]:
     """Texte aktiver Funde, die im Ergebnis noch vorkommen – auf den Seiten öfter, als sie bewusst abgewählt
     wurden, oder in Kommentaren, Formularfeldern, Lesezeichen und Metadaten."""
     kept: dict[str, int] = {}

@@ -10,8 +10,8 @@ Original ab und legt sie als **nicht aktivierte Vorschläge** (Quelle „ki“) 
 immer der Mensch; der Export hängt nie vom Modell ab.
 
 Schnittstelle: OpenAI-kompatibel (``POST …/chat/completions``) – direkt am Modellserver oder über ein
-vorgeschaltetes Portal bzw. einen LLM-Proxy. Nur Standardbibliothek (urllib), Proxy- und Zertifikatseinstellungen von Windows
-werden übernommen.
+vorgeschaltetes Portal bzw. einen LLM-Proxy. Nur Standardbibliothek (urllib), Proxy- und Zertifikatseinstellungen
+von Windows werden übernommen.
 """
 
 from __future__ import annotations

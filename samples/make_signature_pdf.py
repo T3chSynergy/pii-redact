@@ -21,7 +21,7 @@ def scribble(page: fitz.Page, x: float, y: float, width: float, seed: int, heigh
     rng = np.random.default_rng(seed)
     shape = page.new_shape()
     pts = [fitz.Point(x + width * i / 14, y + rng.uniform(-height, height) * math.sin(i)) for i in range(15)]
-    for a, b in zip(pts, pts[1:]):
+    for a, b in zip(pts, pts[1:], strict=False):
         c1 = fitz.Point(a.x + rng.uniform(0, 8), a.y - rng.uniform(4, 14))
         c2 = fitz.Point(b.x - rng.uniform(0, 8), b.y + rng.uniform(4, 14))
         shape.draw_bezier(a, c1, c2, b)

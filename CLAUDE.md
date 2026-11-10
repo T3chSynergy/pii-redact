@@ -150,7 +150,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 214 Tests (Stand 10.11.2026, `dev` n
   das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
-  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
+  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen; ruff in der CI auf `0.17.x` festgelegt; Komplexitätsregeln und mypy bewusst erst mit einem Refactoring),
   `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
   PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows

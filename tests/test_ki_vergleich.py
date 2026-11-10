@@ -7,7 +7,6 @@ from http.server import HTTPServer
 from pathlib import Path
 
 import pytest
-
 from test_llm_review import FakeLLM
 
 ROOT = Path(__file__).resolve().parent.parent

@@ -30,8 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, load_document
-from ..core import llm_review
+from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, llm_review, load_document
 from ..core.loaders import SUPPORTED_SUFFIXES
 from ..core.redactor import pdf_redaction_plan, rects_of
 from ..paths import find_ner_model, ner_model_info
@@ -52,7 +51,8 @@ from .window_ki import KiMixin
 from .window_view import ZOOM_PRESETS, ViewMixin
 from .worker import AnalysisRunner
 
-FILE_FILTER = "Dokumente (*.pdf *.txt *.md *.markdown *.text *.log);;PDF (*.pdf);;Text (*.txt);;Markdown (*.md *.markdown)"
+FILE_FILTER = ("Dokumente (*.pdf *.txt *.md *.markdown *.text *.log);;PDF (*.pdf);;Text (*.txt);;"
+               "Markdown (*.md *.markdown)")
 
 
 class DocPanel(QWidget):
@@ -117,7 +117,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self._apply_locks()
         self._update_actions()
         if self._mode_fallback:
-            self.status_label.setText("Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – verwende „Schnell“.")
+            self.status_label.setText(
+                "Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – verwende „Schnell“.")
 
     # ================================================================== Aufbau
     def _build_ui(self) -> None:
@@ -187,7 +188,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         dock = QDockWidget("Funde", self)
         dock.setObjectName("findings")
         dock.setWidget(self.findings)
-        dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable
+                         | QDockWidget.DockWidgetFeature.DockWidgetFloatable)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
         self.resizeDocks([dock], [520], Qt.Orientation.Horizontal)
         self.findings_dock = dock
@@ -347,7 +349,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         act("undo", "&Rückgängig", self.undo, QKeySequence.StandardKey.Undo, SP.SP_ArrowBack)
         act("redo", "&Wiederholen", self.redo, QKeySequence.StandardKey.Redo, SP.SP_ArrowForward)
         act("mark", "&Markierung schwärzen …", lambda: self._mark_selection(False), "Ctrl+R")
-        act("mark_all", "Alle Vor&kommen der Markierung schwärzen …", lambda: self._mark_selection(True), "Ctrl+Shift+R")
+        act("mark_all", "Alle Vor&kommen der Markierung schwärzen …", lambda: self._mark_selection(True),
+            "Ctrl+Shift+R")
         act("all_on", "&Alle Funde schwärzen", lambda: self._set_all(True))
         act("all_off", "Kei&nen Fund schwärzen", lambda: self._set_all(False))
         act("settings", "&Einstellungen …", self.open_settings, "Ctrl+,", SP.SP_FileDialogDetailedView)
@@ -487,7 +490,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.right.text.set_text(doc.text)
         self.findings.set_session(self.session)
         self._show_notices(doc)
-        stored = self.batch.entries[self.batch_rel].ki_review if (self.batch and self.batch_rel in self.batch.entries) else None
+        in_batch = self.batch and self.batch_rel in self.batch.entries
+        stored = self.batch.entries[self.batch_rel].ki_review if in_batch else None
         self.ki_panel.clear(stored if self._batch_loading else None)
         if doc.has_ocr:
             self.right.tabs.setCurrentWidget(self.right.pages)
@@ -868,7 +872,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             if p.suffix.lower() in SUPPORTED_SUFFIXES:
                 self.open_file(p)
                 return
-        QMessageBox.information(self, "Nicht unterstützt", "Bitte eine PDF-, TXT- oder Markdown-Datei oder einen Ordner ablegen.")
+        QMessageBox.information(self, "Nicht unterstützt",
+                                "Bitte eine PDF-, TXT- oder Markdown-Datei oder einen Ordner ablegen.")
 
     def closeEvent(self, e):
         if not self._confirm_discard():

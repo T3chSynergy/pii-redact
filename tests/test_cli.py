@@ -181,7 +181,8 @@ def test_folder_holds_back_and_keeps_suggestions(work, capsys):
     shutil.copy(SAMPLES / "beispiel.txt", source / "brief.txt")
     args = [str(source), "-o", str(work / "aus"), "--schnell"]
     assert cli.main(args) == cli.OCR_SKIPPED
-    assert (work / "aus" / "brief_anonymisiert.txt").is_file() and not (work / "aus" / "antrag_anonymisiert.txt").exists()
+    assert (work / "aus" / "brief_anonymisiert.txt").is_file()
+    assert not (work / "aus" / "antrag_anonymisiert.txt").exists()
     entry = Workspace.load(work / "aus").entries["antrag.txt"]
     assert entry.status == Status.TO_REVIEW and entry.note == CHECK_NOT_AUTO
     # der Vorschlag der Kontrolle steht (ohne Klartext) im Arbeitsstand und erscheint beim Öffnen in der Fundliste

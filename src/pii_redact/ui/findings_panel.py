@@ -180,9 +180,7 @@ class _FilterProxy(QSortFilterProxyModel):
         if self.type_filter and f.entity_type != self.type_filter:
             return False
         text = area_description(f) if f.is_area else f.text
-        if self.text_filter and self.text_filter not in text.casefold():
-            return False
-        return True
+        return not self.text_filter or self.text_filter in text.casefold()
 
 
 class _FindingsTable(QTableView):

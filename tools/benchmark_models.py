@@ -101,8 +101,9 @@ def make_predictor(spec: str):
     """Liefert (predict(text) -> [(start, end, typ)], modellgröße_mb)."""
     kind, _, name = spec.partition(":")
     if kind == "spacy":
-        from pii_redact.paths import find_spacy_model
         import spacy
+
+        from pii_redact.paths import find_spacy_model
 
         ref = find_spacy_model(name) or name
         nlp = spacy.load(ref)
@@ -335,7 +336,7 @@ def main(argv=None) -> int:
         print(f"▶ {label(spec)} …", flush=True)
         proc = subprocess.run([sys.executable, __file__, "--single", spec], capture_output=True, text=True,
                               encoding="utf-8", errors="replace")
-        line = next((l for l in proc.stdout.splitlines() if l.startswith("__RESULT__")), None)
+        line = next((ln for ln in proc.stdout.splitlines() if ln.startswith("__RESULT__")), None)
         if line is None:
             err = (proc.stderr.strip().splitlines() or ["unbekannter Fehler"])[-1]
             print(f"  ✗ übersprungen: {err}")
@@ -358,7 +359,8 @@ def render(rows, docs) -> str:
     chars = sum(len(t) for t in docs.values())
     out = ["# Vergleich Namenserkennung", "", system_info(),
            f"- Testtexte: {', '.join(docs)} ({chars} Zeichen)", "",
-           "| Kandidat | Größe | Laden | Analyse | ms/1000 Zeichen | RAM | Personen gefunden | Personen korrekt | Orte gefunden | Orte korrekt |",
+           "| Kandidat | Größe | Laden | Analyse | ms/1000 Zeichen | RAM | Personen gefunden | Personen korrekt "
+           "| Orte gefunden | Orte korrekt |",
            "|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         if "error" in r:
@@ -367,7 +369,8 @@ def render(rows, docs) -> str:
         s = r["score"]
         size = f"{r['size_mb']:.0f} MB" if r["size_mb"] else "–"
         out.append(
-            f"| {label(r['spec'])} | {size} | {r['load_s']:.1f} s | {r['analyze_s']:.2f} s | {r['ms_per_1000_chars']:.0f} "
+            f"| {label(r['spec'])} | {size} | {r['load_s']:.1f} s | {r['analyze_s']:.2f} s "
+            f"| {r['ms_per_1000_chars']:.0f} "
             f"| +{r['ram_mb']:.0f} MB | {s['PERSON']['recall']:.0%} | {s['PERSON']['precision']:.0%} "
             f"| {s['LOCATION']['recall']:.0%} | {s['LOCATION']['precision']:.0%} |"
         )

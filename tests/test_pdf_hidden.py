@@ -4,8 +4,7 @@ ausgeblendeten Ebenen. Er wird beim Laden entfernt; gelingt das nicht nachweisli
 import pymupdf
 import pytest
 
-from pii_redact.core import Level, ReplaceMode, load_document, redact_pdf, verify_pdf
-from pii_redact.core import pdf_hidden
+from pii_redact.core import Level, ReplaceMode, load_document, pdf_hidden, redact_pdf, verify_pdf
 from pii_redact.core.pdf_hidden import _instructions
 
 
@@ -146,7 +145,8 @@ def test_content_beside_sheet_that_cannot_be_removed_is_reported(tmp_path, monke
     doc = _load(tmp_path, pdf.tobytes())
     notice = _notices(doc)["outside_left"]
     assert notice.critical and notice.pages == [0] and "Neben dem Blatt" not in doc.text
-    assert any("außerhalb des sichtbaren Bereichs" in p for p in verify_pdf(redact_pdf(doc, [], ReplaceMode.BLACKOUT), []))
+    problems = verify_pdf(redact_pdf(doc, [], ReplaceMode.BLACKOUT), [])
+    assert any("außerhalb des sichtbaren Bereichs" in p for p in problems)
 
 
 # ---------------------------------------------------------------- Ebenen

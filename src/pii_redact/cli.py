@@ -19,6 +19,7 @@ Bei mehreren Dateien gilt der schwerwiegendste Wert: 2 vor 1 vor 3 vor 4 vor 0.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 from pathlib import Path
@@ -26,17 +27,17 @@ from pathlib import Path
 for _var in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_DATASETS_OFFLINE"):
     os.environ.setdefault(_var, "1")  # nie etwas aus dem Internet nachladen
 
+from . import __version__
 from .core import (
     AnalysisMode,
     ModelMissingError,
-    ThoroughModelMissingError,
     PiiAnalyzer,
     ReplaceMode,
     Settings,
+    ThoroughModelMissingError,
     UnsupportedFileError,
     load_document,
 )
-from . import __version__
 from .core.batch import CHECK_NOT_AUTO, export_document, held_for_check
 from .core.entities import info
 from .settings_store import defaults_path, settings_path
@@ -76,8 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ohne-unterordner", action="store_true", help="bei Ordnern nur die oberste Ebene")
     p.add_argument("-o", "--ausgabe", type=Path, help="Ausgabeordner (Standard: neben der Quelldatei)")
     p.add_argument("--modus", choices=[ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
-    p.add_argument("--gruendlich", action="store_true", help="Modus „Gründlich“ erzwingen (Standard; Fehler, wenn das Modell fehlt)")
-    p.add_argument("--schnell", action="store_true", help="Modus „Schnell“ (nur spaCy + Muster – weniger Treffer, weniger Speicher)")
+    p.add_argument("--gruendlich", action="store_true",
+                   help="Modus „Gründlich“ erzwingen (Standard; Fehler, wenn das Modell fehlt)")
+    p.add_argument("--schnell", action="store_true",
+                   help="Modus „Schnell“ (nur spaCy + Muster – weniger Treffer, weniger Speicher)")
     p.add_argument("--selftest", action="store_true", help="Beispieldokument analysieren und Installation prüfen")
     p.add_argument("--schwelle", type=float, help="Mindest-Score 0–1 (Standard aus Einstellungen)")
     p.add_argument("--als-text", action="store_true", help="PDFs als anonymisierten Text statt als PDF ausgeben")
@@ -93,10 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ohne-ocr", action="store_true", help="gescannte PDF-Seiten nicht per Texterkennung lesen")
     args = p.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
-        try:
+        with contextlib.suppress(AttributeError, ValueError):
             stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError):
-            pass
 
     if args.einstellungen is not None and not args.einstellungen.is_file():
         p.error(f"Einstellungsdatei nicht gefunden: {args.einstellungen}")

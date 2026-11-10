@@ -110,7 +110,8 @@ def test_workspace_resume_and_change_detection(folder, tmp_path):
     export_document(doc, findings, Settings(), out)
     ws.mark_done(rel, reviewed=True, exported_as=out, leftovers=[], findings=findings)
     ws.save()
-    assert out == target / "Verträge" / "brief_anonymisiert.txt" and out.read_text(encoding="utf-8").startswith("[PERSON]")
+    assert out == target / "Verträge" / "brief_anonymisiert.txt"
+    assert out.read_text(encoding="utf-8").startswith("[PERSON]")
 
     # Kein Klartext im Arbeitsstand
     raw = (target / WORKSPACE_NAME).read_text(encoding="utf-8")
@@ -162,7 +163,8 @@ def test_protocol_has_no_clear_text(folder, tmp_path):
     ws = Workspace.create(folder, tmp_path / "ziel")
     _analyze_fake(ws)
     ws.save()
-    rows = list(csv.reader(open(tmp_path / "ziel" / PROTOCOL_NAME, encoding="utf-8-sig"), delimiter=";"))
+    with open(tmp_path / "ziel" / PROTOCOL_NAME, encoding="utf-8-sig") as fh:
+        rows = list(csv.reader(fh, delimiter=";"))
     assert rows[0][:2] == ["Datei", "Status"] and len(rows) == 4
     assert all(r[1] == "zu prüfen" for r in rows[1:])
     content = (tmp_path / "ziel" / PROTOCOL_NAME).read_text(encoding="utf-8-sig")
@@ -199,4 +201,5 @@ def test_protocol_cells_are_not_read_as_formulas(tmp_path):
     with open(ws.protocol_path, encoding="utf-8-sig", newline="") as fh:
         names = [row[0] for row in csv.reader(fh, delimiter=";")][1:]
     assert sorted(names) == sorted(["'=1+1.txt", "'+plus.txt", "'-minus.txt", "'@summe.txt", "normal.txt"])
-    assert set(ws.entries) == {"=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"}   # Arbeitsstand unverändert
+    # Arbeitsstand unverändert
+    assert set(ws.entries) == {"=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"}

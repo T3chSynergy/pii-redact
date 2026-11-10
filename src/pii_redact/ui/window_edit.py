@@ -10,8 +10,8 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMenu, QMessageBox
 
 from ..core.entities import AREA_KEYS, all_keys, info
-from . import dialogs
 from ..core.hyphenation import join_hyphenated
+from . import dialogs
 
 QUICK_TYPES = ["PERSON", "LOCATION", "DE_ADDRESS", "ORGANIZATION", "EMAIL_ADDRESS", "PHONE_NUMBER",
                "DATE_TIME", "IBAN_CODE", "CUSTOM"]
@@ -94,7 +94,7 @@ class EditMixin:
                 ocr = "  – per Texterkennung gelesen, bitte prüfen" if self.session.doc.is_ocr(f.start, f.end) else ""
                 lines.append(f"{info(f.entity_type).label}: {f.text}  ({state}){ocr}")
                 if f.source == "ki":
-                    lines.append(f"  Vorschlag der {f.recognizer}" if f.recognizer else "  Vorschlag der KI-Nachprüfung")
+                    lines.append(f"  Vorschlag der {f.recognizer or 'KI-Nachprüfung'}")
                 elif f.source == "kontrolle":
                     lines.append("  Vorschlag der Kontrolle: Dieser Text wird an anderer Stelle geschwärzt")
         return "\n".join(lines)
@@ -287,15 +287,16 @@ class EditMixin:
             self.right.text.setReadOnly(False)
             self.right.title.setText("<b>Bearbeitet</b> – <span style='color:#e8590c'>freie Bearbeitung aktiv</span>")
             self.right.title.setToolTip("Änderungen an Funden werden erst nach Beenden der freien Bearbeitung "
-                                        "angezeigt. Beenden verwirft die Handänderungen. Wirkt nur auf den Text-Export.")
+                                        "angezeigt. Beenden verwirft die Handänderungen. "
+                                        "Wirkt nur auf den Text-Export.")
         else:
-            if s.manual_text is not None and s.manual_text != s.redacted().text:
-                if not dialogs.ask_yes_no(self, "Freie Bearbeitung beenden",
-                                          "Handänderungen am anonymisierten Text verwerfen?"):
-                    self.edit_btn.blockSignals(True)
-                    self.edit_btn.setChecked(True)
-                    self.edit_btn.blockSignals(False)
-                    return
+            changed = s.manual_text is not None and s.manual_text != s.redacted().text
+            if changed and not dialogs.ask_yes_no(self, "Freie Bearbeitung beenden",
+                                                  "Handänderungen am anonymisierten Text verwerfen?"):
+                self.edit_btn.blockSignals(True)
+                self.edit_btn.setChecked(True)
+                self.edit_btn.blockSignals(False)
+                return
             self.right.text.setReadOnly(True)
             s.set_manual_text(None)
             self.right.title.setText("<b>Bearbeitet (Vorschau)</b>")
