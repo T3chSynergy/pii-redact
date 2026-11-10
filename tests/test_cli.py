@@ -192,3 +192,45 @@ def test_folder_holds_back_and_keeps_suggestions(work, capsys):
     # ein zweiter Lauf exportiert nicht etwa deshalb, weil der Vorschlag nun schon in der Liste steht
     assert cli.main(args) == cli.OCR_SKIPPED
     assert not (work / "aus" / "antrag_anonymisiert.txt").exists()
+
+
+@needs_model
+def test_selftest_reports_each_part(work, capsys, monkeypatch):
+    """``--selftest`` prüft Modelle, Hilfe, Texterkennung und eine Beispielanalyse je Modus."""
+    pytest.importorskip("rapidocr")
+    from pii_redact.core import ocr
+    from pii_redact.core.analyzer import PiiAnalyzer
+    from pii_redact.paths import find_ner_model
+
+    assert cli.main(["--selftest"]) == cli.OK
+    out = capsys.readouterr().out
+    assert "pii-redact Selbsttest – Quellcode" in out and "Anwenderhilfe: OK" in out
+    assert "✓ Texterkennung: OK" in out and "✓ Modus schnell: OK" in out and "FEHLT" not in out
+    assert ("✓ Modus gruendlich: OK" in out) == bool(find_ner_model(""))
+    assert "Anna Schneider" not in out                    # der Beispieltext selbst wird nicht ausgegeben
+
+    def broken():
+        raise RuntimeError("Modell der Texterkennung fehlt")
+
+    monkeypatch.setattr(ocr, "selftest", broken)
+    assert cli.main(["--selftest", "--schnell"]) == cli.ERROR
+    assert "✗ Texterkennung: Modell der Texterkennung fehlt" in capsys.readouterr().out
+
+    monkeypatch.setattr(ocr, "selftest", lambda: "nichts erkannt")
+    assert cli.main(["--selftest"]) == cli.ERROR
+    assert "✗ Texterkennung: FEHLER – gelesen: 'nichts erkannt'" in capsys.readouterr().out
+
+    monkeypatch.undo()
+    real = PiiAnalyzer.analyze
+    monkeypatch.setattr(PiiAnalyzer, "analyze",
+                        lambda self, text, settings, **k: [f for f in real(self, text, settings, **k)
+                                                           if f.entity_type != "IBAN_CODE"])
+    assert cli.main(["--selftest"]) == cli.ERROR
+    assert "✗ Modus schnell: FEHLT: IBAN_CODE" in capsys.readouterr().out
+
+    def no_model(_settings):
+        raise RuntimeError("Sprachmodell fehlt")
+
+    monkeypatch.setattr(PiiAnalyzer, "for_settings", staticmethod(no_model))
+    assert cli.main(["--selftest"]) == cli.ERROR
+    assert "✗ Modus schnell: Sprachmodell fehlt" in capsys.readouterr().out
