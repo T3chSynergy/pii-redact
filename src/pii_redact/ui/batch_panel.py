@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.batch import Status, Workspace, scan_folder
+from .dialogs import german_buttons
 
 STATUS_STYLE = {
     # Status: (Symbol, Text, Farbe)
@@ -95,7 +96,8 @@ class NewBatchDialog(QDialog):
         hint.setWordWrap(True)
         hint.setStyleSheet("color: gray")
 
-        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttons = german_buttons(
+            QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel))
         self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Starten")
         self.buttons.accepted.connect(self._accept)
         self.buttons.rejected.connect(self.reject)
@@ -342,7 +344,8 @@ class ReviewBar(QWidget):
 
 def confirm_auto_export(parent, count: int, waiting: int, ocr_skipped: int = 0) -> bool:
     text = (
-        f"<p><b>{count} Datei(en)</b> werden <b>ohne manuelle Prüfung</b> automatisch geschwärzt und exportiert."
+        f"<p><b>Bis zu {count} Datei(en)</b> werden <b>ohne manuelle Prüfung</b> automatisch geschwärzt und "
+        "exportiert."
         + (f" {waiting} davon werden erst noch analysiert und danach exportiert." if waiting else "")
         + (f"</p><p><b>{ocr_skipped} Datei(en) mit Texterkennung (OCR)</b> werden nicht automatisch exportiert – "
            "sie müssen einzeln gründlich geprüft werden." if ocr_skipped else "")
@@ -357,6 +360,7 @@ def confirm_auto_export(parent, count: int, waiting: int, ocr_skipped: int = 0) 
     box = QMessageBox(QMessageBox.Icon.Warning, "Ungeprüfte Dateien exportieren", text,
                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel, parent)
     box.button(QMessageBox.StandardButton.Yes).setText("Ohne Prüfung exportieren")
+    box.button(QMessageBox.StandardButton.Cancel).setText("Abbrechen")
     box.setDefaultButton(QMessageBox.StandardButton.Cancel)
     return box.exec() == QMessageBox.StandardButton.Yes
 

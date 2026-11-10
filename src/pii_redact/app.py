@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     log_path = setup_logging()
     log = logging.getLogger("pii_redact")
 
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QLibraryInfo, QTimer, QTranslator
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -65,6 +65,14 @@ def main(argv: list[str] | None = None) -> int:
     icon = Path(__file__).resolve().parent / "resources" / "icon.png"
     if icon.is_file():
         app.setWindowIcon(QIcon(str(icon)))
+
+    # Deutsche Texte für alles, was Qt selbst beschriftet (Kontextmenüs der Textfelder, Dateidialoge ohne
+    # Windows-Dialog …). Die eigenen Rückfragen sind unabhängig davon deutsch beschriftet (ui/dialogs.py).
+    translator = QTranslator(app)
+    if translator.load("qtbase_de", QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+        app.installTranslator(translator)
+    else:
+        log.info("Deutsche Qt-Übersetzung (qtbase_de) nicht gefunden – Qt-eigene Menüs bleiben englisch")
 
     def excepthook(exc_type, exc, tb):
         log.error("Unerwarteter Fehler:\n%s", "".join(traceback.format_exception(exc_type, exc, tb)))

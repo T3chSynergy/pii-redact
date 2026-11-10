@@ -103,7 +103,9 @@ def test_free_edit_roundtrip(window, monkeypatch):
     assert not window.right.text.isReadOnly()
     window.right.text.setPlainText("komplett neu")
     assert s.output_text() == "komplett neu"
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    from pii_redact.ui import dialogs
+
+    monkeypatch.setattr(dialogs, "ask_yes_no", lambda *a, **k: True)
     window.edit_btn.setChecked(False)
     assert s.manual_text is None
     assert window.right.text.toPlainText() == s.redacted().text
@@ -587,3 +589,30 @@ def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path,
     assert ws.entries["a_antrag.txt"].status == Status.REVIEWED
     assert "kaya" not in (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").read_text(encoding="utf-8").casefold()
     window.close_batch()
+
+
+def test_dialog_buttons_are_german(window, monkeypatch):
+    """Rückfragen und Dialoge tragen deutsche Schaltflächen – auch ohne geladene Qt-Übersetzung."""
+    from PySide6.QtWidgets import QDialogButtonBox
+
+    from pii_redact.core import Settings
+    from pii_redact.ui import batch_panel, dialogs
+    from pii_redact.ui.settings_dialog import SettingsDialog
+
+    seen = {}
+
+    def fake_exec(box):
+        seen["texts"] = sorted(b.text() for b in box.buttons())
+        seen["default"] = box.defaultButton().text()
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", fake_exec)
+    assert dialogs.ask_yes_no(window, "Titel", "Frage?") is False
+    assert seen == {"texts": ["Ja", "Nein"], "default": "Nein"}
+    batch_panel.confirm_auto_export(window, 2, 0, 1)
+    assert seen["texts"] == ["Abbrechen", "Ohne Prüfung exportieren"] and seen["default"] == "Abbrechen"
+
+    english = {"Cancel", "Yes", "No", "Close", "Apply"}
+    for dialog in (SettingsDialog(Settings(), window), batch_panel.NewBatchDialog(window)):
+        texts = {b.text().replace("&", "") for box in dialog.findChildren(QDialogButtonBox) for b in box.buttons()}
+        assert texts and not texts & english, texts

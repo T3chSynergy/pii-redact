@@ -33,6 +33,7 @@ from ..core import AnalysisMode, ReplaceMode, Settings
 from ..core import llm_review
 from ..paths import list_ner_models, ner_model_info
 from ..core.entities import all_keys, info
+from .dialogs import german_buttons
 
 MODELS = [
     ("de_core_news_sm", "klein – schnell, weniger genau (~15 MB)"),
@@ -139,7 +140,8 @@ class SettingsDialog(QDialog):
         middle.addWidget(ent_box, 1)
         middle.addWidget(lists, 2)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = german_buttons(
+            QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
