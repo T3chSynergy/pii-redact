@@ -36,6 +36,7 @@ from ..core.loaders import SUPPORTED_SUFFIXES
 from ..core.redactor import pdf_redaction_plan, rects_of
 from ..paths import find_ner_model, ner_model_info
 from ..settings_store import defaults_path, settings_path
+from . import dialogs
 from .batch_panel import BatchPanel, ReviewBar
 from .findings_panel import FindingsPanel
 from .ki_panel import KiReviewPanel
@@ -505,13 +506,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             return True
         if not self.session or not self.session.dirty:
             return True
-        r = QMessageBox.question(
-            self,
-            "Nicht exportierte Änderungen",
-            "Die Nachbearbeitung wurde noch nicht exportiert. Trotzdem fortfahren?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        return r == QMessageBox.StandardButton.Yes
+        return dialogs.ask_yes_no(self, "Nicht exportierte Änderungen",
+                                  "Die Nachbearbeitung wurde noch nicht exportiert. Trotzdem fortfahren?")
 
     # ================================================================== Analyse
     def start_analysis(self) -> None:

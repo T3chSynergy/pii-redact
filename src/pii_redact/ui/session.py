@@ -81,7 +81,7 @@ class DocumentSession(QObject):
         """Neue Analyse übernehmen, ohne Nachbearbeitung zu verlieren: manuelle Funde und Vorschläge der
         KI-Nachprüfung bleiben, deaktivierte oder umtypisierte Stellen behalten ihren Zustand."""
         previous = {f.key: f for f in self.findings if f.source == "auto"}
-        manual = [f for f in self.findings if f.source in ("manuell", "ki")]
+        manual = [f for f in self.findings if f.source in ("manuell", "ki", "kontrolle")]
         for f in new_auto:
             old = previous.get(f.key)
             if old is not None:

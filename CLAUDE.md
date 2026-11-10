@@ -4,14 +4,17 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
-Schwärzung trifft bei engem Zeilenabstand nur noch die eigene Zeile; Hilfe zur Textansicht); davor v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
+**Stand:** v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
+Rückfrage wird zurückgehalten; Namen/Orte in Großbuchstaben, geschützte Leerzeichen, Stern-Datum, Postfach;
+Kommandozeile: Rückgabewert 4, OCR-Einzeldateien nicht exportiert, defekte PDFs; deutsche Schaltflächen); davor
+v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
+Schwärzung trifft bei engem Zeilenabstand nur noch die eigene Zeile; Hilfe zur Textansicht); v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
 Paket-Update, Sicherheitsupdate filelock, Ober-/Untergrenzen in `pyproject.toml`); v0.8.2 (Silbentrennung und
 Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); v0.8.1 (Sicherheitsupdate pillow 13/certifi,
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 169 Tests (Stand 10.11.2026; Stand von PR #58 vom Nutzer getestet, `build.bat` mit 0.8.4 noch nicht). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 202 Tests (Stand 10.11.2026; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -142,11 +145,14 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 169 Tests (Stand 10.11.2026; Stand v
 - Selbsttest: `pii-redact-cli.exe --selftest` + `pii-redact.exe --smoke-test`.
 - **Kommandozeile** (`cli.py`, echte Konsole ohne Qt): Ausgabe ohne Klartext (nur Anzahl/Datenart; Klartext nur
   `--nur-anzeigen`/`--details`), kein stilles Überschreiben (`--ueberschreiben`), Rückgabewert = schwerwiegendster
-  (2 Reste > 1 Fehler > 3 OCR > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
+  (2 Reste > 1 Fehler > 3 nicht automatisch exportiert, in der Oberfläche prüfen – Texterkennung oder Kontrolle
+  vor dem Speichern, einzelne Dateien wie Ordner > 4 „Schnell“ statt „Gründlich“, weil
+  das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
   (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
-  `pytest`. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
+  `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
+  PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
   (`PII_REDACT_PYTHON=python`, `QT_QPA_PLATFORM=offscreen`) bei Release, bei PRs, die Build-Dateien ändern,
   und auf Knopfdruck; ZIP als Artefakt, bei Release als Anhang + Herkunftsnachweis (Attestation, nur bei
@@ -182,6 +188,23 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   - Bewusst **nicht**: unsichtbaren Text *auf* der Seite (weiß auf weiß, verdeckt) erkennen oder entfernen, auch
     kein Hinweis dazu (unzuverlässig) – er wird wie normaler Text geprüft; Hilfe `#textansicht` erklärt es.
   - `verify_pdf` meldet Ebenen und Inhalt außerhalb (`has_outside_content(leftover=True)`).
+- **Kontrolle `verify_pdf`** (seit 10.11.2026): (1) Aufbau (Kommentare, Metadaten, Ebenen …), (2) mit `doc`: je
+  Rechteck des Schwärzungsplans darf nur die Balkenbeschriftung stehen (Zeichenmitte im Rechteck; OCR-Seiten:
+  erneut gelesene Wörter im Rechteck, die dem Fund gleichen) → „an der geschwärzten Stelle noch vorhanden“,
+  (3) Wortlaut aktiver Funde im übrigen Ergebnis, als eigenes Wort/eigene Zahl (`_word_pattern`), öfter als
+  abgewählt → „an anderer Stelle noch lesbar“. (3) ist gewollt: `samples/mail_mit_scan.pdf` meldet so „Kaya“
+  (steht noch im Dateinamen `antrag_kaya.pdf`) und „Anwohnerparkausweis“ (einmal fälschlich als Person
+  geschwärzt, einmal nicht). Ohne `doc` läuft nur (1) und (3).
+- **Kontrolle vor dem Speichern** (seit 10.11.2026, Wunsch des Nutzers): `analyzer.further_occurrences` sucht den
+  Wortlaut aktiver Funde im Dokumenttext an Stellen, die kein Fund berührt → nicht aktivierte Vorschläge
+  `source="kontrolle"` (bleiben wie `ki` bei neuer Analyse erhalten; ein abgewählter Vorschlag ist eine
+  Entscheidung und wird nicht erneut vorgeschlagen). `ExportMixin._confirm_further` (PDF-/Text-Export,
+  „Geprüft & weiter“): Vorschläge in die Fundliste, ersten wählen, Rückfrage `_ask_further` (in Tests ersetzen).
+  Nach „Trotzdem speichern“ blendet die Oberfläche die Meldungen „an anderer Stelle noch lesbar“ der Kontrolle
+  nach dem Export aus. **Ohne Rückfrage wird zurückgehalten** (Entscheidung des Nutzers): `batch.held_for_check`
+  in `window_batch._export_auto` und `cli` – nicht exportieren, Vermerk `CHECK_NOT_AUTO`, Vorschläge im
+  Arbeitsstand, Rückgabewert 3; auch ein vorhandener, unbestätigter Vorschlag hält zurück. Anrede/Titel und
+  Satzzeichen am Rand zählen bei der Suche nicht (`word_pattern`).
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen
@@ -189,10 +212,25 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
   Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
   Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
+- **Großschrift** (`PiiAnalyzer._upper_case`, seit 10.11.2026): Zeilen mit Wörtern in Großbuchstaben (ab 3
+  Buchstaben, `normal_case` – längenneutral) werden zusätzlich in normaler Schreibweise geprüft; übernommen nur
+  von `CASE_RECOGNIZERS` (NER, Anschrift, Name nach Anrede), nur mit mindestens einem solchen Wort, nur noch
+  nicht Abgedecktes. Messung 10.11.2026 (Soll-Funde in Großbuchstaben, Anteil vollständig geschwärzt): Gründlich
+  Personen 78 → 95 %, Orte 79 → 98 %; Schnell 12 → 65 %, 21 → 69 %; normale Texte unverändert; ganz in
+  Großbuchstaben: Gründlich 52 → 89 % / 71 → 98 %, Schnell 4 → 62 % / 2 → 58 %, je +5 Fehlalarme. NER-Treffer mit Ziffern
+  zählen dort nicht („Iban DE89 …“ gälte sonst als Ort und vergrößerte den IBAN-Fund). Abkürzungen als `_NER_STOPWORDS`.
+  Schwellen in `tests/test_erkennung.py`.
+- **Sonder-Leerzeichen** (seit 10.11.2026): `analyzer.plain_spaces` ersetzt U+00A0, U+202F, U+2007 und
+  U+2000–U+200A längenneutral durch normale Leerzeichen – in `analyze()`, `find_terms()` und der Ausnahmeliste.
+  `f.text` wird am Ende immer aus dem Original gesetzt (Wortlaut des Dokuments).
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
+- **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen
+  deshalb über `ui/dialogs.ask_yes_no` (in Tests `dialogs.ask_yes_no` ersetzen, nicht `QMessageBox.question`),
+  Schaltflächenleisten über `german_buttons`; `app.main` lädt zusätzlich `qtbase_de` (Kontextmenüs u. Ä.) – ob
+  die Datei im gebauten Programm liegt, zeigt die Log-Zeile beim Start.
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.

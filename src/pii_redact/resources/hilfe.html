@@ -107,6 +107,26 @@ sobald ein Fund gewählt ist. So können Sie auch ohne eingeblendetes Original p
 <p>Abgewählte Funde bleiben in der Vorschau <b>grau gestrichelt</b> sichtbar und lassen sich jederzeit wieder
 aktivieren.</p>
 
+<h3><a name="vorkontrolle"></a>Kontrolle vor dem Speichern</h3>
+<p>Beim Exportieren prüft das Programm zuerst, ob ein Text, den Sie schwärzen, noch an einer <b>anderen,
+nicht markierten Stelle</b> steht – zum Beispiel ein Name, der auch in einem Dateinamen vorkommt
+(„antrag_mustermann.pdf“) oder einmal in Großbuchstaben geschrieben ist. Solche Stellen blieben im Ergebnis
+lesbar.</p>
+<ul>
+  <li>Die Stellen kommen als <b>Vorschläge</b> in die Fundliste: Herkunft <i>Kontrolle</i>, noch ohne Häkchen.
+      Der erste ist gleich ausgewählt und wird im Dokument gezeigt.</li>
+  <li>Eine Rückfrage nennt die Stellen. <i>Zurück zur Prüfung</i> (Vorgabe) speichert nichts: Setzen Sie das
+      Häkchen, wo geschwärzt werden soll, und exportieren Sie erneut. <i>Trotzdem speichern</i> lässt die Stellen
+      stehen.</li>
+  <li>Ein Vorschlag, den Sie ohne Häkchen lassen, gilt als entschieden – beim nächsten Export wird nicht noch
+      einmal danach gefragt.</li>
+</ul>
+<p><b>Ohne Rückfrage</b> – beim automatischen Export ungeprüfter Dateien und in der Kommandozeile – werden solche
+Dateien nicht exportiert. Sie bleiben in der Arbeitsliste auf „zu prüfen“ stehen, mit einem Vermerk im
+Protokoll; beim Öffnen stehen die Vorschläge der Kontrolle schon in der Fundliste.</p>
+<p class="klein">Gesucht wird der Text als eigenes Wort bzw. eigene Nummer, ohne Rücksicht auf Groß- und
+Kleinschreibung. Teile längerer Wörter zählen nicht („Ende“ in „Wochenende“).</p>
+
 <h3><a name="textansicht"></a>Bei PDFs auch den Reiter <i>Text</i> lesen</h3>
 <p>Der Reiter <i>Seiten</i> zeigt, was man sieht. Der Reiter <i>Text</i> zeigt, was das Programm aus dem PDF
 <b>gelesen</b> hat – und das kann mehr sein: Text in weißer Schrift auf weißem Grund, Text unter einem Bild oder
@@ -275,8 +295,8 @@ nicht mehr herauskopieren. Zusätzlich entfernt das Programm <b>vollständig</b>
 <p><b>Formularfelder</b> werden in normalen Seiteninhalt umgewandelt: Ihre Inhalte werden wie Text geprüft und
 gezielt geschwärzt, die Felder sind im Ergebnis aber nicht mehr ausfüllbar.</p>
 <p>Nach dem Speichern wird das Ergebnis <b>automatisch kontrolliert</b> – der Seitentext ebenso wie Kommentare,
-Formularfelder, Lesezeichen, Metadaten, Ebenen und Inhalt außerhalb des sichtbaren Seitenbereichs. Ist ein geschwärzter Text doch noch lesbar (etwa weil er doppelt im
-PDF steckt), erhalten Sie eine Warnung. Ist alles in Ordnung, erscheint nur eine kurze Meldung in der
+Formularfelder, Lesezeichen, Metadaten, Ebenen und Inhalt außerhalb des sichtbaren Seitenbereichs. Steht an einer geschwärzten Stelle noch Text oder ist ein geschwärzter
+Text an anderer Stelle noch lesbar, erhalten Sie eine Warnung (siehe <a href="#faq">Häufige Fragen</a>). Ist alles in Ordnung, erscheint nur eine kurze Meldung in der
 Statusleiste – mit Link <i>Ordner öffnen</i>; Details zeigt der Tooltip.</p>
 <p>Das Original wird nie überschrieben.</p>
 
@@ -536,8 +556,14 @@ Modus „Schnell“ (findet weniger Namen und Orte – besonders sorgfältig pr�
 <h3>Meldung „Sprachmodell wurde nicht gefunden“.</h3>
 <p>Die Installation ist unvollständig. Bitte an die IT wenden.</p>
 <h3>Nach dem Export erscheint „Reste gefunden“.</h3>
-<p>Ein geschwärzter Text steckt noch an anderer Stelle im PDF. Öffnen Sie das Ergebnis und prüfen Sie die
-genannten Begriffe; ergänzen Sie gegebenenfalls weitere Stellen und exportieren Sie erneut.</p>
+<p>Die Kontrolle nennt zu jedem Begriff, was sie gefunden hat:</p>
+<ul>
+  <li><b>„an anderer Stelle noch lesbar“</b> (mit Seite): Der Text wurde geschwärzt, kommt aber im Ergebnis noch
+      einmal vor. Im Dokumenttext fängt das schon die <a href="#vorkontrolle">Kontrolle vor dem Speichern</a>
+      ab; die Meldung erscheint danach nur noch, wenn der Text außerhalb davon steckt (etwa in Metadaten).</li>
+  <li><b>„an der geschwärzten Stelle noch vorhanden“:</b> Die Schwärzung selbst hat an dieser Stelle nicht
+      gewirkt. Geben Sie das Ergebnis nicht weiter und wenden Sie sich an die IT.</li>
+</ul>
 <h3>Es gibt eine Datei „pii-redact-protokoll (aktuell).csv“.</h3>
 <p>Das Protokoll war beim Speichern in Excel geöffnet. Der aktuelle Stand steht dann in dieser Datei. Nach dem
 Schließen von Excel wird beim nächsten Speichern wieder die normale Datei verwendet.</p>
@@ -551,15 +577,17 @@ Status in der Arbeitsliste halten.</p>
 <h2><a name="kommandozeile"></a>14. Kommandozeile</h2>
 <p class="klein">Für Fortgeschrittene und die IT.</p>
 <p>Für die Stapelverarbeitung ohne Oberfläche gibt es <code>pii-redact-cli</code>. Ergebnisse gelten als
-<b>nicht geprüft</b>; bereits in der Oberfläche geprüfte Dateien bleiben unangetastet. Dateien mit
-Texterkennung werden bei Ordnern nicht exportiert (Rückgabewert 3) und müssen in der Oberfläche geprüft
-werden.</p>
+<b>nicht geprüft</b>; bereits in der Oberfläche geprüfte Dateien bleiben unangetastet. Nicht exportiert
+werden (Rückgabewert 3) Dateien mit Texterkennung und Dateien, in denen ein geschwärzter Text noch an anderer
+Stelle steht – sie müssen in der Oberfläche geprüft werden.</p>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
   <tr><th width="50%">Aufruf</th><th>Wirkung</th></tr>
   <tr><td><code>pii-redact-cli brief.pdf</code></td><td>Erzeugt <code>brief_geschwaerzt.pdf</code></td></tr>
   <tr><td><code>pii-redact-cli C:\Akten -o C:\Akten_geschwaerzt</code></td><td>Ganzen Ordner bearbeiten, mit Protokoll</td></tr>
   <tr><td><code>--schnell</code> / <code>--gruendlich</code></td><td>Modus wählen (Standard: wie in den
-      Einstellungen, voreingestellt „Gründlich“)</td></tr>
+      Einstellungen, voreingestellt „Gründlich“). Fehlt das Modell für „Gründlich“, wird mit „Schnell“
+      bearbeitet und der Rückgabewert 4 gemeldet; mit <code>--gruendlich</code> meldet der Aufruf stattdessen
+      einen Fehler.</td></tr>
   <tr><td><code>--nur-anzeigen</code></td><td>Funde mit dem gefundenen Text auflisten, nichts speichern</td></tr>
   <tr><td><code>--details</code></td><td>Beim Speichern zusätzlich die Funde mit dem gefundenen Text auflisten</td></tr>
   <tr><td><code>--ueberschreiben</code></td><td>Vorhandene Ergebnisdateien ersetzen (sonst Fehler)</td></tr>
@@ -571,8 +599,9 @@ werden.</p>
 </table>
 <p>Die normale Ausgabe nennt nur <b>Anzahl und Datenart</b> der Funde, nicht die Daten selbst. Leiten Sie
 Ausgaben von <code>--nur-anzeigen</code> und <code>--details</code> nicht in Protokolldateien um.</p>
-<p class="klein">Rückgabewerte: 0 = in Ordnung, 1 = Fehler, 2 = Reste im Ergebnis gefunden, 3 = Datei mit
-Texterkennung nicht exportiert. Bei mehreren Dateien gilt der schwerwiegendste Wert (2 vor 1 vor 3).</p>
+<p class="klein">Rückgabewerte: 0 = in Ordnung, 1 = Fehler, 2 = Reste im Ergebnis gefunden, 3 = Datei nicht
+exportiert, bitte in der Oberfläche prüfen (Texterkennung oder Kontrolle), 4 = mit „Schnell“ statt „Gründlich“ bearbeitet (Modell fehlt). Bei mehreren
+Dateien gilt der schwerwiegendste Wert (2 vor 1 vor 3 vor 4).</p>
 
 <h2><a name="komponenten"></a>15. Über pii-redact und verwendete Open-Source-Software</h2>
 <p>pii-redact {{VERSION}} ist <b>freie Software unter der GNU Affero General Public License, Version 3 oder

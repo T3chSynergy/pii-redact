@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMessageBox
 
 from ..core import llm_review
+from . import dialogs
 
 
 class _KiBridge(QObject):
@@ -42,14 +43,14 @@ class KiMixin:
             return
         if not self._ki_confirmed:
             host = llm_review.host_of(self.settings)
-            r = QMessageBox.question(
+            ok = dialogs.ask_yes_no(
                 self, "KI-Nachprüfung",
                 f"Der geschwärzte Text wird an <b>{html.escape(host)}</b> "
                 f"(Modell {html.escape(self.settings.llm_model)}) gesendet.<br><br>"
                 "Das Original verlässt den Rechner nicht – übersehene Angaben im Ergebnis aber schon. "
                 "Fortfahren?<br><span style='color:gray'>(Diese Frage erscheint einmal pro Programmstart.)</span>",
             )
-            if r != QMessageBox.StandardButton.Yes:
+            if not ok:
                 return
             self._ki_confirmed = True
         self._ki_session = s

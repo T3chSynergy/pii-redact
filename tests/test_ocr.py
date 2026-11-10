@@ -61,7 +61,12 @@ def test_verify_rereads_ocr_pages():
     missed = _finding(doc, "Lena Fischer")
     data = redact_pdf(doc, [], ReplaceMode.PLACEHOLDER)   # nichts geschwärzt
     assert verify_pdf(data, [missed]) == []                # ohne OCR-Seiten: keine Textebene, nichts zu sehen
-    assert verify_pdf(data, [missed], doc.ocr_pages) == ["Lena Fischer"]
+    assert verify_pdf(data, [missed], doc.ocr_pages) == ["Lena Fischer – an anderer Stelle noch lesbar (Seite 1)"]
+    # mit Dokument: die Stelle selbst wird geprüft
+    assert verify_pdf(data, [missed], doc.ocr_pages, doc) == [
+        "Lena Fischer – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+    done = redact_pdf(doc, [missed], ReplaceMode.NUMBERED)
+    assert verify_pdf(done, [missed], doc.ocr_pages, doc, ReplaceMode.NUMBERED) == []
 
 
 def test_needs_ocr_heuristic():
@@ -93,7 +98,7 @@ def test_batch_skips_ocr_in_auto_export_and_checks_text(tmp_path):
     shutil.copy(SAMPLES / "scan.pdf", src / "scan.pdf")
     shutil.copy(SAMPLES / "beispiel.txt", src / "brief.txt")
     out = tmp_path / "ziel"
-    rc = main([str(src), "-o", str(out)])
+    rc = main([str(src), "-o", str(out), "--schnell"])
     assert rc == 3
     ws = Workspace.load(out)
     e = ws.entries["scan.pdf"]

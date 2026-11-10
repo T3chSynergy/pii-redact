@@ -47,6 +47,7 @@ class DeAddressRecognizer(PatternRecognizer):
             rf"[ \t]{_NAME_WORD}[ \t]\d{{1,3}}[a-z]?\b",
             0.3,
         ),
+        Pattern("Postfach + Nummer", r"\bPostfach[ \t]+\d{1,3}(?:[ \t]?\d{2,3}){0,3}\b", 0.6),
         Pattern(
             "PLZ + Ort",
             rf"(?<![\d.,])\b\d{{5}}[ \t]+(?!(?:Euro|EUR|Stück|Mal|Einwohner|Menschen|Personen)\b)"
@@ -87,6 +88,14 @@ class DeDateRecognizer(PatternRecognizer):
             0.3,
         ),
         Pattern("ISO", r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b", 0.25),
+        # Geburts-/Sterbedatum mit Stern bzw. Kreuz davor („Yılmaz, Ayşe, *17.11.1984“) – braucht kein Kontextwort.
+        # Nicht bei Markdown-Hervorhebung („*17.11.2024*“, „**17.11.2024**“).
+        Pattern(
+            "*TT.MM.JJJJ / †TT.MM.JJJJ",
+            r"(?:(?<=(?<![*\w])\*)|(?<=(?<![*\w])\*[ \t])|(?<=†)|(?<=†[ \t]))"
+            r"(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:19|20)?\d{2}\b(?!\*)",
+            0.6,
+        ),
     ]
     CONTEXT = ["geboren", "geb", "geburtsdatum", "geburtstag", "geburtsort", "jahrgang", "verstorben", "gestorben"]
 

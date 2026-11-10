@@ -17,6 +17,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from .analyzer import CHECK_SOURCE, further_occurrences
 from .entities import info
 from .loaders import OCR_WARNING_PREFIX, SUPPORTED_SUFFIXES, LoadedDocument
 from .models import Finding, Settings
@@ -103,6 +104,34 @@ def findings_from_compact(items: list[dict], text: str) -> list[Finding]:
                            active=bool(it.get("a", True)), recognizer=it.get("rec", ""),
                            original_type=it.get("ot", "")))
     return out
+
+
+def csv_safe(value):
+    """Zelle für das Protokoll: Text, der mit ``=``, ``+``, ``-`` oder ``@`` beginnt, liest eine Tabellenkalkulation
+    als Formel (z. B. ein Dateiname „=Summe.pdf“). Ein vorangestelltes Hochkomma macht daraus reinen Text."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
+#: Vermerk an Dateien, die die Kontrolle vor dem Speichern zurückhält (automatischer Export, Kommandozeile)
+CHECK_NOT_AUTO = ("Kontrolle: geschwärzter Text steht noch an anderer Stelle – nicht automatisch exportiert, "
+                  "bitte in der Oberfläche prüfen")
+
+
+def held_for_check(text: str, findings: list[Finding]) -> list[Finding] | None:
+    """Kontrolle vor dem Speichern für Läufe ohne Rückfrage (automatischer Export, Kommandozeile).
+
+    Steht der Text eines aktiven Fundes noch an einer nicht markierten Stelle, wird die Datei nicht exportiert,
+    sondern bleibt zur Prüfung in der Oberfläche stehen – wie Dateien mit Texterkennung. Rückgabe: die Funde
+    samt Vorschlägen der Kontrolle, wenn die Datei zurückgehalten wird, sonst None.
+
+    Auch ein schon vorhandener, noch nicht bestätigter Vorschlag hält die Datei zurück: Ohne Prüfung durch
+    einen Menschen ist er keine Entscheidung."""
+    new = further_occurrences(text, findings)
+    if new or any(f.source == CHECK_SOURCE and not f.active for f in findings):
+        return sorted(findings + new, key=lambda f: (f.start, f.end))
+    return None
 
 
 def ki_summary(review: dict | None) -> str:
@@ -411,6 +440,13 @@ class Workspace:
             e.status = Status.TO_REVIEW
             e.note = "nach der Prüfung geändert – bitte erneut bestätigen"
 
+    def hold_for_check(self, rel: str, findings: list[Finding]) -> None:
+        """Datei bleibt zur Prüfung stehen; die Vorschläge der Kontrolle stehen beim Öffnen in der Fundliste."""
+        e = self.entries[rel]
+        e.findings = findings_to_compact(findings)
+        e.stats = finding_stats(findings)
+        e.note = CHECK_NOT_AUTO
+
     def mark_done(self, rel: str, *, reviewed: bool, exported_as: Path, leftovers: list[str],
                   findings: list[Finding]) -> None:
         e = self.entries[rel]
@@ -443,7 +479,7 @@ class Workspace:
                     hints.append(e.note)
                 if e.error:
                     hints.append(f"Fehler: {e.error.splitlines()[0]}")
-                w.writerow([
+                w.writerow(csv_safe(cell) for cell in [
                     e.rel,
                     Status.LABELS.get(e.status, e.status),
                     e.reviewed_by,

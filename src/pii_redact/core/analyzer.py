@@ -124,17 +124,18 @@ class PiiAnalyzer:
         # Silbentrennung am Zeilenende aufheben („Bergen-⏎thaler“): Erkennung auf dem zusammengefügten Text,
         # die Funde werden am Ende auf den Originaltext zurückgerechnet und decken dann beide Zeilen ab.
         original = text
-        text, hmap = dehyphenate(original)
+        text, hmap = dehyphenate(plain_spaces(original))
         entities = [e for e in settings.entities if e != "CUSTOM"]
         raw = self._run(text, entities, settings.threshold, progress)
         raw = clean_ner(raw, text)
         raw.extend(find_terms(text, settings.all_deny))
         raw.extend(self._cross_line(text, entities, settings.threshold, raw))
+        raw.extend(self._upper_case(text, entities, settings.threshold, raw))
         findings = apply_allow_list(merge_overlaps(trim(raw, text), text), settings.all_allow)
-        if hmap:
-            for f in findings:
+        for f in findings:
+            if hmap:
                 f.start, f.end = hmap.span(f.start, f.end)
-                f.text = original[f.start:f.end]
+            f.text = original[f.start:f.end]   # Wortlaut des Dokuments (mit Trennung und Sonder-Leerzeichen)
         return findings
 
     def _run(self, text: str, entities: list[str], threshold: float,
@@ -157,6 +158,45 @@ class PiiAnalyzer:
         if progress:
             progress(len(chunks), len(chunks))
         return raw
+
+    def _upper_case(self, text: str, entities: list[str], threshold: float, found: list[Finding]) -> list[Finding]:
+        """Namen und Orte in Großbuchstaben („SCHNEIDER, ANNA“, „80331 MÜNCHEN“ – Formulare, Adressfelder).
+
+        Die Namenserkennung und die Muster für Anschriften stützen sich auf die übliche Schreibweise. Zeilen mit
+        Wörtern in Großbuchstaben werden deshalb zusätzlich in normaler Schreibweise geprüft („Schneider, Anna“).
+        Übernommen wird nur, was mindestens ein solches Wort enthält und noch nicht gefunden war – und nur von
+        Erkennern, die auf die Schreibweise angewiesen sind (Namenserkennung, Anschrift, Name nach Anrede);
+        Nummern, E-Mail usw. findet schon der normale Durchgang."""
+        probe_text, upper = normal_case(text)
+        if not upper:
+            return []
+        # nur die betroffenen Zeilen prüfen (Absatz als Trenner, damit nichts über Zeilen hinweg passt)
+        lines, parts, starts, pos = [], [], [], 0
+        for m in re.finditer(r"[^\n]+", text):
+            if any(m.start() <= s < m.end() for s, _e in upper):
+                lines.append((m.start(), m.end()))
+                starts.append(pos)
+                parts.append(probe_text[m.start():m.end()])
+                pos += m.end() - m.start() + 2
+        covered = bytearray(len(text))
+        for f in found:
+            covered[f.start:f.end] = b"\x01" * (f.end - f.start)
+        out = []
+        probe = "\n\n".join(parts)
+        for f in clean_ner(self._run(probe, entities, threshold), probe):
+            k = bisect.bisect_right(starts, f.start) - 1
+            a, b = lines[k]
+            s, e = f.start - starts[k] + a, f.end - starts[k] + a
+            if f.recognizer not in CASE_RECOGNIZERS:
+                continue
+            if f.recognizer in NER_RECOGNIZERS and any(c.isdigit() for c in f.text):
+                continue   # Namen und Orte enthalten keine Ziffern („Iban DE89 …“ hält die Namenserkennung für einen Ort)
+            if e > b or not any(s < ue and us < e for us, ue in upper):
+                continue
+            if all(covered[i] or text[i].isspace() for i in range(s, e)):
+                continue
+            out.append(Finding(s, e, f.entity_type, text[s:e], f.score, recognizer=f.recognizer))
+        return out
 
     def _cross_line(self, text: str, entities: list[str], threshold: float, found: list[Finding]) -> list[Finding]:
         """Nummern über eine Zeilengrenze hinweg (IBAN, Telefon …, z. B. „DE89 3704 0044⏎0532 0130 00“).
@@ -200,6 +240,42 @@ class PiiAnalyzer:
 
 
 # ---------------------------------------------------------------------- Helfer
+# Leerzeichen-Varianten, wie sie Satzprogramme und Textverarbeitung setzen: geschützt (U+00A0), schmal
+# geschützt (U+202F), Ziffernbreite (U+2007) und die festen Breiten U+2000–U+200A. Die Muster für IBAN,
+# Telefon usw. kennen nur das normale Leerzeichen („DE89 3704 …“ mit geschützten Leerzeichen blieb unerkannt).
+_SPACES = dict.fromkeys([0x00A0, 0x202F, 0x2007, *range(0x2000, 0x200B)], " ")
+
+
+#: Wörter in Großbuchstaben (ab drei Buchstaben, auch mit Bindestrich: „MÜLLER-LÜDENSCHEID“)
+_UPPER_WORD = re.compile(r"(?<![^\W\d_])[A-ZÄÖÜ][A-ZÄÖÜẞß]{2,}(?:-[A-ZÄÖÜ][A-ZÄÖÜẞß]+)*(?![^\W\d_])")
+
+
+def normal_case(text: str) -> tuple[str, list[tuple[int, int]]]:
+    """Wörter in Großbuchstaben in normaler Schreibweise („SCHNEIDER“ → „Schneider“) – Zeichen für Zeichen,
+    alle Positionen bleiben gleich. Rückgabe: Text und die Bereiche der geänderten Wörter."""
+    chars = None
+    spans = []
+    for m in _UPPER_WORD.finditer(text):
+        if chars is None:
+            chars = list(text)
+        spans.append((m.start(), m.end()))
+        start = True
+        for i in range(m.start(), m.end()):
+            if chars[i] == "-":
+                start = True
+                continue
+            if not start:
+                low = chars[i].lower()
+                chars[i] = low if len(low) == 1 else chars[i]
+            start = False
+    return ("".join(chars) if chars else text), spans
+
+
+def plain_spaces(text: str) -> str:
+    """Sonder-Leerzeichen durch normale ersetzen – Zeichen für Zeichen, alle Positionen bleiben gleich."""
+    return text.translate(_SPACES)
+
+
 # Zeilenende mit Ziffer/Buchstabe, nächste Zeile (im selben Absatz) beginnt mit einer Ziffer, „+“ (Vorwahl)
 # oder einem einzelnen Großbuchstaben vor einer Ziffer (Rentenversicherungsnummer „65 170839⏎J 00 3“)
 _NUMBER_BREAK = re.compile(r"(?<=[0-9A-Za-z])[ \t]*\n(?=[ \t]*(?:[0-9+]|[A-Z][ \t]?\d))")
@@ -236,6 +312,8 @@ def _chunks(text: str, size: int) -> Iterable[tuple[int, int]]:
 
 
 NER_RECOGNIZERS = {"SpacyRecognizer", "OnnxNerRecognizer"}
+#: Erkenner, die auf Groß-/Kleinschreibung angewiesen sind – nur sie zählen im Durchgang für Großschrift
+CASE_RECOGNIZERS = NER_RECOGNIZERS | {"DeAddressRecognizer", "DeTitledPersonRecognizer"}
 
 # Typische Feldbezeichnungen, die spaCy gern als Name/Ort mitnimmt („Berlin\nTelefon“).
 _NER_STOPWORDS = {
@@ -243,7 +321,10 @@ _NER_STOPWORDS = {
     "datum", "ort", "name", "vorname", "nachname", "iban", "bic", "straße", "strasse", "plz",
     "betreff", "anlage", "anlagen", "seite", "herr", "frau", "hallo", "liebe", "lieber",
     "sehr", "geehrte", "geehrter", "mit", "freundlichen", "grüßen", "grüße", "gruß", "viele",
-    "beste", "herzliche", "steuer-id",
+    "beste", "herzliche", "steuer-id", "personalnr", "personalnummer", "kundennr", "kundennummer", "postfach",
+    # Abkürzungen, die in normaler Schreibweise („Dsgvo“) wie Namen aussehen – siehe PiiAnalyzer._upper_case
+    "geb", "geb.", "dr.", "prof.", "tel.", "mailto", "dsgvo", "bdsg", "bgb", "sgb", "stgb", "hgb", "ihk", "hwk", "aok", "tüv", "adac", "drk",
+    "dhl", "ups", "sepa", "gmbh",
 }
 _NER_SPLIT = re.compile(r"[\n\[\]()<>|*_#=/\\@:;]+")
 
@@ -330,10 +411,10 @@ def merge_overlaps(findings: list[Finding], text: str) -> list[Finding]:
 def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> list[Finding]:
     """Alle Vorkommen der Begriffe (ohne Groß-/Kleinschreibung, ganze Wörter) – auch über eine
     Silbentrennung am Zeilenende hinweg („Bergen-⏎thaler“ für „Bergenthaler“)."""
-    joined, hmap = dehyphenate(text)
+    joined, hmap = dehyphenate(plain_spaces(text))
     out = []
     for term in terms:
-        term = join_hyphenated(term.strip())
+        term = join_hyphenated(plain_spaces(term).strip())
         if not term:
             continue
         pattern = re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
@@ -343,8 +424,65 @@ def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> 
     return out
 
 
+_SALUTATIONS = {"herr", "herrn", "frau", "dr", "prof", "med"}
+
+
+def word_pattern(text: str) -> re.Pattern | None:
+    """Suchmuster für den Text eines Fundes: Leerraum beliebig, und nicht als Teil eines längeren Wortes bzw.
+    einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“).
+    None bei Texten unter drei Zeichen."""
+    # Satzzeichen am Rand gehören nicht zum gesuchten Text („KAYA.“ am Satzende → „kaya“ im Dateinamen)
+    words = join_hyphenated(plain_spaces(text)).strip(_TRIM_CHARS + ".!?").split()
+    # Anrede und Titel gehören nicht zum Namen („Herrn Kaya“ → „kaya“ im Dateinamen)
+    while len(words) > 1 and words[0].casefold().rstrip(".") in _SALUTATIONS:
+        words = words[1:]
+    if not words or len("".join(words)) < 3:
+        return None
+    core = r"\s*".join(re.escape(w) for w in words)
+    first, last = words[0][0], words[-1][-1]
+    before = r"(?<![^\W\d_])" if first.isalpha() else r"(?<!\d)" if first.isdigit() else ""
+    after = r"(?![^\W\d_])" if last.isalpha() else r"(?!\d)" if last.isdigit() else ""
+    return re.compile(before + core + after, re.IGNORECASE)
+
+
+#: Herkunft der Vorschläge aus der Kontrolle vor dem Speichern (wie „ki“: nicht aktiviert, bleiben bei neuer Analyse)
+CHECK_SOURCE = "kontrolle"
+
+
+def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
+    """Stellen, an denen der Text eines aktiven Fundes noch einmal steht, ohne selbst als Fund markiert zu sein –
+    etwa ein Name im Dateinamen („antrag_kaya.pdf“) oder in anderer Groß-/Kleinschreibung. Sie blieben im Ergebnis
+    lesbar. Rückgabe: nicht aktivierte Vorschläge (Herkunft „kontrolle“) mit der Datenart des Fundes.
+
+    Stellen, die ein vorhandener Fund berührt, zählen nicht: aktive werden geschwärzt, abgewählte sind eine
+    bewusste Entscheidung (auch ein früher abgelehnter Vorschlag)."""
+    marked = bytearray(len(text))
+    for f in findings:
+        if f.area is None:
+            marked[f.start:f.end] = b"\x01" * (f.end - f.start)
+    joined, hmap = dehyphenate(plain_spaces(text))
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for f in sorted(findings, key=lambda f: f.start):
+        key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
+        if not f.active or f.area is not None or key in seen:
+            continue
+        seen.add(key)
+        pattern = word_pattern(f.text)
+        if pattern is None:
+            continue
+        for m in pattern.finditer(joined):
+            s, e = hmap.span(m.start(), m.end()) if hmap else (m.start(), m.end())
+            if any(marked[s:e]):
+                continue
+            marked[s:e] = b"\x01" * (e - s)
+            out.append(Finding(s, e, f.entity_type, text[s:e], 1.0, source=CHECK_SOURCE, active=False,
+                               recognizer="Kontrolle: weiteres Vorkommen eines geschwärzten Textes"))
+    return sorted(out, key=lambda f: f.start)
+
+
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
-    allowed = {join_hyphenated(a.strip()).casefold() for a in allow_list if a.strip()}
+    allowed = {join_hyphenated(plain_spaces(a).strip()).casefold() for a in allow_list if a.strip()}
     if not allowed:
         return findings
-    return [f for f in findings if join_hyphenated(f.text.strip()).casefold() not in allowed]
+    return [f for f in findings if join_hyphenated(plain_spaces(f.text).strip()).casefold() not in allowed]

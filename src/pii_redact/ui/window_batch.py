@@ -11,8 +11,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressDialog
 
 from ..core import UnsupportedFileError
-from ..core.batch import Status, Workspace, export_document
+from ..core.batch import Status, Workspace, export_document, held_for_check
 from .batch_panel import NewBatchDialog, confirm_auto_export, status_style
+from .window_export import ELSEWHERE
 
 OCR_NOT_AUTO = "Texterkennung (OCR) – wird nicht automatisch exportiert, bitte einzeln prüfen"
 
@@ -206,7 +207,7 @@ class BatchMixin:
             entry.note = OCR_NOT_AUTO
         elif self._auto_export and entry.status == Status.TO_REVIEW:
             try:
-                self._export_entry(rel, reviewed=False, findings=findings)
+                self._export_auto(rel, findings)
             except Exception as exc:  # noqa: BLE001
                 self.batch.set_error(rel, f"Export fehlgeschlagen: {exc}")
         if self._auto_export and not self.runner.pending_files(self.batch_id):
@@ -240,6 +241,20 @@ class BatchMixin:
         self.batch.mark_done(rel, reviewed=reviewed, exported_as=out, leftovers=leftovers, findings=findings)
         return leftovers
 
+    def _export_auto(self, rel: str, findings, doc=None) -> bool:
+        """Export ohne Prüfung. Steht ein geschwärzter Text noch an anderer Stelle, bleibt die Datei stattdessen
+        zur Prüfung stehen (Vorschläge der Kontrolle in der Fundliste). Rückgabe: exportiert?"""
+        doc = doc or self._load(self.batch.abs(rel))
+        held = held_for_check(doc.text, findings)
+        if held is None:
+            self._export_entry(rel, False, findings, doc)
+            return True
+        if rel == self.batch_rel and self.session is not None and self.session.doc is doc:
+            known = {f.id for f in findings}
+            self.session.add_findings([f for f in held if f.id not in known])
+        self.batch.hold_for_check(rel, held)
+        return False
+
     def confirm_and_next(self) -> None:
         if not (self.batch and self.batch_rel and self.session):
             return
@@ -251,6 +266,10 @@ class BatchMixin:
         rel = self.batch_rel
         if not self._confirm_ocr(self.session.doc):
             return
+        accepted = self._confirm_further()
+        if accepted is None:
+            self._store_batch_session()   # Vorschläge der Kontrolle im Arbeitsstand festhalten
+            return
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             leftovers = self._export_entry(rel, True, self.session.findings, self.session.doc)
@@ -261,6 +280,8 @@ class BatchMixin:
         QApplication.restoreOverrideCursor()
         self.session.dirty = False
         self._save_batch()
+        if accepted:   # vor dem Speichern gezeigt und bewusst belassen – nicht erneut melden
+            leftovers = [x for x in leftovers if ELSEWHERE not in x]
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",
@@ -312,7 +333,7 @@ class BatchMixin:
         dlg = QProgressDialog("Exportiere …", "Abbrechen", 0, len(ready), self)
         dlg.setWindowTitle("Ungeprüfte Dateien exportieren")
         dlg.setMinimumDuration(300)
-        failed = requeued = 0
+        failed = requeued = held = 0
         for i, e in enumerate(ready):
             if dlg.wasCanceled():
                 break
@@ -321,7 +342,7 @@ class BatchMixin:
             QApplication.processEvents()
             try:
                 if e.rel == self.batch_rel and self.session is not None:
-                    self._export_entry(e.rel, False, self.session.findings, self.session.doc)
+                    held += not self._export_auto(e.rel, self.session.findings, self.session.doc)
                 else:
                     doc = self._load(self.batch.abs(e.rel))
                     findings = self.batch.restore_findings(e.rel, doc)
@@ -330,7 +351,7 @@ class BatchMixin:
                         waiting.append(e)
                         requeued += 1
                         continue
-                    self._export_entry(e.rel, False, findings, doc)
+                    held += not self._export_auto(e.rel, findings, doc)
             except Exception as exc:  # noqa: BLE001
                 failed += 1
                 self.batch.set_error(e.rel, f"Export fehlgeschlagen: {exc}")
@@ -340,10 +361,12 @@ class BatchMixin:
         self._save_batch()
         self._refresh_batch()
         self.status_label.setText(
-            f"{len(ready) - failed - requeued} Datei(en) automatisch exportiert"
+            f"{len(ready) - failed - requeued - held} Datei(en) automatisch exportiert"
             + (f", {len(waiting)} folgen nach der Analyse" if self._auto_export else "")
             + (f", {failed} Fehler" if failed else "")
-            + (f", {len(ocr_skipped)} mit Texterkennung bleiben zur Prüfung stehen" if ocr_skipped else "") + ".")
+            + (f", {len(ocr_skipped)} mit Texterkennung bleiben zur Prüfung stehen" if ocr_skipped else "")
+            + (f", {held} hält die Kontrolle zur Prüfung zurück (geschwärzter Text steht noch an anderer Stelle)"
+               if held else "") + ".")
 
     def _requeue_batch(self) -> None:
         """Nach Änderung von Modus/Einstellungen: noch nicht analysierte Dateien mit neuen Einstellungen."""

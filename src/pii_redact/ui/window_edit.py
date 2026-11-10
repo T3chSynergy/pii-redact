@@ -10,6 +10,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMenu, QMessageBox
 
 from ..core.entities import AREA_KEYS, all_keys, info
+from . import dialogs
 from ..core.hyphenation import join_hyphenated
 
 QUICK_TYPES = ["PERSON", "LOCATION", "DE_ADDRESS", "ORGANIZATION", "EMAIL_ADDRESS", "PHONE_NUMBER",
@@ -94,6 +95,8 @@ class EditMixin:
                 lines.append(f"{info(f.entity_type).label}: {f.text}  ({state}){ocr}")
                 if f.source == "ki":
                     lines.append(f"  Vorschlag der {f.recognizer}" if f.recognizer else "  Vorschlag der KI-Nachprüfung")
+                elif f.source == "kontrolle":
+                    lines.append("  Vorschlag der Kontrolle: Dieser Text wird an anderer Stelle geschwärzt")
         return "\n".join(lines)
 
     def _redacted_tooltip(self, offset: int) -> str:
@@ -287,9 +290,8 @@ class EditMixin:
                                         "angezeigt. Beenden verwirft die Handänderungen. Wirkt nur auf den Text-Export.")
         else:
             if s.manual_text is not None and s.manual_text != s.redacted().text:
-                r = QMessageBox.question(self, "Freie Bearbeitung beenden",
-                                         "Handänderungen am anonymisierten Text verwerfen?")
-                if r != QMessageBox.StandardButton.Yes:
+                if not dialogs.ask_yes_no(self, "Freie Bearbeitung beenden",
+                                          "Handänderungen am anonymisierten Text verwerfen?"):
                     self.edit_btn.blockSignals(True)
                     self.edit_btn.setChecked(True)
                     self.edit_btn.blockSignals(False)

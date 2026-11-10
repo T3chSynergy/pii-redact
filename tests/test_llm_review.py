@@ -201,7 +201,7 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     from PySide6.QtCore import QEventLoop, QTimer
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication
 
     QApplication.instance() or QApplication([])
     from pii_redact.ui.main_window import MainWindow
@@ -212,7 +212,9 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
         loop.exec()
 
     asked = []
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: asked.append(a[2]) or QMessageBox.StandardButton.Yes)
+    from pii_redact.ui import dialogs
+
+    monkeypatch.setattr(dialogs, "ask_yes_no", lambda *a, **k: asked.append(a[2]) or True)
     w = MainWindow()
     try:
         assert not w.actions_["ki_review"].isVisible()  # nicht eingerichtet → unsichtbar
@@ -264,3 +266,10 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
 def test_parse_json_tolerates_fences_and_thinking():
     raw = '<think>erst überlegen {x}</think>\n```json\n{"risiko": "hoch", "hinweise": []}\n```'
     assert lr.parse_json(raw)["risiko"] == "hoch"
+
+
+def test_unencrypted_address_is_recognised():
+    assert lr.is_unencrypted("http://llm.intern.example/v1")
+    assert lr.is_unencrypted(" HTTP://10.0.0.5:8080/v1 ")
+    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080", "http://[::1]:8080/v1", ""):
+        assert not lr.is_unencrypted(url), url

@@ -11,6 +11,7 @@ from pathlib import Path
 import pymupdf as fitz  # PyMuPDF
 
 from .entities import info
+from .analyzer import word_pattern
 from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
 from .pdf_hidden import has_layers, has_outside_content
@@ -403,51 +404,56 @@ def redraw_behind(page: fitz.Page, drawings: list[dict]) -> None:
     shape.commit(overlay=False)
 
 
-def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] | None = None) -> list[str]:
-    """Kontrolle des fertigen PDFs.
+def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] | None = None,
+               doc: LoadedDocument | None = None, mode: str = ReplaceMode.PLACEHOLDER, labels: bool = True) -> list[str]:
+    """Kontrolle des fertigen PDFs. Liefert die Liste der Beanstandungen (leer = sauber).
 
-    Prüft, ob Texte aktiver Funde noch extrahierbar sind – im Seitentext, in Kommentaren,
-    Formularfeldern, Lesezeichen und Metadaten – und ob noch Kommentare, Formularfelder,
-    Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder Inhalt außerhalb des sichtbaren Seitenbereichs
-    vorhanden sind.
+    1. **Aufbau:** Sind noch Kommentare, Formularfelder, Lesezeichen, Links, Anhänge, Metadaten, Ebenen oder
+       Inhalt außerhalb des sichtbaren Seitenbereichs vorhanden?
+    2. **Geschwärzte Stellen** (nur mit ``doc``): Steht an einer Stelle, die geschwärzt wurde, noch Text?
+       Geprüft wird jedes Schwärzungsrechteck des Plans – unabhängig davon, wie der Text lautet und ob er
+       anderswo abgewählt wurde.
+    3. **Andere Stellen:** Kommt der Text eines aktiven Fundes sonst noch im Ergebnis vor – im Seitentext
+       (als eigenes Wort bzw. eigene Nummer, nicht als Teil eines längeren Wortes), in Kommentaren,
+       Formularfeldern, Lesezeichen oder Metadaten? Vorkommen, die bewusst abgewählt wurden, zählen nicht.
 
-    Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per
-    OCR gelesen.
-
-    Liefert die Liste der gefundenen Reste (leer = alles entfernt). Texte, die an anderer Stelle
-    bewusst NICHT geschwärzt wurden, werden ignoriert."""
+    Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per OCR gelesen."""
     pdf = fitz.open(stream=pdf_bytes, filetype="pdf")
-    parts = [page.get_text() for page in pdf]
+    page_texts = [page.get_text() for page in pdf]
+    ocr_words: dict[int, list] = {}
     if ocr_pages:
         from . import ocr as ocr_mod
 
         key = ocr_mod.doc_key(pdf_bytes)
         for pno in ocr_pages:
             if 0 <= pno < pdf.page_count:
-                parts.append(ocr_mod.ocr_page_text(pdf[pno], key))
+                lines = ocr_mod.ocr_page(pdf[pno], key)
+                ocr_words[pno] = [w for line in lines for w in line]
+                page_texts[pno] += "\n" + "\n".join(" ".join(w.text for w in line) for line in lines)
+    other: list[str] = []
     n_annots = n_widgets = n_links = n_outside = 0
     for page in pdf:
         n_outside += has_outside_content(page, leftover=True)
         for a in page.annots():
             n_annots += 1
-            parts += [a.info.get("content", ""), a.info.get("title", ""), a.info.get("subject", "")]
+            other += [a.info.get("content", ""), a.info.get("title", ""), a.info.get("subject", "")]
         for w in page.widgets():
             n_widgets += 1
-            parts.append(str(w.field_value or ""))
+            other.append(str(w.field_value or ""))
         n_links += len(page.get_links())
     toc = pdf.get_toc(simple=True)
-    parts += [str(t[1]) for t in toc]
+    other += [str(t[1]) for t in toc]
     meta = {k: v for k, v in (pdf.metadata or {}).items() if v and k not in ("format", "encryption")}
-    parts += [str(v) for v in meta.values()]
+    other += [str(v) for v in meta.values()]
     xml = pdf.get_xml_metadata() or ""
-    parts.append(xml)
+    other.append(xml)
     n_files = pdf.embfile_count()
     layers = has_layers(pdf)
-    pdf.close()
 
     problems = []
     for n, what in ((n_annots, "Kommentare/Markierungen"), (n_widgets, "Formularfelder"), (len(toc), "Lesezeichen"),
-                    (n_links, "Links"), (n_files, "Dateianhänge"), (n_outside, "Seiten mit Inhalt außerhalb des sichtbaren Bereichs")):
+                    (n_links, "Links"), (n_files, "Dateianhänge"),
+                    (n_outside, "Seiten mit Inhalt außerhalb des sichtbaren Bereichs")):
         if n:
             problems.append(f"{what} noch vorhanden: {n}")
     if layers:
@@ -455,18 +461,97 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
     if meta or xml.strip():
         problems.append("Metadaten noch vorhanden: " + ", ".join(list(meta) + (["XMP"] if xml.strip() else [])))
 
-    content = re.sub(r"\s+", "", "".join(parts)).casefold()
-    kept = {re.sub(r"\s+", "", f.text).casefold() for f in findings if not f.active}
-    leftovers = []
+    failed: dict[int, list[int]] = {}
+    if doc is not None:
+        failed = _unredacted_spots(pdf, doc, findings, mode, labels, ocr_words)
+    pdf.close()
+    by_id = {f.id: f for f in findings}
+    reported: set[str] = set()
+    for fid, pages in failed.items():
+        f = by_id[fid]
+        label = f.text if f.text.strip() else info(f.entity_type).label
+        if label not in reported:
+            reported.add(label)
+            problems.append(f"{label} – an der geschwärzten Stelle noch vorhanden ({_pages(pages)})")
+    problems += _other_occurrences(findings, page_texts, other, reported)
+    return problems
+
+
+def _pages(pages: list[int]) -> str:
+    pages = sorted(set(pages))
+    return ("Seite " if len(pages) == 1 else "Seiten ") + ", ".join(str(p + 1) for p in pages)
+
+
+def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Finding], mode: str, labels: bool,
+                      ocr_words: dict[int, list]) -> dict[int, list[int]]:
+    """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle noch Text steht.
+
+    Im Ergebnis darf in einem Schwärzungsrechteck nur die Beschriftung des Balkens stehen. Maßgeblich ist die
+    Mitte jedes Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
+    plan = pdf_redaction_plan(doc, findings, mode, labels)
+    by_page: dict[int, list] = {}
+    for entry in plan:
+        by_page.setdefault(entry[0], []).append(entry)
+    by_id = {f.id: f for f in findings}
+    failed: dict[int, list[int]] = {}
+    for pno, entries in by_page.items():
+        if not 0 <= pno < pdf.page_count:
+            continue
+        # Beschriftungen der Balken dieser Seite (längste zuerst) – nur sie dürfen in einem Rechteck stehen
+        page_labels = sorted({_squash(label) for _p, _r, label, _i in entries if label}, key=len, reverse=True)
+        chars = [(c["c"], ((c["bbox"][0] + c["bbox"][2]) / 2, (c["bbox"][1] + c["bbox"][3]) / 2))
+                 for block in pdf[pno].get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+                 if block.get("type") == 0 for line in block["lines"] for span in line["spans"] for c in span["chars"]]
+        for _p, rect, _label, ids in entries:
+            inside = _squash("".join(c for c, (x, y) in chars if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1))
+            for label in page_labels:   # auch die eines überlappenden Nachbar-Balkens
+                inside = inside.replace(label, "")
+            bad = bool(inside)
+            if not bad and pno in ocr_words:
+                # Texterkennung liest auch die Beschriftung des Balkens – nur melden, was dem Fund gleicht
+                seen = _squash("".join(w.text for w in ocr_words[pno]
+                                       if rect.x0 <= (w.rect[0] + w.rect[2]) / 2 <= rect.x1
+                                       and rect.y0 <= (w.rect[1] + w.rect[3]) / 2 <= rect.y1))
+                texts = [_squash(by_id[i].text) for i in ids if i in by_id]
+                bad = len(seen) >= 3 and any(seen in t or t in seen for t in texts if len(t) >= 3)
+            if bad:
+                for i in ids:
+                    failed.setdefault(i, []).append(pno)
+    return failed
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", "", text).casefold()
+
+
+def _other_occurrences(findings: list[Finding], page_texts: list[str], other: list[str], reported: set[str]) -> list[str]:
+    """Texte aktiver Funde, die im Ergebnis noch vorkommen – auf den Seiten öfter, als sie bewusst abgewählt
+    wurden, oder in Kommentaren, Formularfeldern, Lesezeichen und Metadaten."""
+    kept: dict[str, int] = {}
     for f in findings:
-        if not f.active:
+        if not f.active and f.area is None:
+            key = _squash(join_hyphenated(f.text))
+            kept[key] = kept.get(key, 0) + 1
+    pages = [join_hyphenated(t) for t in page_texts]
+    rest = _squash("".join(other))
+    out = []
+    for f in findings:
+        if not f.active or f.area is not None or f.text in reported:
             continue
-        needle = re.sub(r"\s+", "", f.text).casefold()
-        if len(needle) < 3 or needle in kept:
+        pattern = word_pattern(f.text)
+        if pattern is None:
             continue
-        if needle in content and f.text not in leftovers:
-            leftovers.append(f.text)
-    return problems + leftovers
+        hits = [pno for pno, text in enumerate(pages) for _ in pattern.finditer(text)]
+        key = _squash(join_hyphenated(f.text))
+        where = []
+        if len(hits) > kept.get(key, 0):
+            where.append(_pages(hits))
+        if key in rest:
+            where.append("Kommentare/Formularfelder/Lesezeichen/Metadaten")
+        if where:
+            reported.add(f.text)
+            out.append(f"{f.text} – an anderer Stelle noch lesbar ({', '.join(where)})")
+    return out
 
 
 def save_redacted_pdf(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path) -> list[str]:
@@ -478,7 +563,7 @@ def save_redacted_pdf(doc: LoadedDocument, findings: list[Finding], settings: Se
     tmp = target.with_name(target.name + ".tmp")
     try:
         tmp.write_bytes(data)
-        leftovers = verify_pdf(data, findings, doc.ocr_pages)
+        leftovers = verify_pdf(data, findings, doc.ocr_pages, doc, settings.replace_mode, settings.pdf_labels)
         os.replace(tmp, target)
     except BaseException:
         tmp.unlink(missing_ok=True)

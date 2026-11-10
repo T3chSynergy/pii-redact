@@ -98,3 +98,88 @@ def test_return_code_keeps_most_severe(work, monkeypatch):
     assert cli.main([missing, str(work / "brief.txt"), "--schnell"]) == cli.ERROR
     monkeypatch.setattr(cli, "export_document", lambda *a, **k: ["Text „Muster“ auf Seite 1"])
     assert cli.main([missing, str(work / "brief.txt"), "--schnell", "--ueberschreiben"]) == cli.LEFTOVERS
+
+
+@needs_model
+def test_broken_pdf_is_reported_and_run_continues(work, capsys):
+    """Ein defektes PDF beendet den Lauf nicht – weder bei einzelnen Dateien noch im Ordner."""
+    (work / "defekt.pdf").write_bytes(b"%PDF-1.4\nkaputt")
+    (work / "leer.pdf").write_bytes(b"")
+    rc = cli.main([str(work / "defekt.pdf"), str(work / "leer.pdf"), str(work / "brief.txt"), "--schnell"])
+    err = capsys.readouterr().err
+    assert rc == cli.ERROR and err.count("beschädigt oder kein gültiges PDF") == 2
+    assert (work / "brief_anonymisiert.txt").is_file()
+
+    source = work / "ordner"
+    source.mkdir()
+    (source / "a_defekt.pdf").write_bytes(b"%PDF-1.4\nkaputt")
+    shutil.copy(SAMPLES / "beispiel.txt", source / "b_brief.txt")
+    rc = cli.main([str(source), "-o", str(work / "aus"), "--schnell"])
+    assert rc == cli.ERROR
+    assert (work / "aus" / "b_brief_anonymisiert.txt").is_file()
+    protocol = (work / "aus" / "pii-redact-protokoll.csv").read_text(encoding="utf-8-sig")
+    assert "a_defekt.pdf;Fehler" in protocol and "beschädigt" in protocol
+
+
+@needs_model
+def test_missing_thorough_model_is_not_silent(work, capsys, monkeypatch):
+    """„Gründlich“ eingestellt, Modell fehlt: Bearbeitung mit „Schnell“, aber eigener Rückgabewert."""
+    from pii_redact import paths
+
+    monkeypatch.setattr(paths, "find_ner_model", lambda name="": None)
+    assert cli.main([str(work / "brief.txt")]) == cli.FAST_FALLBACK
+    assert "Rückgabewert 4" in capsys.readouterr().err and (work / "brief_anonymisiert.txt").is_file()
+    assert cli.main([str(work / "brief.txt"), "--schnell", "--ueberschreiben"]) == cli.OK       # bewusst gewählt
+    assert cli.worst(cli.FAST_FALLBACK, cli.OK) == cli.FAST_FALLBACK
+    assert cli.worst(cli.FAST_FALLBACK, cli.OCR_SKIPPED) == cli.OCR_SKIPPED
+
+
+@needs_model
+def test_single_file_with_ocr_pages_is_not_exported(work, capsys):
+    from pii_redact.core import ocr
+
+    if not ocr.is_available():
+        pytest.skip("RapidOCR nicht installiert")
+    shutil.copy(SAMPLES / "scan.pdf", work / "scan.pdf")
+    assert cli.main([str(work / "scan.pdf"), "--schnell"]) == cli.OCR_SKIPPED
+    assert "nicht automatisch exportiert" in capsys.readouterr().err
+    assert not (work / "scan_geschwaerzt.pdf").exists()
+    assert cli.main([str(work / "scan.pdf"), "--schnell", "--nur-anzeigen"]) == cli.OK
+    assert cli.main([str(work / "scan.pdf"), "--schnell", "--ohne-ocr"]) == cli.OK      # ohne Texterkennung: wie bisher
+    assert (work / "scan_geschwaerzt.pdf").is_file()
+
+
+_FURTHER = "Antrag von Herrn Kaya.\nAnhang: antrag_kaya.pdf\nMit freundlichen Grüßen\n"
+
+
+@needs_model
+def test_file_with_further_occurrences_is_held_back(work, capsys):
+    """Geschwärzter Text steht noch an anderer Stelle: ohne Rückfrage wird nicht exportiert (Rückgabewert 3)."""
+    (work / "antrag.txt").write_text(_FURTHER, encoding="utf-8")
+    assert cli.main([str(work / "antrag.txt"), "--schnell"]) == cli.OCR_SKIPPED
+    assert "steht noch an anderer Stelle" in capsys.readouterr().err
+    assert not (work / "antrag_anonymisiert.txt").exists()
+    assert cli.main([str(work / "antrag.txt"), "--schnell", "--nur-anzeigen"]) == cli.OK
+    assert cli.main([str(work / "brief.txt"), "--schnell"]) == cli.OK          # ohne weitere Vorkommen wie bisher
+
+
+@needs_model
+def test_folder_holds_back_and_keeps_suggestions(work, capsys):
+    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
+
+    source = work / "ordner"
+    source.mkdir()
+    (source / "antrag.txt").write_text(_FURTHER, encoding="utf-8")
+    shutil.copy(SAMPLES / "beispiel.txt", source / "brief.txt")
+    args = [str(source), "-o", str(work / "aus"), "--schnell"]
+    assert cli.main(args) == cli.OCR_SKIPPED
+    assert (work / "aus" / "brief_anonymisiert.txt").is_file() and not (work / "aus" / "antrag_anonymisiert.txt").exists()
+    entry = Workspace.load(work / "aus").entries["antrag.txt"]
+    assert entry.status == Status.TO_REVIEW and entry.note == CHECK_NOT_AUTO
+    # der Vorschlag der Kontrolle steht (ohne Klartext) im Arbeitsstand und erscheint beim Öffnen in der Fundliste
+    assert [(f["src"], f["a"]) for f in entry.findings if f["src"] == "kontrolle"] == [("kontrolle", False)]
+    protocol = (work / "aus" / "pii-redact-protokoll.csv").read_text(encoding="utf-8-sig")
+    assert "nicht automatisch exportiert" in protocol and "kaya" not in protocol.casefold().replace("antrag.txt", "")
+    # ein zweiter Lauf exportiert nicht etwa deshalb, weil der Vorschlag nun schon in der Liste steht
+    assert cli.main(args) == cli.OCR_SKIPPED
+    assert not (work / "aus" / "antrag_anonymisiert.txt").exists()

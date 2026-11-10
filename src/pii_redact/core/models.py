@@ -28,7 +28,7 @@ class Finding:
     entity_type: str
     text: str
     score: float = 1.0
-    source: str = "auto"      # "auto" | "manuell"
+    source: str = "auto"      # "auto" | "manuell" | "ki" | "kontrolle" (die beiden letzten: Vorschläge)
     active: bool = True
     recognizer: str = ""
     original_type: str = ""   # ursprünglicher Typ, falls in der Nachbearbeitung geändert

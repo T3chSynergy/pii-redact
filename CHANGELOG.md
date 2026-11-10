@@ -1,5 +1,79 @@
 # Änderungen
 
+## 0.8.5 – 10.11.2026
+
+**Kontrolle nach dem Export**
+- **Jede geschwärzte Stelle wird einzeln geprüft:** Die Kontrolle sieht jetzt an jeder Schwärzung nach, ob dort
+  noch Text steht. Bisher suchte sie nur den Wortlaut im ganzen Dokument – und übersprang einen Text ganz, sobald
+  er an anderer Stelle bewusst abgewählt war.
+- **Weniger Fehlalarme:** Ein geschwärzter Begriff gilt nicht mehr als „noch vorhanden“, nur weil er Teil eines
+  längeren Wortes ist („Ende“ in „Wochenende“, „4711“ in „14711“). Weiterhin gemeldet wird er als eigenes Wort an
+  einer nicht markierten Stelle, etwa in einem Dateinamen („akte_ende.pdf“); bewusst abgewählte Vorkommen zählen
+  dabei nicht.
+- Die Meldungen sagen, was gefunden wurde: „an der geschwärzten Stelle noch vorhanden“ oder „an anderer Stelle
+  noch lesbar“, jeweils mit Seite. Erklärung in der Hilfe unter „Häufige Fragen“.
+
+- **Kontrolle vor dem Speichern:** Steht ein geschwärzter Text noch an einer nicht markierten Stelle (etwa ein
+  Name im Dateinamen „antrag_mustermann.pdf“ oder in Großbuchstaben), fragt das Programm jetzt **vor** dem
+  Speichern nach, statt danach zu warnen. Die Stellen kommen als Vorschläge in die Fundliste (Herkunft
+  „Kontrolle“, ohne Häkchen), der erste wird gleich gezeigt. „Zurück zur Prüfung“ speichert nichts, „Trotzdem
+  speichern“ lässt sie stehen; ein Vorschlag ohne Häkchen gilt als entschieden. Gilt für PDF- und Text-Export
+  und für „Geprüft & weiter“ im Ordner.
+- **Ohne Rückfrage wird zurückgehalten:** Der automatische Export („Ungeprüfte Dateien exportieren“) und die
+  Kommandozeile können nicht nachfragen. Dateien, in denen ein geschwärzter Text noch an anderer Stelle steht,
+  werden dort nicht mehr exportiert, sondern bleiben zur Prüfung stehen – wie Dateien mit Texterkennung
+  (Vermerk im Protokoll, Kommandozeile: Rückgabewert 3). Beim Öffnen in der Oberfläche stehen die Vorschläge
+  der Kontrolle schon in der Fundliste.
+
+**Kommandozeile**
+- **Fehlendes Modell für „Gründlich“ fällt auf:** Ist „Gründlich“ eingestellt und das Transformer-Modell fehlt,
+  wird wie bisher mit „Schnell“ bearbeitet – aber mit dem neuen **Rückgabewert 4** statt 0. Wer „Schnell“ will,
+  wählt es mit `--schnell` oder in den Einstellungen (dann 0). Reihenfolge bei mehreren Dateien: 2 vor 1 vor 3
+  vor 4 vor 0.
+- **Rückgabewert 3** bedeutet jetzt allgemein „nicht automatisch exportiert, bitte in der Oberfläche prüfen“:
+  Texterkennung oder ein geschwärzter Text, der noch an anderer Stelle steht.
+- **Einzelne Dateien mit Texterkennung** werden nicht mehr automatisch exportiert (Rückgabewert 3), wie schon im
+  Ordnerlauf. `--nur-anzeigen` und `--ohne-ocr` arbeiten wie bisher.
+
+**Erkennung**
+- **Namen und Orte in Großbuchstaben:** In Formularen und Adressfeldern stehen Namen oft in Großbuchstaben
+  („SCHNEIDER, ANNA“, „80331 MÜNCHEN“) – die Erkennung fand sie bisher kaum. Zeilen mit solchen Wörtern werden
+  jetzt zusätzlich in normaler Schreibweise geprüft. Gemessen an den Testtexten, wenn Namen und Orte dort in
+  Großbuchstaben stehen: „Gründlich“ Personen 78 % → 95 %, Orte 79 % → 98 %; „Schnell“ Personen 12 % → 65 %,
+  Orte 21 % → 69 %. Bei normal geschriebenen Texten ändert sich nichts (dieselben Funde, keine zusätzlichen
+  Fehlalarme). In Texten, die ganz in Großbuchstaben stehen, kommen einzelne Fehlalarme hinzu (gewöhnliche
+  Wörter wie „AULA“ als Ort; 5 in den Testtexten mit rund 3000 Wörtern).
+- Gängige Abkürzungen (DSGVO, BGB, IHK, AOK, TÜV, SEPA …) gelten nicht als Name oder Ort.
+- **Geschützte und schmale Leerzeichen:** IBAN, Telefonnummern und andere Nummern wurden nicht erkannt, wenn
+  statt normaler Leerzeichen geschützte standen („DE89 3704 …“ aus Satzprogrammen oder der Textverarbeitung).
+  Solche Leerzeichen zählen jetzt wie normale – auch in Sperr- und Ausnahmeliste.
+- **Geburtsdatum mit Stern:** „*17.11.1984“ und „† 12.01.2020“ werden ohne Kontextwort als Datum erkannt
+  (nicht bei Markdown-Hervorhebung wie „*12.03.2024*“).
+- **Postfach:** „Postfach 10 20 30“ wird als Adresse erkannt. Die Wörter „Postfach“, „Personalnr“ und „Kundennr“
+  allein gelten nicht mehr als Ort.
+
+**Fehlerbehebung**
+- **Kommandozeile:** Ein defektes oder leeres PDF beendete den ganzen Lauf mit einer Fehlerausgabe des
+  Programms; im Ordnerlauf blieben die folgenden Dateien unbearbeitet. Jetzt wird die Datei gemeldet
+  („beschädigt oder kein gültiges PDF“, Rückgabewert 1) und der Lauf geht weiter.
+- **Protokoll:** Dateinamen, die mit `=`, `+`, `-` oder `@` beginnen, las Excel im Protokoll als Formel. Solche
+  Zellen beginnen jetzt mit einem Hochkomma und bleiben Text.
+
+**Oberfläche**
+- **Schaltflächen durchgehend deutsch:** Rückfragen und Dialoge zeigten teils englische Schaltflächen („Cancel“,
+  „Yes“/„No“). Sie sind jetzt deutsch beschriftet; zusätzlich lädt das Programm die deutsche Übersetzung für
+  alles, was Qt selbst beschriftet (z. B. Kontextmenüs der Textfelder).
+- „Ungeprüfte Dateien exportieren“: Die Rückfrage nennt die Zahl jetzt als „Bis zu …“, weil die Kontrolle
+  einzelne Dateien danach noch zurückhalten kann.
+
+**KI-Nachprüfung**
+- Die Einstellungen warnen bei einer unverschlüsselten Server-Adresse (`http://`, außer zum eigenen Rechner).
+
+**Intern**
+- GitHub Actions sind in den Workflows per Commit-SHA festgelegt; `.github/dependabot.yml` hält sie mit
+  Pull Requests gegen `dev` aktuell (nur Actions, keine Python-Pakete).
+- `pyproject.toml`: Python ab 3.12 (getestet werden 3.12 bis 3.14).
+
 ## 0.8.4 – 10.11.2026
 
 **Sicherheit des Ergebnisses**

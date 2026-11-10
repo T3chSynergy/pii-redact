@@ -6,7 +6,9 @@ import pymupdf
 import pytest
 import spacy
 
-from pii_redact.core import Finding, PiiAnalyzer, ReplaceMode, Settings, load_document, redact_pdf, redact_text, verify_pdf
+from pii_redact.core import (
+    Finding, PiiAnalyzer, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, redact_text, verify_pdf,
+)
 from pii_redact.core.analyzer import apply_allow_list, clean_ner, find_terms, merge_overlaps
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
@@ -259,7 +261,7 @@ def test_verify_pdf_reports_extras(tmp_path):
     joined = " | ".join(problems)
     for what in ("Kommentare/Markierungen", "Formularfelder", "Lesezeichen", "Dateianhänge", "Metadaten"):
         assert what in joined
-    assert "Erika Musterfrau" in problems  # steht im Kommentartext
+    assert any(p.startswith("Erika Musterfrau – an anderer Stelle") for p in problems)  # steht im Kommentartext
 
 
 def test_to_original_end_expands_partial_placeholder():
@@ -374,6 +376,83 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
 
 
+# ---------------------------------------------------------------- Sonder-Leerzeichen, Stern-Datum, Postfach
+def test_plain_spaces_keeps_positions():
+    from pii_redact.core.analyzer import plain_spaces
+
+    text = "DE89\u00a03704\u202f0044\u20070532\u2009x"
+    assert plain_spaces(text) == "DE89 3704 0044 0532 x" and len(plain_spaces(text)) == len(text)
+
+
+@needs_model
+def test_special_spaces_do_not_hide_numbers(analyzer):
+    """Geschützte und schmale Leerzeichen (Satzprogramme, Textverarbeitung) in IBAN und Telefonnummer."""
+    text = "Frau Zofia\u00a0Jaeger, IBAN DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000, Tel.\u202f030\u202f1234567"
+    found = {f.entity_type: f for f in analyzer.analyze(text, Settings())}
+    assert found["IBAN_CODE"].text == "DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000"     # Wortlaut des Dokuments
+    assert found["PHONE_NUMBER"].text == "030\u202f1234567"
+    assert all(text[f.start:f.end] == f.text for f in found.values())
+    lists = Settings(deny_list=["Projekt Adler"], allow_list=["Zofia Jaeger"])
+    hits = analyzer.analyze("Frau Zofia\u00a0Jaeger leitet Projekt\u00a0Adler.", lists)
+    assert [(f.text, f.entity_type) for f in hits] == [("Projekt\u00a0Adler", "CUSTOM")]
+
+
+@needs_model
+@pytest.mark.parametrize("text, dates", [
+    ("Yılmaz, Ayşe, *17.11.1984, Köln", ["17.11.1984"]),
+    ("Jaeger, Zofia (* 3.5.62, † 12.01.2020)", ["3.5.62", "12.01.2020"]),
+    ("Termin am *12.03.2024* und **13.03.2024**, Fußnote* 14.03.2024, Faktor 5*15.03.2024", []),
+    ("Der Unfall ereignete sich am 03.05.2024 gegen 14 Uhr.", []),
+])
+def test_birth_date_with_star(analyzer, text, dates):
+    assert [f.text for f in analyzer.analyze(text, Settings()) if f.entity_type == "DATE_TIME"] == dates
+
+
+@needs_model
+def test_post_office_box_and_field_labels(analyzer):
+    text = "Postfach 10 20 30, 10117 Berlin. Bitte ans Postfach senden. Personalnr. und Kundennr. angeben."
+    hits = [(f.text, f.entity_type) for f in analyzer.analyze(text, Settings())]
+    assert ("Postfach 10 20 30", "DE_ADDRESS") in hits
+    assert not any(t in ("Postfach", "Personalnr", "Kundennr") for t, _ in hits), hits
+
+
+@pytest.mark.parametrize("data", [b"%PDF-1.4\nkaputt", b""], ids=["defekt", "leer"])
+def test_broken_pdf_gives_clear_message(tmp_path, data):
+    path = tmp_path / "defekt.pdf"
+    path.write_bytes(data)
+    with pytest.raises(UnsupportedFileError, match="beschädigt oder kein gültiges PDF"):
+        load_document(path)
+
+
+# ---------------------------------------------------------------- Namen und Orte in Großbuchstaben
+def test_normal_case_keeps_positions():
+    from pii_redact.core.analyzer import normal_case
+
+    text = "Herr MÜLLER-LÜDENSCHEID aus GROSSSTADT, IBAN DE89, EU, Maßstab STRAßE"
+    out, spans = normal_case(text)
+    assert out == "Herr Müller-Lüdenscheid aus Grossstadt, Iban DE89, EU, Maßstab Straße" and len(out) == len(text)
+    assert [text[s:e] for s, e in spans] == ["MÜLLER-LÜDENSCHEID", "GROSSSTADT", "IBAN", "STRAßE"]
+    assert normal_case("Kein Wort in Versalien.") == ("Kein Wort in Versalien.", [])
+
+
+@needs_model
+def test_upper_case_names_and_places_found(analyzer):
+    """Formulare und Adressfelder schreiben Namen und Orte oft in Großbuchstaben."""
+    text = "ANTRAGSTELLER: SCHNEIDER, ANNA, MUSTERWEG 7, 80331 MÜNCHEN\nTelefon 030 1234567"
+    hits = {f.text: f.entity_type for f in analyzer.analyze(text, Settings())}
+    assert {"SCHNEIDER", "ANNA", "80331 MÜNCHEN", "030 1234567"} <= set(hits), hits
+    assert hits["80331 MÜNCHEN"] == "DE_ADDRESS" and "ANTRAGSTELLER" not in hits
+    assert all(text[f.start:f.end] == f.text for f in analyzer.analyze(text, Settings()))
+
+
+@needs_model
+def test_upper_case_headings_and_abbreviations_stay(analyzer):
+    text = ("BETREFF: ANTRAG AUF KOSTENÜBERNAHME\nWICHTIG: Hinweise zur DSGVO und zum BGB beachten.\n"
+            "Die AOK, der TÜV und die IHK haben zugestimmt. Zahlung per SEPA, IBAN und BIC siehe unten.\n"
+            "ANLAGE 1: KOPIE DES BESCHEIDS\nMIT FREUNDLICHEN GRÜSSEN\nSEITE 1 VON 3 – VERTRAULICH")
+    assert [(f.text, f.entity_type) for f in analyzer.analyze(text, Settings())] == []
+
+
 # ---------------------------------------------------------------- Helfer für erzeugte PDFs
 def _find(doc, needle: str, typ: str = "PERSON") -> Finding:
     s = doc.text.index(needle)
@@ -384,6 +463,112 @@ def _load_bytes(tmp_path, data: bytes, name: str = "test.pdf"):
     path = tmp_path / name
     path.write_bytes(data)
     return load_document(path, ocr=False)
+
+
+# ---------------------------------------------------------------- Kontrolle nach dem Export
+def _two_lines(tmp_path, first: str, second: str):
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((72, 100), first)
+    page.insert_text((72, 200), second)
+    pdf.new_page().insert_text((72, 100), "Seite zwei ohne Besonderheiten")
+    return _load_bytes(tmp_path, pdf.tobytes())
+
+
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
+def test_verify_checks_each_redacted_spot(tmp_path, mode):
+    """Geprüft wird die geschwärzte Stelle selbst – auch wenn derselbe Text anderswo bewusst stehen bleibt."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt.", "Briefkopf: Zofia Jaeger")
+    first = _find(doc, "Zofia Jaeger")
+    second = Finding(doc.text.rindex("Zofia Jaeger"), doc.text.rindex("Zofia Jaeger") + 12, "PERSON", "Zofia Jaeger",
+                     active=False)
+    findings = [first, second]
+    assert verify_pdf(redact_pdf(doc, findings, mode), findings, None, doc, mode) == []
+    # Schwärzung ohne Wirkung (unverändertes PDF): früher unbemerkt, weil der Text abgewählt noch einmal vorkommt
+    assert verify_pdf(doc.pdf_bytes, findings, None, doc, mode) == [
+        "Zofia Jaeger – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+
+def test_verify_reports_other_occurrences_but_not_parts_of_words(tmp_path):
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Anhang: akte_ende.pdf, Tel. 4711, Nr. 14711")
+    findings = [_find(doc, "Ende"), _find(doc, "4711", "PHONE_NUMBER")]
+    out = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER)
+    # „Wochenende“ und „14711“ zählen nicht, der Dateiname schon
+    assert verify_pdf(out, findings, None, doc) == ["Ende – an anderer Stelle noch lesbar (Seite 1)"]
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Ohne weiteren Treffer, Nr. 14711")
+    findings = [_find(doc, "Ende")]
+    assert verify_pdf(redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER), findings, None, doc) == []
+
+
+def test_verify_counts_deselected_occurrences(tmp_path):
+    """Drei Vorkommen, eines geschwärzt, eines abgewählt, eines nie markiert → das dritte wird gemeldet."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt an Zofia Jaeger.", "Gruß, Zofia Jaeger")
+    spots = [m.start() for m in __import__("re").finditer("Zofia Jaeger", doc.text)]
+    findings = [Finding(spots[0], spots[0] + 12, "PERSON", "Zofia Jaeger"),
+                Finding(spots[1], spots[1] + 12, "PERSON", "Zofia Jaeger", active=False)]
+    out = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER)
+    assert verify_pdf(out, findings, None, doc) == ["Zofia Jaeger – an anderer Stelle noch lesbar (Seite 1)"]
+    findings.append(Finding(spots[2], spots[2] + 12, "PERSON", "Zofia Jaeger", active=False))
+    assert verify_pdf(out, findings, None, doc) == []
+
+
+def test_verify_area_and_tight_lines(tmp_path):
+    """Frei gezogener Bereich: aller Text darin muss weg sein. Enge Zeilen: Nachbarzeilen zählen nicht."""
+    pdf = pymupdf.open()
+    page = pdf.new_page(width=700, height=300)
+    for i, line in enumerate(_NEIGHBOURS):
+        page.insert_text((40, 80 + i * 11 * 0.85), line, fontsize=11)
+    doc = _load_bytes(tmp_path, pdf.tobytes())
+    findings = [_find(doc, "Zofia Jaeger"),
+                Finding(0, 0, "AREA", "", source="manuell", area=(0, 30, 60, 300, 100))]
+    out = redact_pdf(doc, findings, ReplaceMode.NUMBERED)
+    assert verify_pdf(out, findings, None, doc, ReplaceMode.NUMBERED) == []
+    problems = verify_pdf(doc.pdf_bytes, findings, None, doc, ReplaceMode.NUMBERED)
+    assert problems == ["Zofia Jaeger – an der geschwärzten Stelle noch vorhanden (Seite 1)",
+                        "Bereich – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+
+# ---------------------------------------------------------------- Kontrolle vor dem Speichern: weitere Vorkommen
+def test_further_occurrences_become_inactive_suggestions():
+    from pii_redact.core.analyzer import further_occurrences
+
+    text = ("Herr Deniz Kaya stellt den Antrag.\nAnhang: antrag_kaya.pdf, Rückfragen an KAYA oder Frau Kayala.\n"
+            "Am Wochenende war Herr Ende nicht erreichbar, Tel. 4711 (nicht 14711).\nGruß, Deniz Kaya")
+    def at(needle, typ, nth=0, active=True):
+        pos = [m.start() for m in __import__("re").finditer(needle, text)][nth]
+        return Finding(pos, pos + len(needle), typ, needle, active=active)
+
+    findings = [at("Kaya", "PERSON"), at("Ende", "PERSON"), at("4711", "PHONE_NUMBER")]
+    # Satzzeichen am Rand eines Fundes gehören nicht zum gesuchten Text
+    assert [f.text for f in further_occurrences("Fragen an Herrn KAYA. Anhang: antrag_kaya.pdf",
+                                                [Finding(16, 21, "PERSON", "KAYA.")])] == ["kaya"]
+    # Anrede und Titel ebenso wenig („Herrn Dr. Kaya“ → „kaya“)
+    assert [f.text for f in further_occurrences("Antrag von Herrn Dr. Kaya. Anhang: antrag_kaya.pdf",
+                                                [Finding(11, 25, "PERSON", "Herrn Dr. Kaya")])] == ["kaya"]
+    new = further_occurrences(text, findings)
+    # im Dateinamen, in Großbuchstaben und im Gruß – nicht „Kayala“, „Wochenende“, „14711“
+    assert [(f.text, text[max(f.start - 7, 0):f.start]) for f in new] == [("kaya", "antrag_"), ("KAYA", "gen an "), ("Kaya", " Deniz ")]
+    assert all(f.source == "kontrolle" and not f.active and f.entity_type == "PERSON" for f in new)
+    assert all(text[f.start:f.end] == f.text for f in new)
+    # mit den Vorschlägen in der Liste (auch unbestätigt) wird nichts erneut vorgeschlagen
+    assert further_occurrences(text, findings + new) == []
+    # eine abgewählte Stelle ist eine Entscheidung; ein abgewählter Fund löst selbst keine Suche aus
+    kept = at("Kaya", "PERSON", nth=2, active=False)   # das „Kaya“ im Gruß
+    assert [f.text for f in further_occurrences(text, findings + [kept])] == ["kaya", "KAYA"]
+    assert further_occurrences(text, [at("Kaya", "PERSON", active=False)]) == []
+
+
+def test_further_occurrences_across_hyphenation_and_special_spaces():
+    from pii_redact.core.analyzer import further_occurrences
+
+    text = "Frau Zofia Jaeger wohnt in Bergenthal.\nUnterlagen von Zofia\u00a0Jaeger aus Bergen-\nthal liegen vor."
+    findings = [_find_text(text, "Zofia Jaeger"), _find_text(text, "Bergenthal", "LOCATION")]
+    assert [f.text for f in further_occurrences(text, findings)] == ["Zofia\u00a0Jaeger", "Bergen-\nthal"]
+
+
+def _find_text(text: str, needle: str, typ: str = "PERSON") -> Finding:
+    s = text.index(needle)
+    return Finding(s, s + len(needle), typ, needle)
 
 
 # ---------------------------------------------------------------- Schwärzung trifft nur die eigene Zeile
