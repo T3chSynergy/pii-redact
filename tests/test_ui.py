@@ -479,3 +479,111 @@ def test_menu_mnemonics_unique(window):
         keys = [key(a.text()) for a in menu.actions() if not a.isSeparator()]
         assert None not in keys, (menu.title(), [a.text() for a in menu.actions()])
         assert len(keys) == len(set(keys)), (menu.title(), keys)
+
+
+def test_check_before_saving_adds_suggestions_and_asks(window, tmp_path, monkeypatch):
+    """Geschwärzter Text steht noch an anderer Stelle: Vorschläge in die Fundliste, Rückfrage vor dem Speichern."""
+    from pii_redact.core import Finding
+    from pii_redact.ui.main_window import MainWindow
+
+    source = tmp_path / "antrag.txt"
+    source.write_text("Antrag von Herrn Deniz Kaya.\nAnhang: antrag_kaya.pdf\nMit freundlichen Grüßen", encoding="utf-8")
+    _open(window, source)
+    s = window.session
+    start = s.doc.text.index("Kaya")
+    s.set_findings([Finding(start, start + 4, "PERSON", "Kaya")])
+    target = tmp_path / "out.txt"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    asked = []
+
+    # 1. „Zurück zur Prüfung“: nichts gespeichert, Vorschlag steht ohne Häkchen in der Liste
+    monkeypatch.setattr(MainWindow, "_ask_further", lambda self, new: asked.append([f.text for f in new]) or False)
+    window.export_text()
+    assert asked == [["kaya"]] and not target.exists()
+    suggestion = next(f for f in s.findings if f.source == "kontrolle")
+    assert suggestion.text == "kaya" and not suggestion.active and suggestion.entity_type == "PERSON"
+    assert window.findings.selected_ids() == [suggestion.id]
+    assert "Kontrolle" in window.status_label.text()
+
+    # 2. Häkchen gesetzt: Speichern ohne weitere Rückfrage, die Stelle ist geschwärzt
+    s.set_active([suggestion.id], True)
+    window.export_text()
+    assert len(asked) == 1 and "kaya" not in target.read_text(encoding="utf-8").casefold()
+
+    # 3. Vorschlag bewusst ohne Häkchen gelassen: ebenfalls keine erneute Rückfrage
+    s.set_active([suggestion.id], False)
+    target.unlink()
+    window.export_text()
+    assert len(asked) == 1 and "antrag_kaya.pdf" in target.read_text(encoding="utf-8")
+
+
+def test_check_before_saving_pdf_save_anyway(window, tmp_path, monkeypatch):
+    """„Trotzdem speichern“: gespeichert wird, und die Kontrolle danach meldet dieselben Stellen nicht noch einmal."""
+    import pymupdf
+
+    from pii_redact.core import Finding
+    from pii_redact.ui.main_window import MainWindow
+
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((72, 100), "Antrag von Herrn Deniz Kaya.")
+    page.insert_text((72, 140), "Anhang: antrag_kaya.pdf")
+    source = tmp_path / "antrag.pdf"
+    source.write_bytes(pdf.tobytes())
+    _open(window, source)
+    s = window.session
+    start = s.doc.text.index("Kaya")
+    s.set_findings([Finding(start, start + 4, "PERSON", "Kaya")])
+    target = tmp_path / "out.pdf"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    monkeypatch.setattr(MainWindow, "_ask_further", lambda self, new: True)
+    shown = {}
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: shown.setdefault("warn", a[2]))
+    window.export_pdf()
+    assert target.exists() and not shown
+    assert [f.text for f in s.findings if f.source == "kontrolle" and not f.active] == ["kaya"]
+    text = pymupdf.open(target)[0].get_text()
+    assert "Deniz" in text and "Kaya" not in text and "antrag_kaya.pdf" in text
+
+
+def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path, monkeypatch):
+    """„Ungeprüfte Dateien exportieren“: Was die Kontrolle beanstandet, bleibt zur Prüfung stehen."""
+    import shutil
+
+    from pii_redact.core.batch import CHECK_NOT_AUTO, Status, Workspace
+    import pii_redact.ui.window_batch as wb
+    from pii_redact.ui.main_window import MainWindow
+
+    src = tmp_path / "akten"
+    src.mkdir()
+    (src / "a_antrag.txt").write_text("Antrag von Herrn Kaya.\nAnhang: antrag_kaya.pdf\n", encoding="utf-8")
+    shutil.copy(SAMPLES / "beispiel.txt", src / "b_brief.txt")
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    monkeypatch.setattr(wb, "confirm_auto_export", lambda *a: True)
+
+    def idle():
+        t = time.time()
+        while window.runner.running and time.time() - t < 120:
+            _wait(100)
+        _wait(200)
+
+    window._activate_batch(Workspace.create(src, tmp_path / "ziel"))
+    idle()
+    window.export_unreviewed()
+    idle()
+    ws = window.batch
+    assert ws.entries["b_brief.txt"].status == Status.AUTO and (tmp_path / "ziel" / "b_brief_anonymisiert.txt").is_file()
+    held = ws.entries["a_antrag.txt"]
+    assert held.status == Status.TO_REVIEW and held.note == CHECK_NOT_AUTO
+    assert not (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").exists()
+    assert "hält die Kontrolle" in window.status_label.text()
+    # die offene Datei zeigt den Vorschlag in der Fundliste; mit Häkchen und „Geprüft & weiter“ wird exportiert
+    assert window.batch_rel == "a_antrag.txt"
+    suggestion = next(f for f in window.session.findings if f.source == "kontrolle")
+    window.session.set_active([suggestion.id], True)
+    monkeypatch.setattr(MainWindow, "_ask_further", lambda self, new: pytest.fail("keine Rückfrage erwartet"))
+    window.confirm_and_next()
+    assert ws.entries["a_antrag.txt"].status == Status.REVIEWED
+    assert "kaya" not in (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").read_text(encoding="utf-8").casefold()
+    window.close_batch()

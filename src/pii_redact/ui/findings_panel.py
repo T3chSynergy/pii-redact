@@ -108,7 +108,7 @@ class FindingsModel(QAbstractTableModel):
             if col == COL_SOURCE:
                 if role == Qt.ItemDataRole.ToolTipRole:
                     return f.recognizer
-                return {"manuell": "manuell", "ki": "KI"}.get(f.source, "auto")
+                return {"manuell": "manuell", "ki": "KI", "kontrolle": "Kontrolle"}.get(f.source, "auto")
         if role == Qt.ItemDataRole.EditRole and col == COL_TYPE:
             return f.entity_type
         if role == Qt.ItemDataRole.ForegroundRole and not f.active:

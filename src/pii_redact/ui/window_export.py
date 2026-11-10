@@ -12,6 +12,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from ..core import save_redacted_pdf
+from ..core.analyzer import further_occurrences
+
+#: Kennzeichen der Kontrollmeldung für weitere Vorkommen (siehe core.redactor.verify_pdf)
+ELSEWHERE = " – an anderer Stelle noch lesbar"
 
 
 class ExportMixin:
@@ -31,6 +35,8 @@ class ExportMixin:
             return
         doc = self.session.doc
         if not self._confirm_ocr(doc):
+            return
+        if self.session.manual_text is None and self._confirm_further() is None:
             return
         suffix = ".md" if doc.kind == "md" else ".txt"
         path, _ = QFileDialog.getSaveFileName(self, "Anonymisierten Text speichern", self._suggest(suffix, "anonymisiert"),
@@ -53,6 +59,9 @@ class ExportMixin:
             QMessageBox.information(self, "Export", "PDF-Export ist nur für PDF-Dokumente möglich.")
             return
         if not self._confirm_ocr(doc):
+            return
+        accepted = self._confirm_further()
+        if accepted is None:
             return
         if self.session.manual_text is not None:
             QMessageBox.information(
@@ -80,11 +89,14 @@ class ExportMixin:
         QApplication.restoreOverrideCursor()
         self.session.dirty = False
         self._update_title()
+        if accepted:   # weitere Vorkommen wurden vor dem Speichern gezeigt und bewusst belassen – nicht erneut melden
+            leftovers = [x for x in leftovers if ELSEWHERE not in x]
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",
-                "Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden "
-                "(z. B. doppelt im PDF enthaltener Text):\n\n• " + "\n• ".join(leftovers[:20]),
+                "Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden:\n\n• "
+                + "\n• ".join(leftovers[:20])
+                + "\n\nWas die Meldungen bedeuten, steht in der Hilfe unter „Häufige Fragen“.",
             )
         else:
             # Erfolg: keine Rückfrage, nur eine Meldung in der Statusleiste (Details im Tooltip)
@@ -94,6 +106,50 @@ class ExportMixin:
                 f"Gespeichert: {path}\n\n{n} Stellen wurden physisch aus dem PDF entfernt. Die Kontrolle hat "
                 "keine Reste gefunden. Kommentare, Lesezeichen, Metadaten, Links und Anhänge wurden ebenfalls "
                 "entfernt." + ("\n\nHinweise: " + " ".join(doc.warnings) if doc.warnings else ""))
+
+    def _confirm_further(self) -> bool | None:
+        """Kontrolle vor dem Speichern: Steht ein geschwärzter Text noch an einer nicht markierten Stelle?
+
+        Die Stellen kommen als nicht aktivierte Vorschläge (Herkunft „Kontrolle“) in die Fundliste. Rückgabe:
+        ``False`` – nichts gefunden, speichern; ``True`` – gefunden, der Nutzer speichert trotzdem;
+        ``None`` – zurück zur Prüfung, nicht speichern."""
+        if not self.session:
+            return False
+        new = further_occurrences(self.session.doc.text, self.session.findings)
+        if not new:
+            return False
+        self.session.add_findings(new)   # ein Rückgängig-Schritt; bleiben in der Liste, auch bei „Trotzdem speichern“
+        self._refresh_timer.stop()       # Ansichten sofort auffrischen, damit der erste Vorschlag gewählt und
+        self._refresh_views()            # gezeigt werden kann, während die Rückfrage offen ist
+        self.select([new[0].id], reveal=True)
+        self.status_label.setText(f"Kontrolle: {len(new)} {'Vorschlag' if len(new) == 1 else 'Vorschläge'} in der "
+                                  "Fundliste (Herkunft „Kontrolle“).")
+        return True if self._ask_further(new) else None
+
+    def _ask_further(self, new: list) -> bool:
+        """Rückfrage zu weiteren Vorkommen. True = trotzdem speichern."""
+        doc = self.session.doc
+        lines = []
+        for f in new[:12]:
+            page = doc.page_of(f.start)
+            where = f"Seite {page + 1}" if page is not None else f"Zeile {doc.text.count(chr(10), 0, f.start) + 1}"
+            lines.append(f"• {html.escape(f.text)} ({where})")
+        if len(new) > 12:
+            lines.append(f"• … und {len(new) - 12} weitere")
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("Kontrolle vor dem Speichern")
+        n = len(new)
+        box.setText(f"<b>Geschwärzter Text steht noch an {'einer weiteren Stelle' if n == 1 else f'{n} weiteren Stellen'}.</b>")
+        box.setInformativeText(
+            "Diese Stellen sind nicht als Fund markiert und blieben im Ergebnis lesbar:<br><br>" + "<br>".join(lines)
+            + "<br><br>Sie stehen jetzt als Vorschläge in der Fundliste (Herkunft „Kontrolle“, noch ohne Häkchen). "
+              "Setzen Sie das Häkchen, wo geschwärzt werden soll, und speichern Sie danach erneut.")
+        back = box.addButton("Zurück zur Prüfung", QMessageBox.ButtonRole.RejectRole)
+        save = box.addButton("Trotzdem speichern", QMessageBox.ButtonRole.AcceptRole)
+        box.setDefaultButton(back)
+        box.exec()
+        return box.clickedButton() is save
 
     def _confirm_ocr(self, doc) -> bool:
         """Vor dem Export eines Dokuments mit OCR-Seiten ausdrücklich die gründliche Prüfung bestätigen lassen."""

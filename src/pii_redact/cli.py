@@ -10,8 +10,10 @@ Die Ausgabe nennt nur Anzahl und Datenart der Funde – den gefundenen Klartext 
 und --details (Vorsicht beim Umleiten in Log-Dateien).
 
 Rückgabewerte: 0 = OK, 1 = Fehler (auch falsche Aufrufparameter), 2 = Kontrolle fand Reste im Ergebnis,
-               3 = Dateien mit Texterkennung (OCR) wurden nicht automatisch exportiert (Ordner).
-Bei mehreren Dateien gilt der schwerwiegendste Wert: 2 vor 1 vor 3 vor 0.
+               3 = Dateien wurden nicht automatisch exportiert und müssen in der Oberfläche geprüft werden
+                   (Texterkennung/OCR, oder geschwärzter Text steht noch an anderer Stelle),
+               4 = mit dem Modus „Schnell“ bearbeitet, obwohl „Gründlich“ eingestellt ist (Modell fehlt).
+Bei mehreren Dateien gilt der schwerwiegendste Wert: 2 vor 1 vor 3 vor 4 vor 0.
 """
 
 from __future__ import annotations
@@ -35,19 +37,20 @@ from .core import (
     load_document,
 )
 from . import __version__
-from .core.batch import export_document
+from .core.batch import CHECK_NOT_AUTO, export_document, held_for_check
 from .core.entities import info
 from .settings_store import defaults_path, settings_path
 
-OK, ERROR, LEFTOVERS, OCR_SKIPPED = 0, 1, 2, 3
+OK, ERROR, LEFTOVERS, OCR_SKIPPED, FAST_FALLBACK = 0, 1, 2, 3, 4
 #: Fehler an einer einzelnen Datei – melden und mit der nächsten weitermachen. RuntimeError deckt Fehler der
 #: PDF-Bibliothek bei defekten Dateien ab (die Modell-Fehler sind ebenfalls RuntimeError).
 FILE_ERRORS = (UnsupportedFileError, ModelMissingError, ThoroughModelMissingError, OSError, RuntimeError)
-_SEVERITY = {OK: 0, OCR_SKIPPED: 1, ERROR: 2, LEFTOVERS: 3}
+_SEVERITY = {OK: 0, FAST_FALLBACK: 1, OCR_SKIPPED: 2, ERROR: 3, LEFTOVERS: 4}
 
 
 def worst(*codes: int) -> int:
-    """Schwerwiegendster Rückgabewert: Reste im Ergebnis vor Fehler vor nicht exportierter OCR-Datei."""
+    """Schwerwiegendster Rückgabewert: Reste im Ergebnis vor Fehler vor nicht exportierter OCR-Datei vor
+    Bearbeitung im Modus „Schnell“ statt „Gründlich“."""
     return max(codes, key=_SEVERITY.__getitem__)
 
 
@@ -104,13 +107,17 @@ def main(argv: list[str] | None = None) -> int:
         settings.analysis_mode = AnalysisMode.THOROUGH
     if args.schnell:
         settings.analysis_mode = AnalysisMode.FAST
+    fallback = False
     if not args.gruendlich and settings.analysis_mode == AnalysisMode.THOROUGH:
         from .paths import find_ner_model
 
         if find_ner_model(settings.ner_model) is None:
-            print("Hinweis: Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – verwende „Schnell“.",
-                  file=sys.stderr)
+            # Weniger Treffer als eingestellt – nicht stillschweigend: eigener Rückgabewert, damit Skripte es
+            # bemerken. Wer „Schnell“ will, sagt es mit --schnell oder in den Einstellungen.
+            print("⚠ Modus „Gründlich“ nicht verfügbar (kein Transformer-Modell) – bearbeitet wird mit „Schnell“ "
+                  f"(weniger Treffer, Rückgabewert {FAST_FALLBACK}). Bewusst wählen mit --schnell.", file=sys.stderr)
             settings.analysis_mode = AnalysisMode.FAST
+            fallback = True
     if args.selftest:
         return selftest(settings)
     if not args.dateien:
@@ -121,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         settings.threshold = args.schwelle
 
     analyzer = PiiAnalyzer.for_settings(settings)
-    rc = OK
+    rc = FAST_FALLBACK if fallback else OK
     for path in args.dateien:
         if path.is_dir():
             rc = worst(rc, process_folder(path, args, settings, analyzer))
@@ -155,6 +162,15 @@ def process_file(path: Path, args, settings: Settings, analyzer) -> int:
             print(f"  {where:>7}  {info(f.entity_type).label:<22} {f.score:.2f}  {f.text!r}")
     if args.nur_anzeigen:
         return OK
+    if doc.has_ocr:
+        # wie im Ordnerlauf: Texterkennung macht Fehler – nicht ungeprüft exportieren
+        pages = ", ".join(str(p + 1) for p in doc.ocr_pages)
+        print(f"  ! {path}: Texterkennung (OCR, Seiten {pages}) – nicht automatisch exportiert, bitte in der "
+              "Oberfläche prüfen", file=sys.stderr)
+        return OCR_SKIPPED
+    if held_for_check(doc.text, findings) is not None:
+        print(f"  ! {path}: {CHECK_NOT_AUTO}", file=sys.stderr)
+        return OCR_SKIPPED
 
     target = target_for(path, doc, args)
     if target.exists() and not args.ueberschreiben:
@@ -218,6 +234,13 @@ def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
                 res = analyze_file(path, analyzer, settings)
                 ws.set_analysis_result(e.rel, res)
                 findings = res["findings"]
+            held = held_for_check(doc.text, findings)
+            if held is not None:
+                ws.hold_for_check(e.rel, held)
+                print(f"  ! {e.rel}: {CHECK_NOT_AUTO}")
+                rc = worst(rc, OCR_SKIPPED)
+                ws.save()
+                continue
             out = ws.out(e.rel)
             leftovers = export_document(doc, findings, settings, out)
             ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)

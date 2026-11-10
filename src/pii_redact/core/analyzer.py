@@ -354,6 +354,63 @@ def find_terms(text: str, terms: Iterable[str], entity_type: str = "CUSTOM") -> 
     return out
 
 
+_SALUTATIONS = {"herr", "herrn", "frau", "dr", "prof", "med"}
+
+
+def word_pattern(text: str) -> re.Pattern | None:
+    """Suchmuster für den Text eines Fundes: Leerraum beliebig, und nicht als Teil eines längeren Wortes bzw.
+    einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“).
+    None bei Texten unter drei Zeichen."""
+    # Satzzeichen am Rand gehören nicht zum gesuchten Text („KAYA.“ am Satzende → „kaya“ im Dateinamen)
+    words = join_hyphenated(plain_spaces(text)).strip(_TRIM_CHARS + ".!?").split()
+    # Anrede und Titel gehören nicht zum Namen („Herrn Kaya“ → „kaya“ im Dateinamen)
+    while len(words) > 1 and words[0].casefold().rstrip(".") in _SALUTATIONS:
+        words = words[1:]
+    if not words or len("".join(words)) < 3:
+        return None
+    core = r"\s*".join(re.escape(w) for w in words)
+    first, last = words[0][0], words[-1][-1]
+    before = r"(?<![^\W\d_])" if first.isalpha() else r"(?<!\d)" if first.isdigit() else ""
+    after = r"(?![^\W\d_])" if last.isalpha() else r"(?!\d)" if last.isdigit() else ""
+    return re.compile(before + core + after, re.IGNORECASE)
+
+
+#: Herkunft der Vorschläge aus der Kontrolle vor dem Speichern (wie „ki“: nicht aktiviert, bleiben bei neuer Analyse)
+CHECK_SOURCE = "kontrolle"
+
+
+def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
+    """Stellen, an denen der Text eines aktiven Fundes noch einmal steht, ohne selbst als Fund markiert zu sein –
+    etwa ein Name im Dateinamen („antrag_kaya.pdf“) oder in anderer Groß-/Kleinschreibung. Sie blieben im Ergebnis
+    lesbar. Rückgabe: nicht aktivierte Vorschläge (Herkunft „kontrolle“) mit der Datenart des Fundes.
+
+    Stellen, die ein vorhandener Fund berührt, zählen nicht: aktive werden geschwärzt, abgewählte sind eine
+    bewusste Entscheidung (auch ein früher abgelehnter Vorschlag)."""
+    marked = bytearray(len(text))
+    for f in findings:
+        if f.area is None:
+            marked[f.start:f.end] = b"\x01" * (f.end - f.start)
+    joined, hmap = dehyphenate(plain_spaces(text))
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for f in sorted(findings, key=lambda f: f.start):
+        key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
+        if not f.active or f.area is not None or key in seen:
+            continue
+        seen.add(key)
+        pattern = word_pattern(f.text)
+        if pattern is None:
+            continue
+        for m in pattern.finditer(joined):
+            s, e = hmap.span(m.start(), m.end()) if hmap else (m.start(), m.end())
+            if any(marked[s:e]):
+                continue
+            marked[s:e] = b"\x01" * (e - s)
+            out.append(Finding(s, e, f.entity_type, text[s:e], 1.0, source=CHECK_SOURCE, active=False,
+                               recognizer="Kontrolle: weiteres Vorkommen eines geschwärzten Textes"))
+    return sorted(out, key=lambda f: f.start)
+
+
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
     allowed = {join_hyphenated(plain_spaces(a).strip()).casefold() for a in allow_list if a.strip()}
     if not allowed:
