@@ -224,6 +224,10 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
+- **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen
+  deshalb über `ui/dialogs.ask_yes_no` (in Tests `dialogs.ask_yes_no` ersetzen, nicht `QMessageBox.question`),
+  Schaltflächenleisten über `german_buttons`; `app.main` lädt zusätzlich `qtbase_de` (Kontextmenüs u. Ä.) – ob
+  die Datei im gebauten Programm liegt, zeigt die Log-Zeile beim Start.
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.

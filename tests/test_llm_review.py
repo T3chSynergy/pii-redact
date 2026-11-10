@@ -201,7 +201,7 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     from PySide6.QtCore import QEventLoop, QTimer
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication
 
     QApplication.instance() or QApplication([])
     from pii_redact.ui.main_window import MainWindow
@@ -212,7 +212,9 @@ def test_ui_review_flow(server, tmp_path, monkeypatch):
         loop.exec()
 
     asked = []
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: asked.append(a[2]) or QMessageBox.StandardButton.Yes)
+    from pii_redact.ui import dialogs
+
+    monkeypatch.setattr(dialogs, "ask_yes_no", lambda *a, **k: asked.append(a[2]) or True)
     w = MainWindow()
     try:
         assert not w.actions_["ki_review"].isVisible()  # nicht eingerichtet → unsichtbar

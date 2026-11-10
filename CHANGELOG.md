@@ -44,8 +44,6 @@
   Fehlalarme). In Texten, die ganz in Großbuchstaben stehen, kommen einzelne Fehlalarme hinzu (gewöhnliche
   Wörter wie „AULA“ als Ort; 5 in den Testtexten mit rund 3000 Wörtern).
 - Gängige Abkürzungen (DSGVO, BGB, IHK, AOK, TÜV, SEPA …) gelten nicht als Name oder Ort.
-
-**Erkennung**
 - **Geschützte und schmale Leerzeichen:** IBAN, Telefonnummern und andere Nummern wurden nicht erkannt, wenn
   statt normaler Leerzeichen geschützte standen („DE89 3704 …“ aus Satzprogrammen oder der Textverarbeitung).
   Solche Leerzeichen zählen jetzt wie normale – auch in Sperr- und Ausnahmeliste.
@@ -60,6 +58,13 @@
   („beschädigt oder kein gültiges PDF“, Rückgabewert 1) und der Lauf geht weiter.
 - **Protokoll:** Dateinamen, die mit `=`, `+`, `-` oder `@` beginnen, las Excel im Protokoll als Formel. Solche
   Zellen beginnen jetzt mit einem Hochkomma und bleiben Text.
+
+**Oberfläche**
+- **Schaltflächen durchgehend deutsch:** Rückfragen und Dialoge zeigten teils englische Schaltflächen („Cancel“,
+  „Yes“/„No“). Sie sind jetzt deutsch beschriftet; zusätzlich lädt das Programm die deutsche Übersetzung für
+  alles, was Qt selbst beschriftet (z. B. Kontextmenüs der Textfelder).
+- „Ungeprüfte Dateien exportieren“: Die Rückfrage nennt die Zahl jetzt als „Bis zu …“, weil die Kontrolle
+  einzelne Dateien danach noch zurückhalten kann.
 
 **KI-Nachprüfung**
 - Die Einstellungen warnen bei einer unverschlüsselten Server-Adresse (`http://`, außer zum eigenen Rechner).
