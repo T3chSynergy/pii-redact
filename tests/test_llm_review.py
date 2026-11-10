@@ -65,6 +65,31 @@ def server(monkeypatch):
     srv.shutdown()
 
 
+@pytest.mark.parametrize("code", [301, 302, 303, 307, 308])
+def test_redirect_is_not_followed(server, code):
+    """Weiterleitung auf einen anderen Server: weder Anfrage noch API-Schlüssel gehen dorthin."""
+    class Umleitung(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(code)
+            self.send_header("Location", server.replace("127.0.0.1", "localhost") + "/chat/completions")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *_a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Umleitung)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(lr.LlmError) as exc:
+            lr.chat(_settings(f"http://127.0.0.1:{srv.server_port}/v1"), [{"role": "user", "content": "x"}])
+    finally:
+        srv.shutdown()
+    assert "leitet auf localhost" in str(exc.value) and "geheim" not in str(exc.value)
+    assert FakeLLM.requests == []
+
+
 def _settings(url, **kw):
     s = Settings(llm_enabled=True, llm_url=url, llm_model="test/modell", llm_api_key="geheim", **kw)
     return s
@@ -110,7 +135,8 @@ def test_only_redacted_text_is_sent_and_hints_map_to_original(server, tmp_path):
     assert res.unmatched == 2
 
     sugg = lr.suggestions(res, findings, doc.text)
-    assert {f.text for f in sugg} == {"Schwerbehindertenvertreterin im Einkauf am Standort Nord", "Personalnummer 48213"}
+    assert {f.text for f in sugg} == {"Schwerbehindertenvertreterin im Einkauf am Standort Nord",
+                                      "Personalnummer 48213"}
     assert all(f.source == "ki" and not f.active and f.recognizer.startswith("KI-Nachprüfung") for f in sugg)
     # bleiben im Arbeitsstand erhalten
     back = findings_from_compact(findings_to_compact(sugg), doc.text)
@@ -179,7 +205,7 @@ def test_chunks_cover_text_without_gaps(tmp_path):
     red = lr.reviewed_text(doc, [])
     parts = lr.chunks(doc, red, 2000)
     assert parts[0][0] == 0 and parts[-1][1] == len(red.text)
-    assert all(a[1] == b[0] for a, b in zip(parts, parts[1:]))
+    assert all(a[1] == b[0] for a, b in zip(parts, parts[1:], strict=False))
     assert all(e - s <= 2000 for s, e, _ in parts)
 
 
@@ -271,5 +297,6 @@ def test_parse_json_tolerates_fences_and_thinking():
 def test_unencrypted_address_is_recognised():
     assert lr.is_unencrypted("http://llm.intern.example/v1")
     assert lr.is_unencrypted(" HTTP://10.0.0.5:8080/v1 ")
-    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080", "http://[::1]:8080/v1", ""):
+    for url in ("https://llm.intern.example/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080",
+                "http://[::1]:8080/v1", ""):
         assert not lr.is_unencrypted(url), url

@@ -71,6 +71,27 @@ def _analyze_fake(ws: Workspace):
                         findings=[Finding(0, 4, "PERSON", doc.text[0:4])], warnings=doc.warnings, mode="schnell")
 
 
+def test_workspace_entry_outside_source_is_not_processed(folder, tmp_path):
+    """Von Hand veränderter Arbeitsstand mit „..“ im Pfad: Die Datei gilt als fehlend und wird übergangen –
+    gelesen und geschrieben wird nur, was der Abgleich im Quellordner findet."""
+    import json
+
+    from pii_redact.core.batch import WORKSPACE_NAME
+
+    (tmp_path / "aussen.txt").write_text("Frau Erika Beispiel", encoding="utf-8")
+    target = tmp_path / "ziel"
+    Workspace.create(folder, target).save()
+    path = target / WORKSPACE_NAME
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["files"]["../aussen.txt"] = dict(next(iter(data["files"].values())), status=Status.TO_REVIEW)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    ws = Workspace.load(target)
+    todo = ws.sync_with_disk()
+    assert "../aussen.txt" not in todo and ws.entries["../aussen.txt"].status == Status.MISSING
+    assert not ws.entries["../aussen.txt"].analyzed
+
+
 def test_workspace_resume_and_change_detection(folder, tmp_path):
     target = tmp_path / "ziel"
     ws = Workspace.create(folder, target)
@@ -89,7 +110,8 @@ def test_workspace_resume_and_change_detection(folder, tmp_path):
     export_document(doc, findings, Settings(), out)
     ws.mark_done(rel, reviewed=True, exported_as=out, leftovers=[], findings=findings)
     ws.save()
-    assert out == target / "Verträge" / "brief_anonymisiert.txt" and out.read_text(encoding="utf-8").startswith("[PERSON]")
+    assert out == target / "Verträge" / "brief_anonymisiert.txt"
+    assert out.read_text(encoding="utf-8").startswith("[PERSON]")
 
     # Kein Klartext im Arbeitsstand
     raw = (target / WORKSPACE_NAME).read_text(encoding="utf-8")
@@ -141,7 +163,8 @@ def test_protocol_has_no_clear_text(folder, tmp_path):
     ws = Workspace.create(folder, tmp_path / "ziel")
     _analyze_fake(ws)
     ws.save()
-    rows = list(csv.reader(open(tmp_path / "ziel" / PROTOCOL_NAME, encoding="utf-8-sig"), delimiter=";"))
+    with open(tmp_path / "ziel" / PROTOCOL_NAME, encoding="utf-8-sig") as fh:
+        rows = list(csv.reader(fh, delimiter=";"))
     assert rows[0][:2] == ["Datei", "Status"] and len(rows) == 4
     assert all(r[1] == "zu prüfen" for r in rows[1:])
     content = (tmp_path / "ziel" / PROTOCOL_NAME).read_text(encoding="utf-8-sig")
@@ -178,4 +201,5 @@ def test_protocol_cells_are_not_read_as_formulas(tmp_path):
     with open(ws.protocol_path, encoding="utf-8-sig", newline="") as fh:
         names = [row[0] for row in csv.reader(fh, delimiter=";")][1:]
     assert sorted(names) == sorted(["'=1+1.txt", "'+plus.txt", "'-minus.txt", "'@summe.txt", "normal.txt"])
-    assert set(ws.entries) == {"=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"}   # Arbeitsstand unverändert
+    # Arbeitsstand unverändert
+    assert set(ws.entries) == {"=1+1.txt", "+plus.txt", "-minus.txt", "@summe.txt", "normal.txt"}

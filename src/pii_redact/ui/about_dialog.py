@@ -37,12 +37,11 @@ def about_html(settings, dark: bool = False) -> str:
     if ner_dir:
         meta = ner_model_info(ner_dir)
         ner = (f"{html.escape(str(meta.get('source', ner_dir.name)))} – ONNX"
-               f"{' 8-Bit' if meta.get('quantized') else ''}, Lizenz {html.escape(str(meta.get('license') or 'siehe MODEL_CARD.md'))}")
+               f"{' 8-Bit' if meta.get('quantized') else ''}, "
+               f"Lizenz {html.escape(str(meta.get('license') or 'siehe MODEL_CARD.md'))}")
     else:
         ner = "nicht installiert – Modus „Gründlich“ nicht verfügbar"
-    from ..core import ocr
-
-    from ..core import llm_review
+    from ..core import llm_review, ocr
 
     if llm_review.is_configured(settings):
         ki = (f"eingeschaltet: {html.escape(settings.llm_model)} über {html.escape(llm_review.host_of(settings))} "
@@ -78,7 +77,8 @@ def about_html(settings, dark: bool = False) -> str:
 <p>Freie Software unter der {html.escape(LICENSE)} – ohne Gewährleistung.{source}</p>
 <h3>Installierte Modelle</h3>
 <table border="1" cellspacing="0" cellpadding="4" width="100%">
-<tr><td width="30%">Sprachmodell (beide Modi)</td><td>spaCy {html.escape(settings.spacy_model)}{'' if spacy_ref else ' – FEHLT'}</td></tr>
+<tr><td width="30%">Sprachmodell (beide Modi)</td>
+<td>spaCy {html.escape(settings.spacy_model)}{'' if spacy_ref else ' – FEHLT'}</td></tr>
 <tr><td>KI-Modell „Gründlich“</td><td>{ner}</td></tr>
 <tr><td>Texterkennung (OCR)</td><td>{ocr_state}</td></tr>
 <tr><td>KI-Nachprüfung</td><td>{ki}</td></tr>

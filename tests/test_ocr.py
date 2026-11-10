@@ -7,8 +7,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from pii_redact.core import Finding, ReplaceMode, load_document, redact_pdf, verify_pdf
-from pii_redact.core import ocr
+from pii_redact.core import Finding, ReplaceMode, load_document, ocr, redact_pdf, verify_pdf
 from pii_redact.core.loaders import OCR_WARNING_PREFIX
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"

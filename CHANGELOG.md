@@ -1,5 +1,42 @@
 # Änderungen
 
+## 0.8.6 – 10.11.2026
+
+**Kontrolle vor dem Speichern**
+- **Nachname allein:** Ist ein Personenname aus mehreren Wörtern geschwärzt („Max Mustermann“), schlägt die
+  Kontrolle jetzt auch Stellen vor, an denen nur der Nachname steht („Mustermann zahlt …“,
+  „antrag_mustermann.pdf“). Bisher suchte sie nur den ganzen Wortlaut. Weil viele Nachnamen auch gewöhnliche
+  Wörter sind, zählt der Nachname nur groß geschrieben und nicht nach einem Artikel oder „im“/„am“ („im Winter“,
+  „der Koch“), klein geschrieben nur in Dateinamen und Kennungen. Wie alle Vorschläge der Kontrolle: ohne
+  Häkchen in der Fundliste, Rückfrage vor dem Speichern; automatischer Export und Kommandozeile halten die Datei
+  zurück (Rückgabewert 3). Hilfe: „Kontrolle vor dem Speichern“.
+
+**Kleine Korrekturen**
+- **KI-Nachprüfung folgt keinen Weiterleitungen mehr:** Antwortete der eingestellte Server mit einer
+  Weiterleitung (301/302/303), ging die Anfrage bisher an die neue Adresse – auch an einen anderen Server, samt
+  API-Schlüssel. Jetzt bricht die Anfrage mit einer Meldung ab, die das Ziel nennt; die Server-Adresse ist dann
+  in den Einstellungen anzupassen.
+- **Text-Export und Einstellungen werden sicher geschrieben:** erst in eine Datei `<Name>.tmp`, dann umbenannt
+  (wie schon beim PDF-Export). Bricht das Schreiben ab – Datenträger voll, Netzlaufwerk getrennt –, bleibt die
+  bisherige Datei unverändert, und unter dem Zielnamen liegt keine halbe Datei.
+- **Einstellungsdatei mit unpassenden Werten:** In einer von Hand bearbeiteten `settings.json` oder
+  `defaults.json` werden Werte der falschen Art (etwa Text statt Zahl) übergangen; dafür gilt die Vorgabe der IT
+  bzw. die Voreinstellung. Bisher konnte das Programm damit später an unerwarteter Stelle abbrechen.
+- **Von Hand hinzugefügte Schwärzung ist in der Fundliste ausgewählt:** Nach „Schwärzen als“, „Alle Vorkommen
+  schwärzen“ oder einem aufgezogenen Bereich war der neue Fund nur im Text hervorgehoben; in der Fundliste war
+  nichts ausgewählt, die Detailzeile darunter blieb leer. Jetzt steht die Auswahl auf dem neuen Eintrag.
+- **Text-Export: verständliche Meldung, wenn das Speichern scheitert** (Ziel schreibgeschützt, Netzlaufwerk
+  getrennt, Datenträger voll). Bisher erschien das allgemeine Fenster „Unerwarteter Fehler“; beim PDF-Export gab
+  es die Meldung „Export fehlgeschlagen“ schon. Verloren ging dabei nichts.
+- **Kommandozeile:** `--schwelle` nimmt nur noch Werte von 0 bis 1 an (sonst Aufruffehler, Rückgabewert 1).
+
+**Intern**
+- Deutlich mehr automatische Tests der Oberfläche (Export, Ordnerbearbeitung, Bearbeiten, Einstellungen,
+  KI-Nachprüfung, Selbsttest, Programmstart): 61 neue Tests, der Code wird jetzt zu 89 % von Tests durchlaufen
+  (vorher 81 %). Zwei der Korrekturen oben sind dabei aufgefallen.
+- Strengere Stilprüfung mit ruff (Regeln in `pyproject.toml`), Code entsprechend bereinigt – ohne geändertes
+  Verhalten.
+
 ## 0.8.5 – 10.11.2026
 
 **Kontrolle nach dem Export**
@@ -12,7 +49,6 @@
   dabei nicht.
 - Die Meldungen sagen, was gefunden wurde: „an der geschwärzten Stelle noch vorhanden“ oder „an anderer Stelle
   noch lesbar“, jeweils mit Seite. Erklärung in der Hilfe unter „Häufige Fragen“.
-
 - **Kontrolle vor dem Speichern:** Steht ein geschwärzter Text noch an einer nicht markierten Stelle (etwa ein
   Name im Dateinamen „antrag_mustermann.pdf“ oder in Großbuchstaben), fragt das Programm jetzt **vor** dem
   Speichern nach, statt danach zu warnen. Die Stellen kommen als Vorschläge in die Fundliste (Herkunft

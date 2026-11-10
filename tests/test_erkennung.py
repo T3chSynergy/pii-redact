@@ -35,7 +35,7 @@ def test_gold_data_consistent():
     assert sum(map(len, gold.values())) >= 150
     for name, spans in gold.items():
         text = docs[name]
-        for s, e, typ in spans + neutral[name]:
+        for s, e, _typ in spans + neutral[name]:
             assert text[s:e].strip() == text[s:e] and text[s:e], (name, s, e)
 
 

@@ -64,13 +64,44 @@ def test_signature_sample_is_flagged():
 def test_locked_settings(tmp_path):
     defaults = tmp_path / "defaults.json"
     user = tmp_path / "settings.json"
-    defaults.write_text(json.dumps({"compact_notices": True, "ocr": True, "locked": ["compact_notices", "ocr", "fehlt"]}))
+    defaults.write_text(json.dumps({"compact_notices": True, "ocr": True,
+                                    "locked": ["compact_notices", "ocr", "fehlt"]}))
     user.write_text(json.dumps({"compact_notices": False, "ocr": False, "pdf_labels": False, "locked": []}))
     s = Settings.load(user, defaults)
     assert s.compact_notices is True and s.ocr is True and s.pdf_labels is False
     assert s.locked == ["compact_notices", "ocr"]
     s.save(user)
     assert "locked" not in json.loads(user.read_text())
+
+
+def test_settings_with_wrong_types_fall_back(tmp_path):
+    """Von Hand bearbeitete Einstellungsdatei: unpassende Werte werden übergangen, der Rest gilt."""
+    defaults = tmp_path / "defaults.json"
+    user = tmp_path / "settings.json"
+    defaults.write_text(json.dumps({"llm_timeout": 60, "threshold": "hoch", "allow_list": "Musterstadt"}))
+    user.write_text(json.dumps({"threshold": 1, "llm_timeout": "lang", "ocr": "ja", "zoom_percent": True,
+                                "deny_list": ["Projekt Falke", 7], "entities": None, "pdf_labels": False}))
+    s = Settings.load(user, defaults)
+    assert s.threshold == 1 and s.pdf_labels is False            # ganze Zahl als Schwelle ist in Ordnung
+    assert s.llm_timeout == 60                                    # Vorgabe der IT bleibt, nicht die Voreinstellung
+    assert s.ocr is True and s.zoom_percent == 100 and s.deny_list == [] and s.entities == Settings().entities
+    assert s.org_allow_list == []
+
+
+def test_settings_save_keeps_old_file_on_error(tmp_path, monkeypatch):
+    user = tmp_path / "settings.json"
+    Settings(zoom_percent=150).save(user)
+    before = user.read_text(encoding="utf-8")
+
+    def broken(self, *_a, **_kw):
+        self.write_bytes(b"{")          # halbe Datei, dann Abbruch
+        raise OSError("Datenträger voll")
+
+    monkeypatch.setattr(Path, "write_text", broken)
+    with pytest.raises(OSError):
+        Settings(zoom_percent=80).save(user)
+    monkeypatch.undo()
+    assert user.read_text(encoding="utf-8") == before and list(tmp_path.iterdir()) == [user]
 
 
 # ---------------------------------------------------------------- Oberfläche

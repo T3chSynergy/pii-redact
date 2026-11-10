@@ -149,7 +149,8 @@ def check(exe: Path | None = None, workdir: Path | None = None, control: bool = 
         _logman("stop", session, "-ets")
 
     if result.returncode == 3:
-        raise NotPossible("pii-redact hat die Texterkennung nicht ausgeführt (RapidOCR fehlt?) – Prüfung unvollständig.")
+        raise NotPossible(
+            "pii-redact hat die Texterkennung nicht ausgeführt (RapidOCR fehlt?) – Prüfung unvollständig.")
     if result.returncode not in (0, 2):   # 2 = Reste im Ergebnis – bei „nur anzeigen“ ohnehin nicht relevant
         raise NotPossible(f"pii-redact ist mit Fehler {result.returncode} beendet: {result.stderr.strip()[-500:]}")
     conv = subprocess.run(["tracerpt", str(etl), "-o", str(xml), "-of", "XML", "-y"], capture_output=True,

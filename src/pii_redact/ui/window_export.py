@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from ..core import save_redacted_pdf
 from ..core.analyzer import further_occurrences
+from ..core.models import write_text_safely
 
 #: Kennzeichen der Kontrollmeldung für weitere Vorkommen (siehe core.redactor.verify_pdf)
 ELSEWHERE = " – an anderer Stelle noch lesbar"
@@ -39,14 +40,20 @@ class ExportMixin:
         if self.session.manual_text is None and self._confirm_further() is None:
             return
         suffix = ".md" if doc.kind == "md" else ".txt"
-        path, _ = QFileDialog.getSaveFileName(self, "Anonymisierten Text speichern", self._suggest(suffix, "anonymisiert"),
+        path, _ = QFileDialog.getSaveFileName(self, "Anonymisierten Text speichern",
+                                              self._suggest(suffix, "anonymisiert"),
                                               "Markdown (*.md);;Text (*.txt);;Alle Dateien (*)")
         if not path:
             return
         if Path(path).resolve() == doc.path.resolve():
             QMessageBox.warning(self, "Export", "Das Original darf nicht überschrieben werden.")
             return
-        Path(path).write_text(self.session.output_text(), encoding="utf-8")
+        try:
+            write_text_safely(Path(path), self.session.output_text())
+        except OSError as exc:   # Ziel schreibgeschützt, Netzlaufwerk getrennt, Datenträger voll
+            QMessageBox.critical(self, "Export fehlgeschlagen",
+                                 f"Die Datei konnte nicht gespeichert werden:\n{path}\n\n{exc.strerror or exc}")
+            return
         self.session.dirty = False
         self._update_title()
         self._show_saved(Path(path), "Text gespeichert")
@@ -68,7 +75,8 @@ class ExportMixin:
                 self, "Hinweis",
                 "Die freie Textbearbeitung wirkt nur auf den Text-Export. Das PDF wird aus den Funden erzeugt."
             )
-        path, _ = QFileDialog.getSaveFileName(self, "Geschwärztes PDF speichern", self._suggest(".pdf", "geschwaerzt"), "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self, "Geschwärztes PDF speichern",
+                                              self._suggest(".pdf", "geschwaerzt"), "PDF (*.pdf)")
         if not path:
             return
         if Path(path).resolve() == doc.path.resolve():
@@ -140,7 +148,8 @@ class ExportMixin:
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle("Kontrolle vor dem Speichern")
         n = len(new)
-        box.setText(f"<b>Geschwärzter Text steht noch an {'einer weiteren Stelle' if n == 1 else f'{n} weiteren Stellen'}.</b>")
+        where = "einer weiteren Stelle" if n == 1 else f"{n} weiteren Stellen"
+        box.setText(f"<b>Geschwärzter Text steht noch an {where}.</b>")
         box.setInformativeText(
             "Diese Stellen sind nicht als Fund markiert und blieben im Ergebnis lesbar:<br><br>" + "<br>".join(lines)
             + "<br><br>Sie stehen jetzt als Vorschläge in der Fundliste (Herkunft „Kontrolle“, noch ohne Häkchen). "

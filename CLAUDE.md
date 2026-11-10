@@ -4,9 +4,11 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
+**Stand:** v0.8.6 (Kontrolle vor dem Speichern schlägt auch den Nachnamen allein vor; KI-Anfrage folgt keinen
+Weiterleitungen; Text-Export/Einstellungen über `.tmp`, Fehlermeldung beim Text-Export; neue Funde in der Fundliste
+ausgewählt; strengere ruff-Regeln; 61 neue Oberflächentests, 89 % Abdeckung); davor v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
 Rückfrage wird zurückgehalten; Namen/Orte in Großbuchstaben, geschützte Leerzeichen, Stern-Datum, Postfach;
-Kommandozeile: Rückgabewert 4, OCR-Einzeldateien nicht exportiert, defekte PDFs; deutsche Schaltflächen); davor
+Kommandozeile: Rückgabewert 4, OCR-Einzeldateien nicht exportiert, defekte PDFs; deutsche Schaltflächen);
 v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
 Schwärzung trifft bei engem Zeilenabstand nur noch die eigene Zeile; Hilfe zur Textansicht); v0.8.3 (Telemetrie von onnxruntime abgeschaltet + ETW-Prüfung `tools\etw_pruefen.bat`, gebündeltes
 Paket-Update, Sicherheitsupdate filelock, Ober-/Untergrenzen in `pyproject.toml`); v0.8.2 (Silbentrennung und
@@ -14,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 202 Tests (Stand 10.11.2026; `dev` mit PR #61–#63 vom Nutzer getestet, #64 danach gemergt; Release-Build 0.8.4 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 275 Tests (Stand 10.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -150,7 +152,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 202 Tests (Stand 10.11.2026; `dev` m
   das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
-  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff --select F,E9`,
+  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen; ruff in der CI auf `0.17.x` festgelegt; Komplexitätsregeln und mypy bewusst erst mit einem Refactoring),
   `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
   PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
@@ -205,6 +207,11 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   in `window_batch._export_auto` und `cli` – nicht exportieren, Vermerk `CHECK_NOT_AUTO`, Vorschläge im
   Arbeitsstand, Rückgabewert 3; auch ein vorhandener, unbestätigter Vorschlag hält zurück. Anrede/Titel und
   Satzzeichen am Rand zählen bei der Suche nicht (`word_pattern`).
+  **Nachname allein** (seit 10.11.2026): bei aktiven PERSON-Funden aus mehreren Wörtern sucht ein zweiter
+  Durchgang `surname()` (letztes Wort bzw. Wort vor dem Komma); `_surname_hit`: groß geschrieben und nicht nach
+  `_NOUN_MARKERS` („im Winter“, „der Fuchs“), klein nur in Dateinamen/Kennungen. Messung über 16 Beispieldateien:
+  Gründlich 0 zusätzliche Vorschläge (ohne die Artikel-Regel 3 Fehlalarme in den Texten mit doppeldeutigen
+  Namen), Schnell 2 (beide richtig: „Koch und Bauer“ in `schwierig.txt`). Vornamen allein werden nicht gesucht.
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen
@@ -225,6 +232,18 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   `f.text` wird am Ende immer aus dem Original gesetzt (Wortlaut des Dokuments).
 - Hauptfenster aufgeteilt: `ui/main_window.py` + Mixins `ui/window_{export,edit,view,ki,batch}.py`. Tests, die
   Funktionen eines Teils ersetzen (monkeypatch), müssen das Modul des Mixins patchen, nicht `main_window`.
+- **Oberflächentests vor einem Refactoring** (Plan 10.11.2026; Messung mit `coverage run --branch`: gesamt 81 %,
+  Kern 94–96 %, Oberfläche teils 55–60 %): erst Lücken schließen, dann je Modul umbauen. Teil 1 erledigt:
+  `tests/test_ui_export.py` (Export/Speichern, `window_export.py` 55 → 99 %; Fund: Schreibfehler beim Text-Export
+  ohne Meldung, behoben). Teil 2 erledigt: `tests/test_ui_batch.py` (Ordnerbearbeitung, `window_batch.py` 60 → 94 %,
+  `batch_panel.py` 85 → 97 %; Fixture `batch` = Ordner mit drei Textdateien im Modus „Schnell“). Teil 3 erledigt:
+  `tests/test_ui_edit.py` (Bearbeiten, Einstellungsdialog, KI-Fehlerwege), `tests/test_app.py` (Protokoll, Start per
+  `--smoke-test` als eigener Prozess), `--selftest` in `test_cli.py`; gesamt 81 → 89 %. Menüs, die das Programm
+  selbst mit `exec` öffnet, bedient `_in_menu` (Timer wählt einen Eintrag und schließt das Menü – immer schließen,
+  sonst hängt der Test). Bekannte Lücken: Mausbedienung der Seitenansicht (`pdf_view.py` 76 %), Hintergrund-Thread
+  (`worker.py`), Abbruch im Fortschrittsfenster. Fixture `window` liegt in
+  `tests/conftest.py`; Klasse `Dialogs` in `test_ui_export.py` ersetzt Dateidialog und Meldungsfenster und klickt in
+  Rückfragen die voreingestellte oder eine benannte Schaltfläche (so läuft der echte Dialogcode).
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
 - **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen
@@ -234,6 +253,13 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.
+- **Weiterleitungen bei der KI-Anfrage** (nachgestellt 10.11.2026): urllib folgt bei POST den Codes 301/302/303
+  als GET ohne Inhalt, aber **mit** `Authorization` – auch zu einem anderen Server. `llm_review._opener` folgt
+  deshalb keiner Weiterleitung; Meldung nennt das Ziel. (307/308 folgte urllib bei POST ohnehin nie.)
+- Textdateien, die eine vorhandene ersetzen (Text-Export, `Settings.save`), über `models.write_text_safely`
+  (`.tmp` + Umbenennen). `Settings.load` übergeht Werte der falschen Art je Datei (`_same_kind`).
+- Arbeitsstand mit „..“ im Pfad (von Hand verändert) ist unkritisch: `sync_with_disk` setzt alles, was der
+  Abgleich im Quellordner nicht findet, auf „fehlt“; Kommandozeile und Oberfläche übergehen diese Einträge (Test).
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in
   `sys.modules` eintragen.
 - Werkzeugleiste bei 1500 px mit Überlauf (»), bei 1920 px ok.

@@ -98,9 +98,8 @@ def has_outside_content(page: fitz.Page, leftover: bool = False) -> bool:
                 check_text = check_text or not visible.contains(r)
             elif grown.contains(r):
                 continue
-            elif not r.intersects(visible):
-                return True
-            elif ("image" in kind or "imgmask" in kind or "shade" in kind) and not leftover:
+            elif (not r.intersects(visible)
+                  or ("image" in kind or "imgmask" in kind or "shade" in kind) and not leftover):
                 return True
         if check_text:
             for span in page.get_texttrace():
@@ -133,7 +132,7 @@ def _remove_outside(pdf: fitz.Document, report: HiddenReport) -> bool:
         elif is_cropped(page):
             # CropBox direkt an der Seite gleich der MediaBox setzen (set_cropbox scheitert bei Seiten mit
             # verschobenem Nullpunkt; ein Eintrag an der Seite hat Vorrang vor einem geerbten)
-            pdf.xref_set_key(page.xref, "CropBox", "[%g %g %g %g]" % tuple(page.mediabox))
+            pdf.xref_set_key(page.xref, "CropBox", "[{:g} {:g} {:g} {:g}]".format(*page.mediabox))
             report.uncropped.append(page.number)
             changed = True
         else:
@@ -188,7 +187,7 @@ def _resolve_layers(pdf: fitz.Document, report: HiddenReport) -> tuple[fitz.Docu
     shown.xref_set_key(shown.pdf_catalog(), "OCProperties", "null")   # ohne Ebenenverzeichnis ist alles sichtbar
     shown = _reopen(shown)
     after = _snapshot(shown)
-    affected = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
+    affected = [i for i, (a, b) in enumerate(zip(before, after, strict=False)) if a != b]
     if not affected:
         return shown, True   # nichts war ausgeblendet
 

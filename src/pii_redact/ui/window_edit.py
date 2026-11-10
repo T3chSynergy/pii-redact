@@ -10,8 +10,8 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMenu, QMessageBox
 
 from ..core.entities import AREA_KEYS, all_keys, info
-from . import dialogs
 from ..core.hyphenation import join_hyphenated
+from . import dialogs
 
 QUICK_TYPES = ["PERSON", "LOCATION", "DE_ADDRESS", "ORGANIZATION", "EMAIL_ADDRESS", "PHONE_NUMBER",
                "DATE_TIME", "IBAN_CODE", "CUSTOM"]
@@ -94,7 +94,7 @@ class EditMixin:
                 ocr = "  – per Texterkennung gelesen, bitte prüfen" if self.session.doc.is_ocr(f.start, f.end) else ""
                 lines.append(f"{info(f.entity_type).label}: {f.text}  ({state}){ocr}")
                 if f.source == "ki":
-                    lines.append(f"  Vorschlag der {f.recognizer}" if f.recognizer else "  Vorschlag der KI-Nachprüfung")
+                    lines.append(f"  Vorschlag der {f.recognizer or 'KI-Nachprüfung'}")
                 elif f.source == "kontrolle":
                     lines.append("  Vorschlag der Kontrolle: Dieser Text wird an anderer Stelle geschwärzt")
         return "\n".join(lines)
@@ -138,7 +138,7 @@ class EditMixin:
 
         def add_area(t: str, with_text: bool) -> None:
             added = s.add_area(page, area, t, ranges if with_text else None)
-            self.select([f.id for f in added[:1]])
+            self._select_added([f.id for f in added[:1]])
             self.status_label.setText(f"Bereich auf Seite {page + 1} wird geschwärzt ({info(t).label}).")
 
         if ranges:
@@ -183,8 +183,15 @@ class EditMixin:
         else:
             added = s.add_manual(list(ranges), entity_type)
         if added:
-            self.select([f.id for f in added])
+            self._select_added([f.id for f in added])
             self.status_label.setText(f"{len(added)} Stelle(n) hinzugefügt.")
+
+    def _select_added(self, ids: list[int]) -> None:
+        """Neu hinzugefügte Funde auswählen – auch in der Fundliste. Die Liste wird sonst erst kurz danach neu
+        aufgebaut und kennt die neuen Einträge in diesem Moment noch nicht (Auswahl und Detailzeile blieben leer)."""
+        self._refresh_timer.stop()
+        self._refresh_views()
+        self.select(ids)
 
     def _add_type_menu(self, menu: QMenu, title: str, handler) -> QMenu:
         sub = menu.addMenu(title)
@@ -287,15 +294,16 @@ class EditMixin:
             self.right.text.setReadOnly(False)
             self.right.title.setText("<b>Bearbeitet</b> – <span style='color:#e8590c'>freie Bearbeitung aktiv</span>")
             self.right.title.setToolTip("Änderungen an Funden werden erst nach Beenden der freien Bearbeitung "
-                                        "angezeigt. Beenden verwirft die Handänderungen. Wirkt nur auf den Text-Export.")
+                                        "angezeigt. Beenden verwirft die Handänderungen. "
+                                        "Wirkt nur auf den Text-Export.")
         else:
-            if s.manual_text is not None and s.manual_text != s.redacted().text:
-                if not dialogs.ask_yes_no(self, "Freie Bearbeitung beenden",
-                                          "Handänderungen am anonymisierten Text verwerfen?"):
-                    self.edit_btn.blockSignals(True)
-                    self.edit_btn.setChecked(True)
-                    self.edit_btn.blockSignals(False)
-                    return
+            changed = s.manual_text is not None and s.manual_text != s.redacted().text
+            if changed and not dialogs.ask_yes_no(self, "Freie Bearbeitung beenden",
+                                                  "Handänderungen am anonymisierten Text verwerfen?"):
+                self.edit_btn.blockSignals(True)
+                self.edit_btn.setChecked(True)
+                self.edit_btn.blockSignals(False)
+                return
             self.right.text.setReadOnly(True)
             s.set_manual_text(None)
             self.right.title.setText("<b>Bearbeitet (Vorschau)</b>")

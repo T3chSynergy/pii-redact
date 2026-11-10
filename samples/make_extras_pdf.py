@@ -106,7 +106,8 @@ def formular() -> Path:
     doc = fitz.open()
     page = doc.new_page(**A4)
     page.insert_text((60, 80), "Antrag auf Dienstreise", fontsize=15, fontname="hebo")
-    page.insert_text((60, 100), "Bitte vollständig ausfüllen und an die Reisestelle senden.", fontsize=10, fontname="helv")
+    page.insert_text((60, 100), "Bitte vollständig ausfüllen und an die Reisestelle senden.", fontsize=10,
+                     fontname="helv")
 
     def field(y: float, label: str, name: str, value: str, width: float = 300) -> None:
         page.insert_text((60, y + 13), label, fontsize=10, fontname="helv")

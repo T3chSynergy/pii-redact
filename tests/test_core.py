@@ -7,7 +7,15 @@ import pytest
 import spacy
 
 from pii_redact.core import (
-    Finding, PiiAnalyzer, ReplaceMode, Settings, UnsupportedFileError, load_document, redact_pdf, redact_text, verify_pdf,
+    Finding,
+    PiiAnalyzer,
+    ReplaceMode,
+    Settings,
+    UnsupportedFileError,
+    load_document,
+    redact_pdf,
+    redact_text,
+    verify_pdf,
 )
 from pii_redact.core.analyzer import apply_allow_list, clean_ner, find_terms, merge_overlaps
 
@@ -387,9 +395,10 @@ def test_plain_spaces_keeps_positions():
 @needs_model
 def test_special_spaces_do_not_hide_numbers(analyzer):
     """Geschützte und schmale Leerzeichen (Satzprogramme, Textverarbeitung) in IBAN und Telefonnummer."""
-    text = "Frau Zofia\u00a0Jaeger, IBAN DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000, Tel.\u202f030\u202f1234567"
+    text = ("Frau Zofia\u00a0Jaeger, IBAN DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000, "
+            "Tel.\u202f030\u202f1234567")
     found = {f.entity_type: f for f in analyzer.analyze(text, Settings())}
-    assert found["IBAN_CODE"].text == "DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000"     # Wortlaut des Dokuments
+    assert found["IBAN_CODE"].text == "DE89\u00a03704\u00a00044\u00a00532\u00a00130\u00a000"   # Wortlaut des Dokuments
     assert found["PHONE_NUMBER"].text == "030\u202f1234567"
     assert all(text[f.start:f.end] == f.text for f in found.values())
     lists = Settings(deny_list=["Projekt Adler"], allow_list=["Zofia Jaeger"])
@@ -490,12 +499,14 @@ def test_verify_checks_each_redacted_spot(tmp_path, mode):
 
 
 def test_verify_reports_other_occurrences_but_not_parts_of_words(tmp_path):
-    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Anhang: akte_ende.pdf, Tel. 4711, Nr. 14711")
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.",
+                     "Anhang: akte_ende.pdf, Tel. 4711, Nr. 14711")
     findings = [_find(doc, "Ende"), _find(doc, "4711", "PHONE_NUMBER")]
     out = redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER)
     # „Wochenende“ und „14711“ zählen nicht, der Dateiname schon
     assert verify_pdf(out, findings, None, doc) == ["Ende – an anderer Stelle noch lesbar (Seite 1)"]
-    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.", "Ohne weiteren Treffer, Nr. 14711")
+    doc = _two_lines(tmp_path, "Herr Ende hat den Antrag am Wochenende eingereicht.",
+                     "Ohne weiteren Treffer, Nr. 14711")
     findings = [_find(doc, "Ende")]
     assert verify_pdf(redact_pdf(doc, findings, ReplaceMode.PLACEHOLDER), findings, None, doc) == []
 
@@ -547,7 +558,8 @@ def test_further_occurrences_become_inactive_suggestions():
                                                 [Finding(11, 25, "PERSON", "Herrn Dr. Kaya")])] == ["kaya"]
     new = further_occurrences(text, findings)
     # im Dateinamen, in Großbuchstaben und im Gruß – nicht „Kayala“, „Wochenende“, „14711“
-    assert [(f.text, text[max(f.start - 7, 0):f.start]) for f in new] == [("kaya", "antrag_"), ("KAYA", "gen an "), ("Kaya", " Deniz ")]
+    assert [(f.text, text[max(f.start - 7, 0):f.start]) for f in new] == [
+        ("kaya", "antrag_"), ("KAYA", "gen an "), ("Kaya", " Deniz ")]
     assert all(f.source == "kontrolle" and not f.active and f.entity_type == "PERSON" for f in new)
     assert all(text[f.start:f.end] == f.text for f in new)
     # mit den Vorschlägen in der Liste (auch unbestätigt) wird nichts erneut vorgeschlagen
@@ -556,6 +568,36 @@ def test_further_occurrences_become_inactive_suggestions():
     kept = at("Kaya", "PERSON", nth=2, active=False)   # das „Kaya“ im Gruß
     assert [f.text for f in further_occurrences(text, findings + [kept])] == ["kaya", "KAYA"]
     assert further_occurrences(text, [at("Kaya", "PERSON", active=False)]) == []
+
+
+def test_further_occurrences_surname_alone():
+    """Mehrteiliger Personenname geschwärzt: der Nachname allein wird an anderer Stelle vorgeschlagen."""
+    from pii_redact.core.analyzer import further_occurrences, surname
+
+    assert surname("Herrn Dr. Max Mustermann") == "Mustermann" and surname("Mustermann, Max") == "Mustermann"
+    assert surname("Erika Müller-Lüdenscheid.") == "Müller-Lüdenscheid"
+    assert surname("Mustermann") is None and surname("Herr Mustermann") is None      # kein mehrteiliger Name
+    assert surname("Max Li") is None and surname("Zimmer 12") is None
+
+    def found(text, name, typ="PERSON"):
+        pos = text.index(name)
+        return [(f.text, f.recognizer.split(":")[1].strip()[:8])
+                for f in further_occurrences(text, [Finding(pos, pos + len(name), typ, name)])]
+
+    text = ("Frau Erika Winter stellt den Antrag. Im Winter ist das Büro geschlossen, der Winter war lang.\n"
+            "Rückfragen an Winter oder WINTER, Anhang: antrag_winter.pdf, Akte winter2 – winterfest, im winter.\n"
+            "Gruß, Erika Winter")
+    # ganzer Name hat Vorrang; allein: groß geschrieben, nicht nach „im“/„der“; klein nur in Dateiname/Kennung
+    assert found(text, "Erika Winter") == [("Winter", "Nachname"), ("WINTER", "Nachname"), ("winter", "Nachname"),
+                                           ("winter", "Nachname"), ("Erika Winter", "weiteres")]
+    assert found("Max Mustermann wohnt in Musterstadt. Mustermann zahlt.", "Max Mustermann") == [
+        ("Mustermann", "Nachname")]
+    # nur bei Personen – ein Ort oder eine Firma aus zwei Wörtern löst keine Suche nach dem letzten Wort aus
+    assert found("Sitz in Bad Homburg. Die Homburg GmbH liefert.", "Bad Homburg", "LOCATION") == []
+    # steht der Nachname schon als Fund in der Liste (auch abgewählt), wird er nicht vorgeschlagen
+    t2 = "Max Mustermann und Mustermann."
+    fs = [Finding(0, 14, "PERSON", "Max Mustermann"), Finding(19, 29, "PERSON", "Mustermann", active=False)]
+    assert further_occurrences(t2, fs) == []
 
 
 def test_further_occurrences_across_hyphenation_and_special_spaces():
@@ -607,7 +649,8 @@ def test_mixed_sizes_and_vertical_text_are_removed(tmp_path):
     page = pdf.new_page(width=600, height=400)
     page.insert_text((40, 69), "Zeile darüber mit Text über die ganze Breite der Seite", fontsize=11)
     x = 40.0
-    for part, size, dy in (("Vermerk ", 11, 0), ("Zofia", 11, 0), ("Jaeger", 7, 0), ("2", 6, -5), (" Rest der Zeile", 11, 0)):
+    parts = (("Vermerk ", 11, 0), ("Zofia", 11, 0), ("Jaeger", 7, 0), ("2", 6, -5), (" Rest der Zeile", 11, 0))
+    for part, size, dy in parts:
         page.insert_text((x, 80 + dy), part, fontsize=size)
         x += pymupdf.get_text_length(part, fontsize=size)
     page.insert_text((40, 91), "Zeile darunter mit Text über die ganze Breite der Seite", fontsize=11)

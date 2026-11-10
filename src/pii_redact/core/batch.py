@@ -334,7 +334,8 @@ class Workspace:
             "recursive": self.recursive,
             "created": self.created,
             "updated": self.updated,
-            "files": {rel: {k: v for k, v in asdict(e).items() if k != "rel"} for rel, e in sorted(self.entries.items())},
+            "files": {rel: {k: v for k, v in asdict(e).items() if k != "rel"}
+                      for rel, e in sorted(self.entries.items())},
         }
         self.target.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(self.path.name + ".tmp")
@@ -416,7 +417,8 @@ class Workspace:
         if e.findings is None:
             return None
         if e.text_sha and e.text_sha != text_sha(doc.text):
-            self._reset(e, "Erkannter Text hat sich geändert (z. B. Texterkennung) – neu analysiert, bitte erneut prüfen")
+            self._reset(e, "Erkannter Text hat sich geändert (z. B. Texterkennung) – neu analysiert, "
+                           "bitte erneut prüfen")
             return None
         return findings_from_compact(e.findings, doc.text)
 

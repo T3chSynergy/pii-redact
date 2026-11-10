@@ -122,7 +122,8 @@ def run_model(settings: Settings, cases: list[dict], repeats: int, log=print) ->
             state = f"Fehler: {r.error[:70]}" if r.error else (
                 f"Risiko {r.risk:7s} {'ok ' if r.risk_ok else 'ABW'}  gefunden {r.found}/{r.expected}  "
                 f"Fehlalarme {r.false_alarms}  sonstige {r.other}  ohne Beleg {r.unmatched}")
-            log(f"  {'[' + str(rep + 1) + '] ' if repeats > 1 else ''}{case['name'][:28]:28s} {r.seconds:5.0f} s  {state}")
+            run = f"[{rep + 1}] " if repeats > 1 else ""
+            log(f"  {run}{case['name'][:28]:28s} {r.seconds:5.0f} s  {state}")
     return results
 
 
