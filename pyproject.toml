@@ -68,11 +68,21 @@ select = [
     "B",    # fehleranfällige Muster (bugbear)
     "UP",   # veraltete Schreibweisen
     "SIM",  # Vereinfachungen
+    "C90",  # Verzweigungen je Funktion (McCabe), Grenze unten
 ]
+
+[tool.ruff.lint.mccabe]
+# Höchstens 12 Verzweigungspfade je Funktion. Wer darüber kommt, zerlegt die Funktion; eine Ausnahme
+# (`# noqa: C901` mit Begründung) nur dort, wo das Zerlegen den Code schlechter lesbar machte.
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 # Offline-Schalter müssen vor den Importen gesetzt sein, die Hugging-Face-Bibliotheken laden
 "src/pii_redact/cli.py" = ["E402"]
+# Hilfsskripte, die nicht zum ausgelieferten Programm gehören: Der Modellvergleich braucht Hugging Face und lässt
+# sich in der CI nicht testen, die ETW-Prüfung nur unter Windows als Administrator – ein Umbau wäre ungeprüft.
+"tools/benchmark_models.py" = ["C901"]
+"tools/etw_pruefen.py" = ["C901"]
 
 [tool.ruff.lint.flake8-bugbear]
 # Qt-Schreibweise für Modellklassen: `parent=QModelIndex()` – der Wert ist unveränderlich

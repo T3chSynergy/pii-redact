@@ -152,7 +152,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; PR #67�
   das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
-  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen; ruff in der CI auf `0.17.x` festgelegt; Komplexitätsregeln und mypy bewusst erst mit einem Refactoring),
+  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen, C901 mit höchstens 12 Verzweigungspfaden je Funktion; ruff in der CI auf `0.17.x` festgelegt; mypy später und getrennt),
   `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
   PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
@@ -280,8 +280,11 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   Anordnung – nicht umstellen. Geprüft mit einer Aufnahme des ganzen Aufbaus alt gegen neu, einmaliges Skript:
   Objektbaum mit allen Qt-Eigenschaften, Empfänger je Signal, Menüs, Fokuskette, `saveState` – neun Zustände von
   Hauptfenster und Dialog bytegleich; fünf absichtliche Fehler wurden alle bemerkt. Nicht angefasst, weil lang, aber
-  ohne Verzweigungen: `FindingsPanel.__init__`, `BatchPanel.__init__`) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
-  für PDF-Inhaltsströme (`_instructions`, `_compound_end`) – begründete Ausnahme statt Umbau; Regel zur Parameterzahl.
+  ohne Verzweigungen: `FindingsPanel.__init__`, `BatchPanel.__init__`) · 7 ruff C901 mit Grenze 12 (erledigt, `[tool.ruff.lint.mccabe]`).
+  Bewusst ausgenommen: der Zerleger für PDF-Inhaltsströme (`_instructions` 19, `_compound_end` 13; `# noqa: C901` mit
+  Begründung im Code) und die Hilfsskripte `tools/benchmark_models.py` (27) und `tools/etw_pruefen.py` (13) – nicht
+  Teil des Programms, in der CI nicht testbar. Nicht eingeschaltet: Regeln zu Parameterzahl und Funktionslänge.
+  An der Grenze: `export_pdf` (12). **Damit ist das Refactoring abgeschlossen**; offen bleibt mypy (nur Kern).
 - **Ergebnisvergleich** `tools/ergebnis_vergleich.py` (seit 10.11.2026): `pruefen --basis <Git-Stand>` checkt die
   Basis in einen eigenen Ordner aus, nimmt beide Stände auf und vergleicht (Rückgabewert 1 bei Abweichung). Aufnahme
   = Beispieldateien + vier erzeugte Sonderfälle (enger Zeilenabstand, gemischte Größen, gedreht/zugeschnitten,
