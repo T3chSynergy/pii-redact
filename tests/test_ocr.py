@@ -68,6 +68,23 @@ def test_verify_rereads_ocr_pages():
     assert verify_pdf(done, [missed], doc.ocr_pages, doc, ReplaceMode.NUMBERED) == []
 
 
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED])
+def test_verify_does_not_take_reread_bar_labels_for_text(mode):
+    """Die Texterkennung liest bei der Kontrolle auch die Beschriftungen der Balken. Ist das Wort „IBAN“ vor der
+    Kontonummer mit geschwärzt, ist „[IBAN]“ auf dem Balken daneben kein weiteres Vorkommen."""
+    doc = load_document(SAMPLES / "scan.pdf")
+    number = doc.text[doc.text.index("IBAN") + 5:].split("\n")[0]
+    used = [_finding(doc, "IBAN", "CUSTOM"), _finding(doc, number, "IBAN_CODE"), _finding(doc, "Lena Fischer")]
+    data = redact_pdf(doc, used, mode)
+    with pymupdf.open(stream=data, filetype="pdf") as pdf:
+        assert "[IBAN" in ocr.ocr_page_text(pdf[0])       # die Beschriftung wird wirklich wieder gelesen
+    assert verify_pdf(data, used, doc.ocr_pages, doc, mode) == []
+    # Gegenprobe: bleibt das Wort stehen, wird es gemeldet – an seiner Stelle
+    data = redact_pdf(doc, used[1:], mode)
+    assert verify_pdf(data, used, doc.ocr_pages, doc, mode) == [
+        "IBAN – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+
 def test_needs_ocr_heuristic():
     pdf = pymupdf.open()
     text_page = pdf.new_page()
