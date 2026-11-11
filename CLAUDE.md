@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 279 Tests (Stand 10.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 283 Tests (Stand 11.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -197,6 +197,12 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   abgewählt → „an anderer Stelle noch lesbar“. (3) ist gewollt: `samples/mail_mit_scan.pdf` meldet so „Kaya“
   (steht noch im Dateinamen `antrag_kaya.pdf`) und „Anwohnerparkausweis“ (einmal fälschlich als Person
   geschwärzt, einmal nicht). Ohne `doc` läuft nur (1) und (3).
+  **Beschriftungs-Bruchstücke** (seit 11.11.2026): Überschneidet ein frei gezogener Bereich einen Textfund nur
+  teilweise, ragt die Beschriftung des einen Balkens als Bruchstück („[PER“) ins Rechteck des anderen – das war ein
+  Fehlalarm in (2). `_label_chars` merkt je Seite die Zeichen, die im Rechteck des eigenen Balkens vollständig als
+  dessen Beschriftung stehen; nur diese Zeichen sind in fremden Rechtecken zulässig (Text, der bloß wie ein
+  Bruchstück aussieht, wird weiter gemeldet – Test). Gegenprobe über alle Beispiele und Sonderfälle: kein Zeichen
+  des Originals blieb in einem Schwärzungsrechteck.
 - **Kontrolle vor dem Speichern** (seit 10.11.2026, Wunsch des Nutzers): `analyzer.further_occurrences` sucht den
   Wortlaut aktiver Funde im Dokumenttext an Stellen, die kein Fund berührt → nicht aktivierte Vorschläge
   `source="kontrolle"` (bleiben wie `ki` bei neuer Analyse erhalten; ein abgewählter Vorschlag ist eine

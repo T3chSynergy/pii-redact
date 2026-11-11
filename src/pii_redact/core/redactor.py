@@ -500,8 +500,10 @@ def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Fi
                       ocr_words: dict[int, list]) -> dict[int, list[int]]:
     """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle noch Text steht.
 
-    Im Ergebnis darf in einem Schwärzungsrechteck nur die Beschriftung des Balkens stehen. Maßgeblich ist die
-    Mitte jedes Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
+    Im Ergebnis dürfen in einem Schwärzungsrechteck nur Balkenbeschriftungen stehen – die eigene, die eines
+    Balkens, der ganz darin liegt, und Bruchstücke der Beschriftung eines Balkens, der sich mit dem Rechteck nur
+    überschneidet (frei gezogener Bereich über einem Teil eines Textfundes). Maßgeblich ist die Mitte jedes
+    Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
     plan = pdf_redaction_plan(doc, findings, mode, labels)
     by_page: dict[int, list] = {}
     for entry in plan:
@@ -516,11 +518,18 @@ def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Fi
         chars = [(c["c"], ((c["bbox"][0] + c["bbox"][2]) / 2, (c["bbox"][1] + c["bbox"][3]) / 2))
                  for block in pdf[pno].get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
                  if block.get("type") == 0 for line in block["lines"] for span in line["spans"] for c in span["chars"]]
+        label_chars: set[int] | None = None
         for _p, rect, _label, ids in entries:
-            inside = _squash("".join(c for c, (x, y) in chars if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1))
-            for label in page_labels:   # auch die eines überlappenden Nachbar-Balkens
+            within = [i for i, (_c, (x, y)) in enumerate(chars) if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1]
+            inside = _squash("".join(chars[i][0] for i in within))
+            for label in page_labels:   # auch die eines Nachbar-Balkens, der ganz in diesem Rechteck liegt
                 inside = inside.replace(label, "")
             bad = bool(inside)
+            if bad:
+                # Rest könnte das Bruchstück einer Beschriftung sein, deren Balken dieses Rechteck nur überschneidet
+                if label_chars is None:
+                    label_chars = _label_chars(chars, entries)
+                bad = any(i not in label_chars and not chars[i][0].isspace() for i in within)
             if not bad and pno in ocr_words:
                 # Texterkennung liest auch die Beschriftung des Balkens – nur melden, was dem Fund gleicht
                 seen = _squash("".join(w.text for w in ocr_words[pno]
@@ -532,6 +541,28 @@ def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Fi
                 for i in ids:
                     failed.setdefault(i, []).append(pno)
     return failed
+
+
+def _label_chars(chars: list, entries: list) -> set[int]:
+    """Nummern der Zeichen einer Seite, die zu einer Balkenbeschriftung gehören. Gezählt wird nur, was im Rechteck
+    des eigenen Balkens vollständig als dessen Beschriftung steht – Text, der bloß wie ein Stück einer
+    Beschriftung aussieht, gehört nicht dazu."""
+    marked: set[int] = set()
+    for _p, rect, label, _ids in entries:
+        if not label:
+            continue
+        want = _squash(label)
+        text, index = "", []            # Zeichen im Rechteck ohne Leerraum, dazu je Zeichen seine Nummer
+        for i, (c, (x, y)) in enumerate(chars):
+            if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1 and not c.isspace():
+                folded = c.casefold()
+                text += folded
+                index += [i] * len(folded)
+        pos = text.find(want)
+        while want and pos >= 0:
+            marked.update(index[pos:pos + len(want)])
+            pos = text.find(want, pos + len(want))
+    return marked
 
 
 def _squash(text: str) -> str:
