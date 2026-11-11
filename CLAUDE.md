@@ -248,7 +248,8 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   getrennt, Aufbau der Oberfläche gehört dazu). Nur Struktur, kein geändertes Verhalten, je Schritt ein PR:
   0 Vergleichswerkzeug (erledigt) · 1 Kommandozeile (erledigt: `build_parser`, `load_settings`,
   `apply_output_options`, `print_findings`, `open_workspace`, `export_entry`) · 2 Laden
-  (erledigt: `_open_cleaned`, `_ocr_plan`, `_read_pages`, Hinweise je Gruppe in eigener Funktion) · 3 Kontrolle (`verify_pdf`, `further_occurrences`) · 4 `pdf_hidden`
+  (erledigt: `_open_cleaned`, `_ocr_plan`, `_read_pages`, Hinweise je Gruppe in eigener Funktion) · 3 Kontrolle (erledigt: `_texts_for_check`, `_structure_problems`; `further_occurrences` über `_FreeSpots`,
+  `_whole_texts`, `_surnames`) · 4 `pdf_hidden`
   (`has_outside_content`, `_strip`) · 5 Oberfläche Logik (`findings_panel.data`, `export_pdf`,
   `export_unreviewed`, `_refresh_views`; Klicktest des Nutzers) · 6 Oberfläche Aufbau (`_build_ui`,
   `_build_actions`, Einstellungsdialog) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
