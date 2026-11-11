@@ -27,6 +27,13 @@
   Wer den Wortlaut meint, wählt wie bisher „Alle Vorkommen schwärzen als“ oder ändert beim eingetragenen Text die
   Datenart (etwa auf „Person“); dann behandelt ihn die Kontrolle wie jeden anderen Fund. Hilfe: „Bereich
   schwärzen“ und „Kontrolle vor dem Speichern“.
+- **Schneller bei großen Dokumenten:** Die Kontrolle vor dem Speichern und – nach dem Export – die Suche nach
+  weiteren Vorkommen gingen für jeden geschwärzten Text einmal durch das ganze Dokument. Bei 200 Seiten mit
+  1600 Funden dauerte das 16 und 8 Sekunden, bei noch größeren Dokumenten Minuten; vor dem Speichern reagierte
+  das Fenster so lange nicht. Jetzt wird der Text einmal in ein Wortverzeichnis zerlegt, und jeder geschwärzte
+  Text wird nur noch dort geprüft, wo ein Wort passend beginnt: 0,2 und 0,1 Sekunden, bei 1000 Seiten mit
+  8000 Funden je gut eine Sekunde. Gefunden wird dasselbe wie bisher – verglichen mit der bisherigen Suche in
+  900 Fällen über alle Beispieldateien. Ebenso beschleunigt: die Vorarbeit für Namen in Großbuchstaben.
 
 ## 0.8.7 – 11.11.2026
 

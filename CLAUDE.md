@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 294 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 330 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -245,6 +245,24 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   `_NOUN_MARKERS` („im Winter“, „der Fuchs“), klein nur in Dateinamen/Kennungen. Messung über 16 Beispieldateien:
   Gründlich 0 zusätzliche Vorschläge (ohne die Artikel-Regel 3 Fehlalarme in den Texten mit doppeldeutigen
   Namen), Schnell 2 (beide richtig: „Koch und Bauer“ in `schwierig.txt`). Vornamen allein werden nicht gesucht.
+- **Wortverzeichnis für die Suche nach Fundtexten** (`analyzer.WordIndex`, seit 11.11.2026): `further_occurrences`
+  und Kontrolle (3) suchten je Fundtext mit `word_pattern(…).finditer` im ganzen Text – Aufwand Funde × Textlänge
+  (200 Seiten, 1600 Funde: 16 s vor dem Speichern im Fenster-Thread, 8 s nach dem Export; 1000 Seiten: Minuten).
+  Ein Treffer des Musters beginnt immer an einem Wortanfang (`(?<![^\W\d_])`) bzw. am Anfang einer Ziffernfolge.
+  Das Verzeichnis (Wort → Stellen, Schlüssel `_fold`, „beginnt mit“ per Binärsuche) liefert diese Stellen; dort wird
+  dasselbe Muster mit `pattern.match(text, pos)` angesetzt – Treffer, Reihenfolge und „keine Überschneidung“ wie bei
+  `finditer`. Messung: 0,2 s / 0,1 s bei 200 Seiten, je gut 1 s bei 1000 Seiten (8000 Funde). Alt gegen neu gleich in
+  902 Fällen (alle Beispieldateien mit Zufallsfunden und zwei große Dokumente: 1132 Vorschläge, 5922 Meldungen),
+  Ergebnisvergleich gegen `dev` ohne Abweichung.
+  **Heikel ist die Groß-/Kleinschreibung:** Der Schlüssel muss gröber vergleichen als `re.IGNORECASE` (I/i/ı/İ,
+  ß/ẞ, s/ſ), sonst findet das Verzeichnis eine Stelle nicht, die das Muster trifft. `_fold` = je Zeichen die
+  einfache Kleinform, davon die Großform; `tests/test_wordindex.py` prüft das für alle Unicode-Zeichen und gegen
+  die Tabelle `re._casefix._EXTRA_CASES` – nach Python-Updates beachten. Der alte Weg (ganzer Text) bleibt für
+  Fundtexte, die weder mit einem Buchstaben noch mit einer Dezimalziffer beginnen („+49“ – das Muster hat dann vorn
+  keine Wortgrenze), und für das griechische Iota (gleicht U+0345, das kein Buchstabe ist; `_IOTA`).
+  Kontrolle (3): `redactor._PageSearch` – ein Verzeichnis über alle Seiten, getrennt durch `\x00` (kein Treffer
+  reicht über eine Seitengrenze), je Fundtext nur eine Suche. `_upper_case`: Binärsuche (`_overlaps`) statt je
+  Zeile alle Großwörter durchzugehen (200 Seiten: 3,6 s → 0,06 s).
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
   und ragen bei engem Zeilenabstand in die Nachbarzeilen. Deshalb: (1) Text mit schmalem Band entfernen

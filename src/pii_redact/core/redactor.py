@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import pymupdf as fitz  # PyMuPDF
 
-from .analyzer import word_pattern
+from .analyzer import WordIndex, word_pattern
 from .entities import info
 from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
@@ -626,16 +626,15 @@ def _other_occurrences(findings: list[Finding], page_texts: list[str], other: li
         if not f.active and f.area is None:
             key = _squash(join_hyphenated(f.text))
             kept[key] = kept.get(key, 0) + 1
-    pages = [join_hyphenated(t) for t in page_texts]
+    search = _PageSearch(page_texts)
     rest = _squash("".join(other))
     out = []
     for f in findings:
         if not f.active or f.area is not None or f.area_text or f.text in reported:
             continue
-        pattern = word_pattern(f.text)
-        if pattern is None:
+        hits = search.hits(f.text)
+        if hits is None:
             continue
-        hits = [pno for pno, text in enumerate(pages) for _ in pattern.finditer(text)]
         key = _squash(join_hyphenated(f.text))
         where = []
         if len(hits) > kept.get(key, 0):
@@ -646,6 +645,40 @@ def _other_occurrences(findings: list[Finding], page_texts: list[str], other: li
             reported.add(f.text)
             out.append(f"{f.text} – an anderer Stelle noch lesbar ({', '.join(where)})")
     return out
+
+
+class _PageSearch:
+    """Sucht Fundtexte in den Seitentexten des Ergebnisses – jeden Fundtext nur einmal und über ein
+    Wortverzeichnis (``WordIndex``) statt je Fund einmal durch alle Seiten."""
+
+    #: Trennt die Seiten im gemeinsamen Suchtext. Kein Leerraum und kein Zeichen, das in einem Fundtext vorkommt –
+    #: kein Treffer reicht darüber, und an der Grenze steht wie am Seitenanfang und -ende kein Buchstabe.
+    SEPARATOR = "\x00"
+
+    def __init__(self, page_texts: list[str]) -> None:
+        self.pages = [join_hyphenated(t) for t in page_texts]
+        self.starts: list[int] = []
+        pos = 0
+        for text in self.pages:
+            self.starts.append(pos)
+            pos += len(text) + len(self.SEPARATOR)
+        self.index = WordIndex(self.SEPARATOR.join(self.pages))
+        self._hits: dict[str, list[int] | None] = {}
+
+    def hits(self, term: str) -> list[int] | None:
+        """Seiten, auf denen der Text als eigenes Wort bzw. eigene Zahl steht – je Vorkommen einmal genannt.
+        None bei Texten unter drei Zeichen (werden nicht gesucht)."""
+        if term not in self._hits:
+            self._hits[term] = self._search(term)
+        return self._hits[term]
+
+    def _search(self, term: str) -> list[int] | None:
+        pattern = word_pattern(term)
+        if pattern is None:
+            return None
+        if self.SEPARATOR in term:      # kommt praktisch nicht vor – dann Seite für Seite wie früher
+            return [pno for pno, text in enumerate(self.pages) for _ in pattern.finditer(text)]
+        return [bisect.bisect_right(self.starts, m.start()) - 1 for m in self.index.finditer(term)]
 
 
 def save_redacted_pdf(doc: LoadedDocument, findings: list[Finding], settings: Settings, target: Path) -> list[str]:

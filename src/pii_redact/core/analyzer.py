@@ -179,9 +179,10 @@ class PiiAnalyzer:
         if not upper:
             return []
         # nur die betroffenen Zeilen prüfen (Absatz als Trenner, damit nichts über Zeilen hinweg passt)
+        upper_starts, upper_ends = [s for s, _e in upper], [e for _s, e in upper]   # beide aufsteigend
         lines, parts, starts, pos = [], [], [], 0
         for m in re.finditer(r"[^\n]+", text):
-            if any(m.start() <= s < m.end() for s, _e in upper):
+            if _overlaps(upper_starts, upper_ends, m.start(), m.end()):
                 lines.append((m.start(), m.end()))
                 starts.append(pos)
                 parts.append(probe_text[m.start():m.end()])
@@ -200,7 +201,7 @@ class PiiAnalyzer:
             if f.recognizer in NER_RECOGNIZERS and any(c.isdigit() for c in f.text):
                 # Namen und Orte enthalten keine Ziffern („Iban DE89 …“ hält die Namenserkennung für einen Ort)
                 continue
-            if e > b or not any(s < ue and us < e for us, ue in upper):
+            if e > b or not _overlaps(upper_starts, upper_ends, s, e):
                 continue
             if all(covered[i] or text[i].isspace() for i in range(s, e)):
                 continue
@@ -278,6 +279,13 @@ def normal_case(text: str) -> tuple[str, list[tuple[int, int]]]:
                 chars[i] = low if len(low) == 1 else chars[i]
             start = False
     return ("".join(chars) if chars else text), spans
+
+
+def _overlaps(starts: list[int], ends: list[int], start: int, end: int) -> bool:
+    """Berührt der Bereich ``start``–``end`` einen der Bereiche (aufsteigend, ohne Überschneidung, gegeben als
+    Anfänge und Enden)? Binärsuche – bei langen Dokumenten nicht je Zeile alle Bereiche durchgehen."""
+    i = bisect.bisect_right(ends, start)      # erster Bereich, der nach ``start`` endet
+    return i < len(starts) and starts[i] < end
 
 
 def plain_spaces(text: str) -> str:
@@ -439,7 +447,17 @@ _SALUTATIONS = {"herr", "herrn", "frau", "dr", "prof", "med"}
 def word_pattern(text: str) -> re.Pattern | None:
     """Suchmuster für den Text eines Fundes: Leerraum beliebig, und nicht als Teil eines längeren Wortes bzw.
     einer längeren Zahl („Ende“ nicht in „Wochenende“, „4711“ nicht in „14711“ – wohl aber in „akte_ende.pdf“).
-    None bei Texten unter drei Zeichen."""
+    None bei Texten unter drei Zeichen.
+
+    Für viele Fundtexte in einem langen Text: ``WordIndex`` – gleiche Treffer, ohne je Fundtext den ganzen Text
+    zu durchsuchen."""
+    search = _word_search(text)
+    return search[0] if search else None
+
+
+def _word_search(text: str) -> tuple[re.Pattern, str] | None:
+    """Suchmuster (siehe ``word_pattern``) und das erste Wort des Fundtextes – an ihm erkennt ``WordIndex``, wo
+    ein Treffer beginnen kann."""
     # Satzzeichen am Rand gehören nicht zum gesuchten Text („KAYA.“ am Satzende → „kaya“ im Dateinamen)
     # Anrede und Titel gehören nicht zum Namen („Herrn Kaya“ → „kaya“ im Dateinamen)
     words = _name_words(text)
@@ -449,7 +467,7 @@ def word_pattern(text: str) -> re.Pattern | None:
     first, last = words[0][0], words[-1][-1]
     before = r"(?<![^\W\d_])" if first.isalpha() else r"(?<!\d)" if first.isdigit() else ""
     after = r"(?![^\W\d_])" if last.isalpha() else r"(?!\d)" if last.isdigit() else ""
-    return re.compile(before + core + after, re.IGNORECASE)
+    return re.compile(before + core + after, re.IGNORECASE), words[0]
 
 
 #: Herkunft der Vorschläge aus der Kontrolle vor dem Speichern (wie „ki“: nicht aktiviert, bleiben bei neuer Analyse)
@@ -476,6 +494,99 @@ def surname(text: str) -> str | None:
     if len(name) < 3 or not all(c.isalpha() or c in "-'’" for c in name) or not name[0].isalpha():
         return None
     return name
+
+
+_LETTER_RUN = re.compile(r"[^\W\d_]+")     # „Wort“: dieselbe Zeichenklasse, mit der word_pattern Wortgrenzen prüft
+_DIGIT_RUN = re.compile(r"\d+")
+#: Griechisches Iota: Ohne Groß-/Kleinschreibung gleicht es einem Zeichen, das kein Buchstabe ist (U+0345) – die
+#: einzige solche Gruppe (Test). Fundtexte, die damit beginnen, werden wie früher im ganzen Text gesucht.
+_IOTA = frozenset("\u0345\u03b9\u0399\u1fbe")
+
+
+def _fold(word: str) -> str:
+    """Schlüssel eines Wortes ohne Groß-/Kleinschreibung. Er vergleicht gröber als der reguläre Ausdruck: Was
+    dieser gleichsetzt („I“, „i“, „ı“ – „ß“, „ẞ“ – „s“, „ſ“), hat denselben Schlüssel (Test über alle Zeichen).
+    Je Zeichen die Kleinform (ein Zeichen, wie sie der reguläre Ausdruck bildet), davon die Großform."""
+    return "".join(c.lower()[:1].upper() for c in word)
+
+
+class WordIndex:
+    """Verzeichnis der Wörter und Ziffernfolgen eines Textes: findet die Vorkommen von Fundtexten, ohne für
+    jeden Fundtext den ganzen Text zu durchsuchen.
+
+    ``word_pattern(term).finditer(text)`` geht je Fundtext einmal durch den ganzen Text; bei vielen Funden in
+    langen Dokumenten wächst das quadratisch (200 Seiten mit 1600 Funden: 15 Sekunden). Ein Treffer des Musters
+    kann aber nur an einem Wortanfang beginnen – das Muster verlangt, dass davor kein Buchstabe steht – bzw. am
+    Anfang einer Ziffernfolge. Das Verzeichnis liefert die Stellen, an denen ein Wort mit dem ersten Wort des
+    Fundtextes beginnt; nur dort wird dasselbe Muster angesetzt. Treffer und Reihenfolge sind dieselben wie bei
+    ``finditer`` (Test gegen die Suche im ganzen Text)."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self._runs: dict[str, tuple[dict[str, list[int]], list[str]]] = {}
+
+    def finditer(self, term: str) -> Iterator[re.Match[str]]:
+        """Vorkommen des Fundtextes ``term`` – wie ``word_pattern(term).finditer(text)``; nichts bei Texten
+        unter drei Zeichen."""
+        search = _word_search(term)
+        if search is None:
+            return
+        pattern, first = search
+        starts = self._starts(first)
+        if starts is None:      # ungewöhnliches erstes Zeichen („+49“): wie früher den ganzen Text durchsuchen
+            yield from pattern.finditer(self.text)
+            return
+        end = 0
+        for pos in starts:
+            if pos < end:       # liegt in einem Treffer – finditer sucht erst dahinter weiter
+                continue
+            m = pattern.match(self.text, pos)
+            if m:
+                yield m
+                end = m.end()
+
+    def _starts(self, first: str) -> list[int] | None:
+        """Stellen (aufsteigend), an denen ein Treffer beginnen kann: Anfänge der Wörter bzw. Ziffernfolgen, die
+        mit dem Anfang von ``first`` (erstes Wort des Fundtextes) beginnen. None, wenn sich das nicht eingrenzen
+        lässt – ein Muster, das weder mit einem Buchstaben noch mit einer Ziffer beginnt, hat vorn keine
+        Wortgrenze."""
+        if first[0].isalpha():
+            run = _LETTER_RUN.match(first)
+            if run is None or not _IOTA.isdisjoint(run.group()):
+                return None
+            kind, prefix = "a", _fold(run.group())
+        elif first[0].isdecimal():
+            run = _DIGIT_RUN.match(first)
+            if run is None:
+                return None
+            kind, prefix = "d", run.group()
+        else:
+            return None
+        positions, keys = self._index(kind)
+        out: list[int] = []
+        # „beginnt mit“, nicht „ist gleich“: Leerraum im Fundtext ist beliebig („Max Mustermann“ steht auch in
+        # „maxmustermann@…“), und das Wort im Text kann länger sein – das entscheidet das Muster
+        for i in range(bisect.bisect_left(keys, prefix), len(keys)):
+            if not keys[i].startswith(prefix):
+                break
+            out += positions[keys[i]]
+        out.sort()
+        return out
+
+    def _index(self, kind: str) -> tuple[dict[str, list[int]], list[str]]:
+        """Schlüssel → Anfänge der Wörter („a“) bzw. Ziffernfolgen („d“), dazu die Schlüssel sortiert (für die
+        Suche nach Wortanfängen). Wird beim ersten Gebrauch aufgebaut."""
+        if kind not in self._runs:
+            positions: dict[str, list[int]] = {}
+            folded: dict[str, str] = {}
+            for m in (_LETTER_RUN if kind == "a" else _DIGIT_RUN).finditer(self.text):
+                raw = m.group()
+                key = raw
+                if kind == "a":
+                    key = folded.get(raw) or folded.setdefault(raw, _fold(raw))
+                positions.setdefault(key, []).append(m.start())
+            self._runs[kind] = (positions, sorted(positions))
+        return self._runs[kind]
 
 
 #: Wörter, nach denen ein großgeschriebenes Wort ein gewöhnliches Hauptwort ist und kein allein stehender Nachname
@@ -518,17 +629,17 @@ def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
     active = [f for f in sorted(findings, key=lambda f: f.start) if f.active and f.area is None and not f.area_text]
     seen: set[str] = set()
     out: list[Finding] = []
-    for f, pattern in _whole_texts(active, seen):       # 1. der ganze Wortlaut
-        out += spots.find(pattern, f.entity_type, "Kontrolle: weiteres Vorkommen eines geschwärzten Textes")
-    for f, pattern in _surnames(active, seen):          # 2. danach der Nachname allein (der ganze Name hat Vorrang)
-        out += spots.find(pattern, f.entity_type, "Kontrolle: Nachname eines geschwärzten Namens steht allein",
+    for f, term in _whole_texts(active, seen):          # 1. der ganze Wortlaut
+        out += spots.find(term, f.entity_type, "Kontrolle: weiteres Vorkommen eines geschwärzten Textes")
+    for f, term in _surnames(active, seen):             # 2. danach der Nachname allein (der ganze Name hat Vorrang)
+        out += spots.find(term, f.entity_type, "Kontrolle: Nachname eines geschwärzten Namens steht allein",
                           _surname_hit)
     return sorted(out, key=lambda f: f.start)
 
 
 class _FreeSpots:
-    """Sucht Muster an Stellen des Dokumenttexts, die noch kein Fund berührt. Jede gefundene Stelle gilt danach
-    als vergeben – ein späteres Muster (etwa der Nachname allein) trifft sie nicht noch einmal."""
+    """Sucht Fundtexte an Stellen des Dokumenttexts, die noch kein Fund berührt. Jede gefundene Stelle gilt danach
+    als vergeben – ein späterer Text (etwa der Nachname allein) trifft sie nicht noch einmal."""
 
     def __init__(self, text: str, findings: list[Finding]) -> None:
         self.text = text
@@ -537,13 +648,14 @@ class _FreeSpots:
             if f.area is None:
                 self.marked[f.start:f.end] = b"\x01" * (f.end - f.start)
         self.joined, self.hmap = dehyphenate(plain_spaces(text))
+        self.index = WordIndex(self.joined)
 
-    def find(self, pattern: re.Pattern, entity_type: str, why: str,
+    def find(self, term: str, entity_type: str, why: str,
              accept: Callable[[str, int, int], bool] | None = None) -> list[Finding]:
-        """Vorschläge für alle freien Fundstellen des Musters; ``accept(text, start, end)`` kann Stellen
-        ausschließen."""
+        """Vorschläge für alle freien Fundstellen des Textes ``term`` (Suchmuster: ``word_pattern``);
+        ``accept(text, start, end)`` kann Stellen ausschließen."""
         out = []
-        for m in pattern.finditer(self.joined):
+        for m in self.index.finditer(term):
             if accept and not accept(self.joined, m.start(), m.end()):
                 continue
             s, e = self.hmap.span(m.start(), m.end()) if self.hmap else (m.start(), m.end())
@@ -555,29 +667,25 @@ class _FreeSpots:
         return out
 
 
-def _whole_texts(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, re.Pattern]]:
-    """Je unterschiedlichem Fundtext einmal: Fund und Suchmuster für den ganzen Wortlaut."""
+def _whole_texts(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, str]]:
+    """Je unterschiedlichem Fundtext einmal: Fund und gesuchter Text (der ganze Wortlaut)."""
     for f in active:
         key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
         if key in seen:
             continue
         seen.add(key)
-        pattern = word_pattern(f.text)
-        if pattern is not None:
-            yield f, pattern
+        yield f, f.text
 
 
-def _surnames(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, re.Pattern]]:
-    """Je Nachname eines mehrteiligen Personennamens einmal: Fund und Suchmuster – sofern der Nachname nicht
-    schon als ganzer Fundtext gesucht wurde."""
+def _surnames(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, str]]:
+    """Je Nachname eines mehrteiligen Personennamens einmal: Fund und gesuchter Text (der Nachname) – sofern er
+    nicht schon als ganzer Fundtext gesucht wurde."""
     for f in active:
         name = surname(f.text) if f.entity_type == "PERSON" else None
         if name is None or name.casefold() in seen:
             continue
         seen.add(name.casefold())
-        pattern = word_pattern(name)
-        if pattern is not None:
-            yield f, pattern
+        yield f, name
 
 
 def apply_allow_list(findings: list[Finding], allow_list: Iterable[str]) -> list[Finding]:
