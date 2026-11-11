@@ -568,39 +568,47 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.left.text.set_marks([(f.start, f.end, [f.id], f.active, f.entity_type)
                                   for f in s.findings if not f.is_area])
         if s.manual_text is None:
-            red = s.redacted()
-            self.right.text.blockSignals(True)
-            self.right.text.set_text(red.text)
-            self.right.text.blockSignals(False)
-            marks = []
-            for seg in red.segments:
-                f = s.get(seg.finding_ids[0])
-                marks.append((seg.red_start, seg.red_end, seg.finding_ids, True, f.entity_type if f else "CUSTOM"))
-            # abgewählte Funde bleiben in der Vorschau erkennbar (grau gepunktet) – wichtig, wenn das
-            # Original ausgeblendet ist
-            for f in self._inactive_uncovered(s):
-                if not f.is_area:
-                    marks.append((red.to_redacted(f.start), red.to_redacted(f.end), [f.id], False, f.entity_type))
-            self.right.text.set_marks(marks)
+            self._refresh_text_preview(s)
         if s.doc.is_pdf:
-            orig = []
-            for f in s.findings:
-                for page, rect in rects_of(s.doc, f):
-                    orig.append(Overlay(page, rect, [f.id], f.active, f.entity_type))
-            self.left.pages.set_overlays(orig)
-            plan = pdf_redaction_plan(s.doc, s.findings, self.settings.replace_mode, self.settings.pdf_labels)
-            red_ov = []
-            for page, rect, label, ids in plan:
-                f = s.get(ids[0])
-                red_ov.append(Overlay(page, rect, ids, True, f.entity_type if f else "CUSTOM", label))
-            for f in self._inactive_uncovered(s):
-                for page, rect in rects_of(s.doc, f):
-                    red_ov.append(Overlay(page, rect, [f.id], False, f.entity_type))
-            self.right.pages.set_overlays(red_ov)
+            self._refresh_page_overlays(s)
         self._apply_selection()
         self._update_actions()
         self._update_title()
         self._refresh_batch()
+
+    def _refresh_text_preview(self, s) -> None:
+        """Rechte Textansicht: anonymisierter Text mit Markierungen der ersetzten Stellen."""
+        red = s.redacted()
+        self.right.text.blockSignals(True)
+        self.right.text.set_text(red.text)
+        self.right.text.blockSignals(False)
+        marks = []
+        for seg in red.segments:
+            f = s.get(seg.finding_ids[0])
+            marks.append((seg.red_start, seg.red_end, seg.finding_ids, True, f.entity_type if f else "CUSTOM"))
+        # abgewählte Funde bleiben in der Vorschau erkennbar (grau gepunktet) – wichtig, wenn das
+        # Original ausgeblendet ist
+        for f in self._inactive_uncovered(s):
+            if not f.is_area:
+                marks.append((red.to_redacted(f.start), red.to_redacted(f.end), [f.id], False, f.entity_type))
+        self.right.text.set_marks(marks)
+
+    def _refresh_page_overlays(self, s) -> None:
+        """Seitenansichten eines PDFs: links die Fundstellen, rechts die Balken wie im Export."""
+        orig = []
+        for f in s.findings:
+            for page, rect in rects_of(s.doc, f):
+                orig.append(Overlay(page, rect, [f.id], f.active, f.entity_type))
+        self.left.pages.set_overlays(orig)
+        plan = pdf_redaction_plan(s.doc, s.findings, self.settings.replace_mode, self.settings.pdf_labels)
+        red_ov = []
+        for page, rect, label, ids in plan:
+            f = s.get(ids[0])
+            red_ov.append(Overlay(page, rect, ids, True, f.entity_type if f else "CUSTOM", label))
+        for f in self._inactive_uncovered(s):
+            for page, rect in rects_of(s.doc, f):
+                red_ov.append(Overlay(page, rect, [f.id], False, f.entity_type))
+        self.right.pages.set_overlays(red_ov)
 
     @staticmethod
     def _inactive_uncovered(s) -> list:
