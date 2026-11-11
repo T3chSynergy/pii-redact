@@ -529,6 +529,38 @@ def test_verify_still_reports_real_text_next_to_cut_labels(tmp_path):
         "[PER – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
 
 
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED])
+def test_verify_does_not_take_bar_labels_for_text(tmp_path, mode):
+    """Die Beschriftung eines Balkens ist kein Text des Dokuments: Ist das Wort „Person“ geschwärzt (etwa als
+    Teil von „Personalabteilung“ in einem frei gezogenen Rahmen), ist „[PERSON]“ auf einem anderen Balken kein
+    weiteres Vorkommen."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt.", "Personalabteilung")
+    used = [_find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")]
+    data = redact_pdf(doc, used, mode)
+    text = pymupdf.open(stream=data)[0].get_text()
+    assert "[PERSON" in text and "alabteilung" in text and "Zofia" not in text
+    assert verify_pdf(data, used, doc=doc, mode=mode) == []
+    # ohne das Dokument kennt die Kontrolle die Balken nicht – dann bleibt es bei der Meldung
+    assert verify_pdf(data, used) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+
+
+def test_verify_still_reports_text_that_reads_like_a_label(tmp_path):
+    """Die Nachsicht gilt nur für die Beschriftung im eigenen Balken – gleich lautender Text des Dokuments an
+    anderer Stelle wird weiter gemeldet, auch wenn er wie eine Beschriftung aussieht."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger ist die zuständige Person im Haus.",
+                     "Vermerk [PERSON] in der Akte, Person B.")
+    name, word = _find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")
+    data = redact_pdf(doc, [name, word], ReplaceMode.PLACEHOLDER)
+    text = pymupdf.open(stream=data)[0].get_text()
+    assert "Vermerk [PERSON] in der Akte, Person B." in text
+    assert verify_pdf(data, [name, word], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+    # zwei der drei Vorkommen bewusst abgewählt: das dritte (im Vermerk) wird weiter gemeldet
+    kept = [Finding(doc.text.index("Person B"), doc.text.index("Person B") + 6, "AREA", "Person", active=False)]
+    assert verify_pdf(data, [name, word, *kept], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+    kept.append(Finding(doc.text.index("[PERSON]") + 1, doc.text.index("[PERSON]") + 7, "AREA", "PERSON", active=False))
+    assert verify_pdf(data, [name, word, *kept], doc=doc) == []
+
+
 @pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
 def test_verify_checks_each_redacted_spot(tmp_path, mode):
     """Geprüft wird die geschwärzte Stelle selbst – auch wenn derselbe Text anderswo bewusst stehen bleibt."""

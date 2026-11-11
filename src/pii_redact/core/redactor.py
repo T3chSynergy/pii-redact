@@ -417,13 +417,15 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
        anderswo abgewählt wurde.
     3. **Andere Stellen:** Kommt der Text eines aktiven Fundes sonst noch im Ergebnis vor – im Seitentext
        (als eigenes Wort bzw. eigene Nummer, nicht als Teil eines längeren Wortes), in Kommentaren,
-       Formularfeldern, Lesezeichen oder Metadaten? Vorkommen, die bewusst abgewählt wurden, zählen nicht.
+       Formularfeldern, Lesezeichen oder Metadaten? Vorkommen, die bewusst abgewählt wurden, zählen nicht –
+       und (mit ``doc``) auch nicht die Beschriftungen der Balken: „[PERSON]“ ist kein Vorkommen von „Person“.
 
     Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per OCR gelesen."""
     pdf = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page_texts, ocr_words = _texts_for_check(pdf, pdf_bytes, ocr_pages)
+    plan = pdf_redaction_plan(doc, findings, mode, labels) if doc is not None else []
+    page_texts, ocr_words = _texts_for_check(pdf, pdf_bytes, ocr_pages, plan)
     problems, other = _structure_problems(pdf)
-    failed = _unredacted_spots(pdf, doc, findings, mode, labels, ocr_words) if doc is not None else {}
+    failed = _unredacted_spots(pdf, plan, findings, ocr_words)
     pdf.close()
     by_id = {f.id: f for f in findings}
     reported: set[str] = set()
@@ -437,11 +439,17 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
     return problems
 
 
-def _texts_for_check(pdf: fitz.Document, pdf_bytes: bytes,
-                     ocr_pages: list[int] | None) -> tuple[list[str], dict[int, list]]:
-    """Text je Seite; Seiten aus ``ocr_pages`` werden zusätzlich per Texterkennung gelesen (Rückgabe auch der
-    dort gelesenen Wörter je Seite)."""
-    page_texts = [page.get_text() for page in pdf]
+def _texts_for_check(pdf: fitz.Document, pdf_bytes: bytes, ocr_pages: list[int] | None,
+                     plan: list) -> tuple[list[str], dict[int, list]]:
+    """Text je Seite – ohne die Beschriftungen der Balken aus ``plan``, denn sie sind kein Text des Dokuments
+    („[PERSON]“ wäre sonst ein Vorkommen des Wortes „Person“). Seiten aus ``ocr_pages`` werden zusätzlich per
+    Texterkennung gelesen (Rückgabe auch der dort gelesenen Wörter je Seite)."""
+    labelled: dict[int, list] = {}
+    for entry in plan:
+        if entry[2]:
+            labelled.setdefault(entry[0], []).append(entry)
+    page_texts = [_text_without_labels(page, labelled[pno]) if pno in labelled else page.get_text()
+                  for pno, page in enumerate(pdf)]
     ocr_words: dict[int, list] = {}
     if ocr_pages:
         from . import ocr as ocr_mod
@@ -451,8 +459,41 @@ def _texts_for_check(pdf: fitz.Document, pdf_bytes: bytes,
             if 0 <= pno < pdf.page_count:
                 lines = ocr_mod.ocr_page(pdf[pno], key)
                 ocr_words[pno] = [w for line in lines for w in line]
-                page_texts[pno] += "\n" + "\n".join(" ".join(w.text for w in line) for line in lines)
+                entries = labelled.get(pno, [])
+                page_texts[pno] += "\n" + "\n".join(" ".join(_ocr_text_without_labels(w, entries) for w in line)
+                                                     for line in lines)
     return page_texts, ocr_words
+
+
+def _text_without_labels(page: fitz.Page, entries: list) -> str:
+    """Seitentext wie ``page.get_text()``, aber mit Leerzeichen an der Stelle der Balkenbeschriftungen. Als
+    Beschriftung zählt nur, was im Rechteck des eigenen Balkens vollständig als dessen Beschriftung steht
+    (siehe ``_label_chars``) – gleich lautender Text an anderer Stelle bleibt stehen."""
+    chars: list[tuple[str, tuple[float, float]]] = []
+    line_ends: list[int] = []
+    for block in page.get_text("rawdict", flags=fitz.TEXTFLAGS_TEXT)["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block["lines"]:
+            chars += [(c["c"], ((c["bbox"][0] + c["bbox"][2]) / 2, (c["bbox"][1] + c["bbox"][3]) / 2))
+                      for span in line["spans"] for c in span["chars"]]
+            line_ends.append(len(chars))
+    marked = _label_chars(chars, entries)
+    out, start = [], 0
+    for end in line_ends:
+        out.append("".join(" " if i in marked else chars[i][0] for i in range(start, end)) + "\n")
+        start = end
+    return "".join(out)
+
+
+def _ocr_text_without_labels(word, entries: list) -> str:
+    """Text eines erneut gelesenen Wortes ohne die Beschriftung eines Balkens, den es berührt – die
+    Texterkennung liest auch die Beschriftungen, mitunter zusammen mit dem Wort daneben („geb.[DATUM]“)."""
+    text = word.text
+    for _p, rect, label, _ids in entries:
+        if label.casefold() in text.casefold() and fitz.Rect(word.rect).intersects(rect):
+            text = re.sub(re.escape(label), " ", text, flags=re.IGNORECASE)
+    return text
 
 
 def _structure_problems(pdf: fitz.Document) -> tuple[list[str], list[str]]:
@@ -496,15 +537,14 @@ def _pages(pages: list[int]) -> str:
     return ("Seite " if len(pages) == 1 else "Seiten ") + ", ".join(str(p + 1) for p in pages)
 
 
-def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Finding], mode: str, labels: bool,
+def _unredacted_spots(pdf: fitz.Document, plan: list, findings: list[Finding],
                       ocr_words: dict[int, list]) -> dict[int, list[int]]:
-    """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle noch Text steht.
+    """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle (Rechtecke aus ``plan``) noch Text steht.
 
     Im Ergebnis dürfen in einem Schwärzungsrechteck nur Balkenbeschriftungen stehen – die eigene, die eines
     Balkens, der ganz darin liegt, und Bruchstücke der Beschriftung eines Balkens, der sich mit dem Rechteck nur
     überschneidet (frei gezogener Bereich über einem Teil eines Textfundes). Maßgeblich ist die Mitte jedes
     Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
-    plan = pdf_redaction_plan(doc, findings, mode, labels)
     by_page: dict[int, list] = {}
     for entry in plan:
         by_page.setdefault(entry[0], []).append(entry)

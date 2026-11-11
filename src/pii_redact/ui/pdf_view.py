@@ -153,7 +153,9 @@ class _PageWidget(QWidget):
     def mouseReleaseEvent(self, e):
         if e.button() != Qt.MouseButton.LeftButton or self._origin is None:
             return
-        rect = QRect(self._origin, e.position().toPoint()).normalized()
+        # Beim Ziehen über den Seitenrand hinaus endet der Rahmen am Rand – ein Balken außerhalb der Seite wäre
+        # nicht zu sehen, seine Beschriftung stünde aber als Inhalt außerhalb des Blattes im Ergebnis.
+        rect = QRect(self._origin, e.position().toPoint()).normalized().intersected(self.rect())
         if self._band is not None:
             self._band.hide()
             self._band.deleteLater()

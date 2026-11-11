@@ -8,6 +8,18 @@
   und für den Textfund. Dort stand aber kein Text des Dokuments mehr, sondern nur ein abgeschnittenes Stück der
   Beschriftung des jeweils anderen Balkens (etwa „[PER“). Solche Bruchstücke echter Balkenbeschriftungen gelten
   jetzt als zulässig; stehen gebliebener Text wird weiterhin gemeldet.
+- **Balkenbeschriftungen gelten nicht mehr als Text des Dokuments:** War ein Wort geschwärzt, das so lautet wie
+  eine Beschriftung – „Person“, „IBAN“, „Datum“, „Telefon“, „Unterschrift“ … –, meldete die Kontrolle „an anderer
+  Stelle noch lesbar“, sobald irgendwo ein Balken mit „[PERSON]“ bzw. „[IBAN]“ stand. Das geschah leicht beim
+  Schwärzen eines ganzen Bereichs, weil der Text im Rahmen dabei zeichengenau übernommen wird (aus
+  „Personalabteilung“ unter einem halb umrahmten Namen wurde „Person“). Die Kontrolle erkennt Beschriftungen jetzt
+  an ihrer Lage im eigenen Balken und zählt sie nicht mit – auch auf Seiten, die per Texterkennung erneut gelesen
+  werden. Gleich lautender Text an anderer Stelle des Dokuments wird weiter gemeldet.
+
+**Seitenansicht**
+- **Rahmen enden am Seitenrand:** Wurde ein Rahmen mit der Maus über den Rand der Seite hinaus gezogen, reichte der
+  Bereich über das Blatt hinaus. Die Beschriftung des Balkens stand dann teils außerhalb der Seite, und die
+  Kontrolle meldete „Inhalt außerhalb des sichtbaren Bereichs“ sowie Reste an der geschwärzten Stelle.
 
 ## 0.8.6 – 10.11.2026
 

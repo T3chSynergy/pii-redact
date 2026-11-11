@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 283 Tests (Stand 11.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -203,6 +203,20 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   dessen Beschriftung stehen; nur diese Zeichen sind in fremden Rechtecken zulässig (Text, der bloß wie ein
   Bruchstück aussieht, wird weiter gemeldet – Test). Gegenprobe über alle Beispiele und Sonderfälle: kein Zeichen
   des Originals blieb in einem Schwärzungsrechteck.
+  **Beschriftungen sind kein Text** (seit 11.11.2026, Fehlalarm im Klicktest des Nutzers): (3) fand „Person“ in
+  „[PERSON]“ bzw. „[PERSON_1]“ – sobald ein Fund so lautete wie ein Beschriftungswort (leicht bei „Ganzen Bereich
+  schwärzen“: der Text im Rahmen wird zeichengenau zum Textfund, aus „Personalabteilung“ wird „Person“; ebenso ein
+  von Hand markiertes „IBAN“ oder „Unterschrift“). Mit `doc` baut `_text_without_labels` den Seitentext deshalb
+  zeichenweise auf (gleich `get_text()`, geprüft auf 532 Seiten) und setzt für Zeichen aus `_label_chars`
+  Leerzeichen; auf OCR-Seiten streicht `_ocr_text_without_labels` die Beschriftung aus erneut gelesenen Wörtern,
+  die den Balken berühren. Ohne `doc` unverändert. **Lehre:** Die Gegenprobe zu den Bruchstücken hatte nur die
+  Meldungen aus (2) ausgewertet – bei solchen Versuchen immer alle Meldungen der Kontrolle gegen den Stand ohne
+  Rahmen vergleichen und den Ablauf der Oberfläche nachstellen (`session.add_area` mit dem Text im Rahmen).
+  Bleibt (gewollt, Folge von (3)): Der zeichengenaue Text im Rahmen („Die“, „2026“) wird wie jeder Fundtext
+  anderswo gesucht – in der Oberfläche als Vorschlag der Kontrolle vor dem Speichern.
+  **Rahmen über den Seitenrand** (seit 11.11.2026): `_PageWidget.mouseReleaseEvent` schneidet den Rahmen auf die
+  Seite zu; sonst stand die Beschriftung teils außerhalb des Blattes (Meldung „Inhalt außerhalb“ und Reste nach (2)).
+  Bereiche aus älteren Arbeitsständen werden nicht nachträglich beschnitten.
 - **Kontrolle vor dem Speichern** (seit 10.11.2026, Wunsch des Nutzers): `analyzer.further_occurrences` sucht den
   Wortlaut aktiver Funde im Dokumenttext an Stellen, die kein Fund berührt → nicht aktivierte Vorschläge
   `source="kontrolle"` (bleiben wie `ki` bei neuer Analyse erhalten; ein abgewählter Vorschlag ist eine

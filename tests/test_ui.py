@@ -207,6 +207,31 @@ def test_pdf_visible_after_text_document(window):
     assert pages[0].pixmap is not None
 
 
+def test_frame_dragged_past_the_page_edge_ends_at_the_edge(window, monkeypatch):
+    """Wird ein Rahmen mit der Maus über den Seitenrand hinaus gezogen, endet der Bereich am Rand. Sonst stünde
+    die Beschriftung des Balkens teils außerhalb des Blattes – die Kontrolle meldete dann Inhalt außerhalb des
+    sichtbaren Bereichs und Reste an der geschwärzten Stelle."""
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    _open(window, SAMPLES / "beispiel.pdf")
+    view = window.left.pages
+    page = view._pages[0]
+    got = []
+    # statt des Menüs, das nach dem Aufziehen erscheint
+    monkeypatch.setattr(type(window), "_area_menu", lambda self, index, rect, pos, ranges: got.append((index, rect)))
+    QTest.mousePress(page, Qt.MouseButton.LeftButton, pos=QPoint(120, 200))
+    QTest.mouseRelease(page, Qt.MouseButton.LeftButton, pos=QPoint(-80, 260))        # links aus der Seite
+    QTest.mousePress(page, Qt.MouseButton.LeftButton, pos=QPoint(page.width() - 90, page.height() - 60))
+    QTest.mouseRelease(page, Qt.MouseButton.LeftButton, pos=QPoint(page.width() + 50, page.height() + 40))
+    (i1, left), (i2, corner) = got
+    size = page.page_size
+    assert i1 == i2 == 0
+    assert left.x0 == 0 and left.x1 == pytest.approx(120 / view.zoom, abs=1) and left.y1 > left.y0
+    assert corner.x1 <= size.width() and corner.y1 <= size.height()
+    assert corner.x1 > size.width() - 2 and corner.y1 > size.height() - 2
+
+
 def test_thorough_is_default_and_fallback_not_saved(tmp_path, monkeypatch):
     """„Gründlich“ ist Standard. Fehlt das Modell, wird „Schnell“ nur ersatzweise genutzt –
     gespeichert bleibt der Wunsch „Gründlich“."""
