@@ -273,8 +273,14 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   (erledigt: `_drawing_outside`, `_text_outside`; `_strip` mit `_marked_content`, `_xobject`, `_drop_path`,
   `_without_text` – zusätzlich alt gegen neu bytegleich auf 17 264 echten und 40 000 erzeugten Inhaltsströmen) · 5 Oberfläche Logik (erledigt: `FindingsModel.data` mit `_cell_text`, `_text_color`, `_cell_value` – alt gegen
   neu gleich in 17 136 Zellenwerten; `_refresh_views` mit `_refresh_text_preview`, `_refresh_page_overlays`;
-  `export_unreviewed` mit `_export_unreviewed_file`; `export_pdf` bleibt, Folge von Abbruchbedingungen) · 6 Oberfläche Aufbau (`_build_ui`,
-  `_build_actions`, Einstellungsdialog) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
+  `export_unreviewed` mit `_export_unreviewed_file`; `export_pdf` bleibt, Folge von Abbruchbedingungen) · 6 Oberfläche Aufbau (erledigt: `_build_ui` ruft `_build_welcome`,
+  `_build_document_view`, `_build_*_dock`, `_build_status_bar`, `_build_zoom_controls`, `_connect_*`; `_build_actions`
+  ruft `_create_actions`, `_build_menus`, `_build_toolbar`; Einstellungsdialog mit `_build_general`,
+  `_build_entities`, `_build_lists`, `_apply_locks`. Die Reihenfolge der Schritte bestimmt Tab-Reihenfolge und
+  Anordnung – nicht umstellen. Geprüft mit einer Aufnahme des ganzen Aufbaus alt gegen neu, einmaliges Skript:
+  Objektbaum mit allen Qt-Eigenschaften, Empfänger je Signal, Menüs, Fokuskette, `saveState` – neun Zustände von
+  Hauptfenster und Dialog bytegleich; fünf absichtliche Fehler wurden alle bemerkt. Nicht angefasst, weil lang, aber
+  ohne Verzweigungen: `FindingsPanel.__init__`, `BatchPanel.__init__`) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
   für PDF-Inhaltsströme (`_instructions`, `_compound_end`) – begründete Ausnahme statt Umbau; Regel zur Parameterzahl.
 - **Ergebnisvergleich** `tools/ergebnis_vergleich.py` (seit 10.11.2026): `pruefen --basis <Git-Stand>` checkt die
   Basis in einen eigenen Ordner aus, nimmt beide Stände auf und vergleicht (Rückgabewert 1 bei Abweichung). Aufnahme
