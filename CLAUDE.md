@@ -4,9 +4,9 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.6 (Kontrolle vor dem Speichern schlägt auch den Nachnamen allein vor; KI-Anfrage folgt keinen
+**Stand:** v0.8.7 (drei Fehlalarme der Kontrolle nach dem PDF-Export behoben – Bruchstücke und Wortlaut von Balkenbeschriftungen, Rahmen über den Seitenrand; Refactoring abgeschlossen: zu große Funktionen zerlegt, Vergleichswerkzeug `tools/ergebnis_vergleich.py`, ruff C901 mit Grenze 12); davor v0.8.6 (Kontrolle vor dem Speichern schlägt auch den Nachnamen allein vor; KI-Anfrage folgt keinen
 Weiterleitungen; Text-Export/Einstellungen über `.tmp`, Fehlermeldung beim Text-Export; neue Funde in der Fundliste
-ausgewählt; strengere ruff-Regeln; 61 neue Oberflächentests, 89 % Abdeckung); davor v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
+ausgewählt; strengere ruff-Regeln; 61 neue Oberflächentests, 89 % Abdeckung); v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
 Rückfrage wird zurückgehalten; Namen/Orte in Großbuchstaben, geschützte Leerzeichen, Stern-Datum, Postfach;
 Kommandozeile: Rückgabewert 4, OCR-Einzeldateien nicht exportiert, defekte PDFs; deutsche Schaltflächen);
 v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 275 Tests (Stand 10.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -152,7 +152,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 275 Tests (Stand 10.11.2026; PR #67�
   das Modell fehlt > 0), Aufruffehler = 1, `--einstellungen`, `--version`. Tests: `tests/test_cli.py`.
 - **CI (GitHub Actions, `.github/workflows/tests.yml`):** bei jedem PR und Push auf `dev`/`main`. Job „Tests“
   auf `windows-latest`, Python 3.14, Pakete aus der Lock-Datei, Transformer-Modell vom neuesten Release
-  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen; ruff in der CI auf `0.17.x` festgelegt; Komplexitätsregeln und mypy bewusst erst mit einem Refactoring),
+  (`gh release download`, Prüfsummen aus `packaging/modell.sha256`, zwischengespeichert), `ruff check` (Regeln in `pyproject.toml`: F, E, W, I, B, UP, SIM bei 120 Zeichen, C901 mit höchstens 12 Verzweigungspfaden je Funktion; ruff in der CI auf `0.17.x` festgelegt; mypy später und getrennt),
   `pytest`. Actions per Commit-SHA mit Versionskommentar; `.github/dependabot.yml` (nur `github-actions`, monatlich,
   PRs gegen `dev`; wirkt aus `main`) – beim Aktualisieren SHA und Kommentar zusammen ändern. Job „Sicherheitslücken“: `pip-audit` gegen die Lock-Datei (Ubuntu).
   `branch-guard.yml`: PR gegen `main` nur von `dev` (sonst rot). `build.yml`: `build.bat` auf Windows
@@ -197,6 +197,26 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   abgewählt → „an anderer Stelle noch lesbar“. (3) ist gewollt: `samples/mail_mit_scan.pdf` meldet so „Kaya“
   (steht noch im Dateinamen `antrag_kaya.pdf`) und „Anwohnerparkausweis“ (einmal fälschlich als Person
   geschwärzt, einmal nicht). Ohne `doc` läuft nur (1) und (3).
+  **Beschriftungs-Bruchstücke** (seit 11.11.2026): Überschneidet ein frei gezogener Bereich einen Textfund nur
+  teilweise, ragt die Beschriftung des einen Balkens als Bruchstück („[PER“) ins Rechteck des anderen – das war ein
+  Fehlalarm in (2). `_label_chars` merkt je Seite die Zeichen, die im Rechteck des eigenen Balkens vollständig als
+  dessen Beschriftung stehen; nur diese Zeichen sind in fremden Rechtecken zulässig (Text, der bloß wie ein
+  Bruchstück aussieht, wird weiter gemeldet – Test). Gegenprobe über alle Beispiele und Sonderfälle: kein Zeichen
+  des Originals blieb in einem Schwärzungsrechteck.
+  **Beschriftungen sind kein Text** (seit 11.11.2026, Fehlalarm im Klicktest des Nutzers): (3) fand „Person“ in
+  „[PERSON]“ bzw. „[PERSON_1]“ – sobald ein Fund so lautete wie ein Beschriftungswort (leicht bei „Ganzen Bereich
+  schwärzen“: der Text im Rahmen wird zeichengenau zum Textfund, aus „Personalabteilung“ wird „Person“; ebenso ein
+  von Hand markiertes „IBAN“ oder „Unterschrift“). Mit `doc` baut `_text_without_labels` den Seitentext deshalb
+  zeichenweise auf (gleich `get_text()`, geprüft auf 532 Seiten) und setzt für Zeichen aus `_label_chars`
+  Leerzeichen; auf OCR-Seiten streicht `_ocr_text_without_labels` die Beschriftung aus erneut gelesenen Wörtern,
+  die den Balken berühren. Ohne `doc` unverändert. **Lehre:** Die Gegenprobe zu den Bruchstücken hatte nur die
+  Meldungen aus (2) ausgewertet – bei solchen Versuchen immer alle Meldungen der Kontrolle gegen den Stand ohne
+  Rahmen vergleichen und den Ablauf der Oberfläche nachstellen (`session.add_area` mit dem Text im Rahmen).
+  Bleibt (gewollt, Folge von (3)): Der zeichengenaue Text im Rahmen („Die“, „2026“) wird wie jeder Fundtext
+  anderswo gesucht – in der Oberfläche als Vorschlag der Kontrolle vor dem Speichern.
+  **Rahmen über den Seitenrand** (seit 11.11.2026): `_PageWidget.mouseReleaseEvent` schneidet den Rahmen auf die
+  Seite zu; sonst stand die Beschriftung teils außerhalb des Blattes (Meldung „Inhalt außerhalb“ und Reste nach (2)).
+  Bereiche aus älteren Arbeitsständen werden nicht nachträglich beschnitten.
 - **Kontrolle vor dem Speichern** (seit 10.11.2026, Wunsch des Nutzers): `analyzer.further_occurrences` sucht den
   Wortlaut aktiver Funde im Dokumenttext an Stellen, die kein Fund berührt → nicht aktivierte Vorschläge
   `source="kontrolle"` (bleiben wie `ki` bei neuer Analyse erhalten; ein abgewählter Vorschlag ist eine
@@ -244,6 +264,40 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   (`worker.py`), Abbruch im Fortschrittsfenster. Fixture `window` liegt in
   `tests/conftest.py`; Klasse `Dialogs` in `test_ui_export.py` ersetzt Dateidialog und Meldungsfenster und klickt in
   Rückfragen die voreingestellte oder eine benannte Schaltfläche (so läuft der echte Dialogcode).
+- **Refactoring** (Plan 10.11.2026, Entscheidungen des Nutzers: Komplexitätsgrenze **12**, mypy später und
+  getrennt, Aufbau der Oberfläche gehört dazu). Nur Struktur, kein geändertes Verhalten, je Schritt ein PR:
+  0 Vergleichswerkzeug (erledigt) · 1 Kommandozeile (erledigt: `build_parser`, `load_settings`,
+  `apply_output_options`, `print_findings`, `open_workspace`, `export_entry`) · 2 Laden
+  (erledigt: `_open_cleaned`, `_ocr_plan`, `_read_pages`, Hinweise je Gruppe in eigener Funktion) · 3 Kontrolle (erledigt: `_texts_for_check`, `_structure_problems`; `further_occurrences` über `_FreeSpots`,
+  `_whole_texts`, `_surnames`) · 4 `pdf_hidden`
+  (erledigt: `_drawing_outside`, `_text_outside`; `_strip` mit `_marked_content`, `_xobject`, `_drop_path`,
+  `_without_text` – zusätzlich alt gegen neu bytegleich auf 17 264 echten und 40 000 erzeugten Inhaltsströmen) · 5 Oberfläche Logik (erledigt: `FindingsModel.data` mit `_cell_text`, `_text_color`, `_cell_value` – alt gegen
+  neu gleich in 17 136 Zellenwerten; `_refresh_views` mit `_refresh_text_preview`, `_refresh_page_overlays`;
+  `export_unreviewed` mit `_export_unreviewed_file`; `export_pdf` bleibt, Folge von Abbruchbedingungen) · 6 Oberfläche Aufbau (erledigt: `_build_ui` ruft `_build_welcome`,
+  `_build_document_view`, `_build_*_dock`, `_build_status_bar`, `_build_zoom_controls`, `_connect_*`; `_build_actions`
+  ruft `_create_actions`, `_build_menus`, `_build_toolbar`; Einstellungsdialog mit `_build_general`,
+  `_build_entities`, `_build_lists`, `_apply_locks`. Die Reihenfolge der Schritte bestimmt Tab-Reihenfolge und
+  Anordnung – nicht umstellen. Geprüft mit einer Aufnahme des ganzen Aufbaus alt gegen neu, einmaliges Skript:
+  Objektbaum mit allen Qt-Eigenschaften, Empfänger je Signal, Menüs, Fokuskette, `saveState` – neun Zustände von
+  Hauptfenster und Dialog bytegleich; fünf absichtliche Fehler wurden alle bemerkt. Nicht angefasst, weil lang, aber
+  ohne Verzweigungen: `FindingsPanel.__init__`, `BatchPanel.__init__`) · 7 ruff C901 mit Grenze 12 (erledigt, `[tool.ruff.lint.mccabe]`).
+  Bewusst ausgenommen: der Zerleger für PDF-Inhaltsströme (`_instructions` 19, `_compound_end` 13; `# noqa: C901` mit
+  Begründung im Code) und die Hilfsskripte `tools/benchmark_models.py` (27) und `tools/etw_pruefen.py` (13) – nicht
+  Teil des Programms, in der CI nicht testbar. Nicht eingeschaltet: Regeln zu Parameterzahl und Funktionslänge.
+  An der Grenze: `export_pdf` (12). **Damit ist das Refactoring abgeschlossen**; offen bleibt mypy (nur Kern).
+- **Ergebnisvergleich** `tools/ergebnis_vergleich.py` (seit 10.11.2026): `pruefen --basis <Git-Stand>` checkt die
+  Basis in einen eigenen Ordner aus, nimmt beide Stände auf und vergleicht (Rückgabewert 1 bei Abweichung). Aufnahme
+  = Beispieldateien + vier erzeugte Sonderfälle (enger Zeilenabstand, gemischte Größen, gedreht/zugeschnitten,
+  ausgeblendete Ebene) in
+  beiden Modi: geladener Text, Hinweise, Funde, Vorschläge der Kontrolle, geschwärzter Text, geschwärztes PDF (Text
+  Seitenbild und Zeichenschritte je Seite – letztere erfassen auch nicht Angezeigtes –, drei Varianten, eine mit
+  frei gezogenem Bereich), Kontrolle, Kommandozeile (Ordner und
+  einzelne Dateien, Ausgaben, Rückgabewerte, Ergebnisordner ohne Zeitangaben). `--ordner`/`--liste`: fremde PDFs nur
+  laden und bereinigen, nur Prüfsummen (für `pdf_hidden`; in der Cloud z. B. `--ordner /usr/share/texlive/texmf-dist`,
+  rund 350 PDFs). Dauer in der Cloud: gut 2 Minuten je Stand, mit Korpus 5 Minuten für beide. Zweimal derselbe
+  Stand ergibt keine Abweichung (geprüft). Ohne die Sonderfälle bliebe z. B. eine Änderung von `TEXT_INSET`
+  unbemerkt – die Beispieldateien haben normalen Zeilenabstand. Auch für Paket-Updates gedacht (Ablauf oben:
+  „Funde aller Beispieldateien vergleichen“), dann in zwei Schritten `aufnehmen` vor und nach dem Update.
 - Qt: `adjustSize()` auf verborgenem Scroll-Container liefert veraltete Größe → `PdfPagesView._relayout`.
 - PySide6: `QMenu.exec` in Tests nicht monkeypatchbar → Menüs über `build_*_menu`.
 - **Deutsche Schaltflächen** (seit 10.11.2026): Qt beschriftet Standard-Schaltflächen englisch. Ja/Nein-Rückfragen

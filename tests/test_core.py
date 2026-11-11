@@ -484,6 +484,83 @@ def _two_lines(tmp_path, first: str, second: str):
     return _load_bytes(tmp_path, pdf.tobytes())
 
 
+def _area_over_right_half(doc, finding, grow=(30, 150, 40)) -> Finding:
+    """Frei gezogener Bereich, der den Fund nur zur Hälfte überdeckt und rechts sowie nach oben und unten
+    darüber hinausreicht."""
+    from pii_redact.core.redactor import finding_rects
+
+    (page, r), = finding_rects(doc, finding.start, finding.end)
+    up, right, down = grow
+    return Finding(0, 0, "AREA", "", area=(page, r.x0 + r.width / 2, r.y0 - up, r.x1 + right, r.y1 + down))
+
+
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
+def test_verify_accepts_labels_cut_by_an_overlapping_area(tmp_path, mode):
+    """Überdeckt ein frei gezogener Bereich einen Textfund nur teilweise, ragt die Beschriftung des einen Balkens
+    in das Rechteck des anderen – als Bruchstück („SON]“). Das ist kein stehen gebliebener Text."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt an die Stadtverwaltung.", "Zweite Zeile bleibt lesbar.")
+    name = _find(doc, "Zofia Jaeger")
+    used = [name, _area_over_right_half(doc, name)]
+    data = redact_pdf(doc, used, mode)
+    text = pymupdf.open(stream=data)[0].get_text()
+    assert "Zofia" not in text and "Jaeger" not in text and "Stadtverwaltung" not in text
+    assert "Zweite Zeile bleibt lesbar." in text
+    assert verify_pdf(data, used, doc=doc, mode=mode) == []
+
+
+def test_verify_still_reports_real_text_next_to_cut_labels(tmp_path):
+    """Die Nachsicht gilt nur für Zeichen echter Balkenbeschriftungen: Text, der an einer geschwärzten Stelle
+    stehen geblieben ist, wird weiter gemeldet – auch wenn dort zusätzlich ein Beschriftungs-Bruchstück steht
+    oder der Text selbst wie eines aussieht."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt an die Stadtverwaltung.", "Kennung [PER 12 vergeben.")
+    name = _find(doc, "Zofia Jaeger")
+    area = _area_over_right_half(doc, name)
+    # 1. nur der Bereich wurde geschwärzt, die Kontrolle erwartet aber auch den Namen: „Zofia“ steht noch da
+    data = redact_pdf(doc, [area], ReplaceMode.PLACEHOLDER)
+    assert "Zofia" in pymupdf.open(stream=data)[0].get_text()
+    assert verify_pdf(data, [name, area], doc=doc) == [
+        "Zofia Jaeger – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+    # 2. Text im Dokument, der wie ein Bruchstück aussieht („[PER“), bleibt an seiner Stelle stehen
+    fragment = _find(doc, "[PER", "CUSTOM")
+    data = redact_pdf(doc, [name, area], ReplaceMode.PLACEHOLDER)
+    assert "[PER 12" in pymupdf.open(stream=data)[0].get_text()
+    assert verify_pdf(data, [name, area, fragment], doc=doc) == [
+        "[PER – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
+
+
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED])
+def test_verify_does_not_take_bar_labels_for_text(tmp_path, mode):
+    """Die Beschriftung eines Balkens ist kein Text des Dokuments: Ist das Wort „Person“ geschwärzt (etwa als
+    Teil von „Personalabteilung“ in einem frei gezogenen Rahmen), ist „[PERSON]“ auf einem anderen Balken kein
+    weiteres Vorkommen."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger schreibt.", "Personalabteilung")
+    used = [_find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")]
+    data = redact_pdf(doc, used, mode)
+    text = pymupdf.open(stream=data)[0].get_text()
+    assert "[PERSON" in text and "alabteilung" in text and "Zofia" not in text
+    assert verify_pdf(data, used, doc=doc, mode=mode) == []
+    # ohne das Dokument kennt die Kontrolle die Balken nicht – dann bleibt es bei der Meldung
+    assert verify_pdf(data, used) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+
+
+def test_verify_still_reports_text_that_reads_like_a_label(tmp_path):
+    """Die Nachsicht gilt nur für die Beschriftung im eigenen Balken – gleich lautender Text des Dokuments an
+    anderer Stelle wird weiter gemeldet, auch wenn er wie eine Beschriftung aussieht."""
+    doc = _two_lines(tmp_path, "Zofia Jaeger ist die zuständige Person im Haus.",
+                     "Vermerk [PERSON] in der Akte, Person B.")
+    name, word = _find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")
+    data = redact_pdf(doc, [name, word], ReplaceMode.PLACEHOLDER)
+    text = pymupdf.open(stream=data)[0].get_text()
+    assert "Vermerk [PERSON] in der Akte, Person B." in text
+    assert verify_pdf(data, [name, word], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+    # zwei der drei Vorkommen bewusst abgewählt: das dritte (im Vermerk) wird weiter gemeldet
+    kept = [Finding(doc.text.index("Person B"), doc.text.index("Person B") + 6, "AREA", "Person", active=False)]
+    assert verify_pdf(data, [name, word, *kept], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
+    kept.append(Finding(doc.text.index("[PERSON]") + 1, doc.text.index("[PERSON]") + 7, "AREA", "PERSON", active=False))
+    assert verify_pdf(data, [name, word, *kept], doc=doc) == []
+
+
 @pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
 def test_verify_checks_each_redacted_spot(tmp_path, mode):
     """Geprüft wird die geschwärzte Stelle selbst – auch wenn derselbe Text anderswo bewusst stehen bleibt."""

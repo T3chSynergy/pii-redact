@@ -417,11 +417,39 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
        anderswo abgewählt wurde.
     3. **Andere Stellen:** Kommt der Text eines aktiven Fundes sonst noch im Ergebnis vor – im Seitentext
        (als eigenes Wort bzw. eigene Nummer, nicht als Teil eines längeren Wortes), in Kommentaren,
-       Formularfeldern, Lesezeichen oder Metadaten? Vorkommen, die bewusst abgewählt wurden, zählen nicht.
+       Formularfeldern, Lesezeichen oder Metadaten? Vorkommen, die bewusst abgewählt wurden, zählen nicht –
+       und (mit ``doc``) auch nicht die Beschriftungen der Balken: „[PERSON]“ ist kein Vorkommen von „Person“.
 
     Seiten aus ``ocr_pages`` (per Texterkennung gelesen, ohne Textebene) werden dazu erneut per OCR gelesen."""
     pdf = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page_texts = [page.get_text() for page in pdf]
+    plan = pdf_redaction_plan(doc, findings, mode, labels) if doc is not None else []
+    page_texts, ocr_words = _texts_for_check(pdf, pdf_bytes, ocr_pages, plan)
+    problems, other = _structure_problems(pdf)
+    failed = _unredacted_spots(pdf, plan, findings, ocr_words)
+    pdf.close()
+    by_id = {f.id: f for f in findings}
+    reported: set[str] = set()
+    for fid, pages in failed.items():
+        f = by_id[fid]
+        label = f.text if f.text.strip() else info(f.entity_type).label
+        if label not in reported:
+            reported.add(label)
+            problems.append(f"{label} – an der geschwärzten Stelle noch vorhanden ({_pages(pages)})")
+    problems += _other_occurrences(findings, page_texts, other, reported)
+    return problems
+
+
+def _texts_for_check(pdf: fitz.Document, pdf_bytes: bytes, ocr_pages: list[int] | None,
+                     plan: list) -> tuple[list[str], dict[int, list]]:
+    """Text je Seite – ohne die Beschriftungen der Balken aus ``plan``, denn sie sind kein Text des Dokuments
+    („[PERSON]“ wäre sonst ein Vorkommen des Wortes „Person“). Seiten aus ``ocr_pages`` werden zusätzlich per
+    Texterkennung gelesen (Rückgabe auch der dort gelesenen Wörter je Seite)."""
+    labelled: dict[int, list] = {}
+    for entry in plan:
+        if entry[2]:
+            labelled.setdefault(entry[0], []).append(entry)
+    page_texts = [_text_without_labels(page, labelled[pno]) if pno in labelled else page.get_text()
+                  for pno, page in enumerate(pdf)]
     ocr_words: dict[int, list] = {}
     if ocr_pages:
         from . import ocr as ocr_mod
@@ -431,7 +459,46 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
             if 0 <= pno < pdf.page_count:
                 lines = ocr_mod.ocr_page(pdf[pno], key)
                 ocr_words[pno] = [w for line in lines for w in line]
-                page_texts[pno] += "\n" + "\n".join(" ".join(w.text for w in line) for line in lines)
+                entries = labelled.get(pno, [])
+                page_texts[pno] += "\n" + "\n".join(" ".join(_ocr_text_without_labels(w, entries) for w in line)
+                                                     for line in lines)
+    return page_texts, ocr_words
+
+
+def _text_without_labels(page: fitz.Page, entries: list) -> str:
+    """Seitentext wie ``page.get_text()``, aber mit Leerzeichen an der Stelle der Balkenbeschriftungen. Als
+    Beschriftung zählt nur, was im Rechteck des eigenen Balkens vollständig als dessen Beschriftung steht
+    (siehe ``_label_chars``) – gleich lautender Text an anderer Stelle bleibt stehen."""
+    chars: list[tuple[str, tuple[float, float]]] = []
+    line_ends: list[int] = []
+    for block in page.get_text("rawdict", flags=fitz.TEXTFLAGS_TEXT)["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block["lines"]:
+            chars += [(c["c"], ((c["bbox"][0] + c["bbox"][2]) / 2, (c["bbox"][1] + c["bbox"][3]) / 2))
+                      for span in line["spans"] for c in span["chars"]]
+            line_ends.append(len(chars))
+    marked = _label_chars(chars, entries)
+    out, start = [], 0
+    for end in line_ends:
+        out.append("".join(" " if i in marked else chars[i][0] for i in range(start, end)) + "\n")
+        start = end
+    return "".join(out)
+
+
+def _ocr_text_without_labels(word, entries: list) -> str:
+    """Text eines erneut gelesenen Wortes ohne die Beschriftung eines Balkens, den es berührt – die
+    Texterkennung liest auch die Beschriftungen, mitunter zusammen mit dem Wort daneben („geb.[DATUM]“)."""
+    text = word.text
+    for _p, rect, label, _ids in entries:
+        if label.casefold() in text.casefold() and fitz.Rect(word.rect).intersects(rect):
+            text = re.sub(re.escape(label), " ", text, flags=re.IGNORECASE)
+    return text
+
+
+def _structure_problems(pdf: fitz.Document) -> tuple[list[str], list[str]]:
+    """Aufbau des fertigen PDFs. Rückgabe: Beanstandungen und die Texte aus Kommentaren, Formularfeldern,
+    Lesezeichen und Metadaten (dort wird anschließend nach Fundtexten gesucht)."""
     other: list[str] = []
     n_annots = n_widgets = n_links = n_outside = 0
     for page in pdf:
@@ -462,21 +529,7 @@ def verify_pdf(pdf_bytes: bytes, findings: list[Finding], ocr_pages: list[int] |
         problems.append("Ebenen noch vorhanden")
     if meta or xml.strip():
         problems.append("Metadaten noch vorhanden: " + ", ".join(list(meta) + (["XMP"] if xml.strip() else [])))
-
-    failed: dict[int, list[int]] = {}
-    if doc is not None:
-        failed = _unredacted_spots(pdf, doc, findings, mode, labels, ocr_words)
-    pdf.close()
-    by_id = {f.id: f for f in findings}
-    reported: set[str] = set()
-    for fid, pages in failed.items():
-        f = by_id[fid]
-        label = f.text if f.text.strip() else info(f.entity_type).label
-        if label not in reported:
-            reported.add(label)
-            problems.append(f"{label} – an der geschwärzten Stelle noch vorhanden ({_pages(pages)})")
-    problems += _other_occurrences(findings, page_texts, other, reported)
-    return problems
+    return problems, other
 
 
 def _pages(pages: list[int]) -> str:
@@ -484,13 +537,14 @@ def _pages(pages: list[int]) -> str:
     return ("Seite " if len(pages) == 1 else "Seiten ") + ", ".join(str(p + 1) for p in pages)
 
 
-def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Finding], mode: str, labels: bool,
+def _unredacted_spots(pdf: fitz.Document, plan: list, findings: list[Finding],
                       ocr_words: dict[int, list]) -> dict[int, list[int]]:
-    """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle noch Text steht.
+    """Fund-ID → Seiten, auf denen an seiner geschwärzten Stelle (Rechtecke aus ``plan``) noch Text steht.
 
-    Im Ergebnis darf in einem Schwärzungsrechteck nur die Beschriftung des Balkens stehen. Maßgeblich ist die
-    Mitte jedes Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
-    plan = pdf_redaction_plan(doc, findings, mode, labels)
+    Im Ergebnis dürfen in einem Schwärzungsrechteck nur Balkenbeschriftungen stehen – die eigene, die eines
+    Balkens, der ganz darin liegt, und Bruchstücke der Beschriftung eines Balkens, der sich mit dem Rechteck nur
+    überschneidet (frei gezogener Bereich über einem Teil eines Textfundes). Maßgeblich ist die Mitte jedes
+    Zeichens – Zeichen der Nachbarzeilen, deren Rahmen nur hineinragen, zählen nicht."""
     by_page: dict[int, list] = {}
     for entry in plan:
         by_page.setdefault(entry[0], []).append(entry)
@@ -504,11 +558,18 @@ def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Fi
         chars = [(c["c"], ((c["bbox"][0] + c["bbox"][2]) / 2, (c["bbox"][1] + c["bbox"][3]) / 2))
                  for block in pdf[pno].get_text("rawdict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
                  if block.get("type") == 0 for line in block["lines"] for span in line["spans"] for c in span["chars"]]
+        label_chars: set[int] | None = None
         for _p, rect, _label, ids in entries:
-            inside = _squash("".join(c for c, (x, y) in chars if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1))
-            for label in page_labels:   # auch die eines überlappenden Nachbar-Balkens
+            within = [i for i, (_c, (x, y)) in enumerate(chars) if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1]
+            inside = _squash("".join(chars[i][0] for i in within))
+            for label in page_labels:   # auch die eines Nachbar-Balkens, der ganz in diesem Rechteck liegt
                 inside = inside.replace(label, "")
             bad = bool(inside)
+            if bad:
+                # Rest könnte das Bruchstück einer Beschriftung sein, deren Balken dieses Rechteck nur überschneidet
+                if label_chars is None:
+                    label_chars = _label_chars(chars, entries)
+                bad = any(i not in label_chars and not chars[i][0].isspace() for i in within)
             if not bad and pno in ocr_words:
                 # Texterkennung liest auch die Beschriftung des Balkens – nur melden, was dem Fund gleicht
                 seen = _squash("".join(w.text for w in ocr_words[pno]
@@ -520,6 +581,28 @@ def _unredacted_spots(pdf: fitz.Document, doc: LoadedDocument, findings: list[Fi
                 for i in ids:
                     failed.setdefault(i, []).append(pno)
     return failed
+
+
+def _label_chars(chars: list, entries: list) -> set[int]:
+    """Nummern der Zeichen einer Seite, die zu einer Balkenbeschriftung gehören. Gezählt wird nur, was im Rechteck
+    des eigenen Balkens vollständig als dessen Beschriftung steht – Text, der bloß wie ein Stück einer
+    Beschriftung aussieht, gehört nicht dazu."""
+    marked: set[int] = set()
+    for _p, rect, label, _ids in entries:
+        if not label:
+            continue
+        want = _squash(label)
+        text, index = "", []            # Zeichen im Rechteck ohne Leerraum, dazu je Zeichen seine Nummer
+        for i, (c, (x, y)) in enumerate(chars):
+            if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1 and not c.isspace():
+                folded = c.casefold()
+                text += folded
+                index += [i] * len(folded)
+        pos = text.find(want)
+        while want and pos >= 0:
+            marked.update(index[pos:pos + len(want)])
+            pos = text.find(want, pos + len(want))
+    return marked
 
 
 def _squash(text: str) -> str:

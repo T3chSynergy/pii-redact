@@ -237,7 +237,16 @@ def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key, text_rects: 
     return added, error
 
 
-def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
+def _reopen(doc: fitz.Document, **save) -> tuple[fitz.Document, bytes]:
+    data = doc.tobytes(**save)
+    doc.close()
+    return fitz.open(stream=data, filetype="pdf"), data
+
+
+def _open_cleaned(path: Path) -> tuple[fitz.Document, bytes, dict]:
+    """PDF öffnen und vorab bereinigen: Kommentare, Lesezeichen, Formularfelder und nicht angezeigten Inhalt
+    (ausgeblendete Ebenen, Inhalt außerhalb des Seitenbereichs). Ansicht, Analyse und Ergebnis beruhen damit auf
+    demselben Inhalt. Rückgabe: Dokument, dessen Bytes und was gefunden wurde."""
     data = path.read_bytes()
     try:
         doc = fitz.open(stream=data, filetype="pdf")
@@ -246,44 +255,47 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
     if doc.needs_pass:
         raise UnsupportedFileError("Das PDF ist passwortgeschützt.")
 
-    # Kommentare, Lesezeichen, Formularfelder und nicht angezeigten Inhalt (ausgeblendete Ebenen, Inhalt
-    # außerhalb des Seitenbereichs) vorab bereinigen: Ansicht, Analyse und Ergebnis beruhen damit auf
-    # demselben Inhalt.
     extras = strip_pdf_extras(doc)
-    changed = bool(extras["annots"] or extras["widgets"] or extras["toc"])
-    if changed:   # vor dem Vergleich der Ebenen: Kommentare und Formularfelder sind dann schon fester Inhalt bzw. weg
-        data = doc.tobytes()
-        doc.close()
-        doc = fitz.open(stream=data, filetype="pdf")
+    if extras["annots"] or extras["widgets"] or extras["toc"]:
+        # vor dem Vergleich der Ebenen: Kommentare und Formularfelder sind dann schon fester Inhalt bzw. weg
+        doc, data = _reopen(doc)
     doc, hidden, hidden_changed = remove_hidden_content(doc)
     extras["hidden"] = hidden   # type: ignore[assignment]
     if hidden_changed:
-        data = doc.tobytes(garbage=4)   # ersetzte Inhaltsströme nicht als unbenutzte Objekte mitschleppen
-        doc.close()
-        doc = fitz.open(stream=data, filetype="pdf")
+        doc, data = _reopen(doc, garbage=4)   # ersetzte Inhaltsströme nicht als unbenutzte Objekte mitschleppen
+    return doc, data, extras
 
-    # Welche Seiten brauchen OCR? (erst zählen, damit der Fortschritt stimmt)
-    flags = fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP
-    raws = [page.get_text("rawdict", flags=flags) for page in doc]
-    want_ocr: list[int] = []
-    ocr_error = ""
-    key = None
-    if ocr:
-        from . import ocr as ocr_mod
 
-        want_ocr = [pno for pno, page in enumerate(doc) if ocr_mod.needs_ocr(page, _char_count(raws[pno]))]
-        if want_ocr and not ocr_mod.is_available():
-            ocr_error = "Texterkennung (OCR) ist nicht installiert."
-            want_ocr = []
-        if want_ocr:
-            key = ocr_mod.doc_key(data)
+def _ocr_plan(doc: fitz.Document, raws: list[dict], data: bytes, ocr: bool) -> tuple[list[int], object, str]:
+    """Welche Seiten brauchen Texterkennung? (vorab, damit der Fortschritt stimmt) Rückgabe: Seiten, Schlüssel
+    des Zwischenspeichers und ggf. eine Fehlermeldung."""
+    if not ocr:
+        return [], None, ""
+    from . import ocr as ocr_mod
+
+    want = [pno for pno, page in enumerate(doc) if ocr_mod.needs_ocr(page, _char_count(raws[pno]))]
+    if want and not ocr_mod.is_available():
+        return [], None, "Texterkennung (OCR) ist nicht installiert."
+    return want, (ocr_mod.doc_key(data) if want else None), ""
+
+
+@dataclass
+class _PageScan:
+    """Ergebnis des Lesens aller Seiten."""
+    tb: _TextBuilder = field(default_factory=_TextBuilder)
+    pages_without_text: list[int] = field(default_factory=list)   # 1-basiert
+    pages_with_images: list[int] = field(default_factory=list)    # 1-basiert
+    ocr_pages: list[int] = field(default_factory=list)            # 0-basiert
+    ocr_low: list[str] = field(default_factory=list)
+    ocr_error: str = ""
+
+
+def _read_pages(doc: fitz.Document, raws: list[dict], want_ocr: list[int], key, ocr_error: str,
+                progress) -> _PageScan:
+    """Textebene aller Seiten übernehmen, wo nötig ergänzt um die Texterkennung."""
     content_images = _content_image_pages(doc)
-
-    tb = _TextBuilder()
-    pages_without_text: list[int] = []
-    pages_with_images: list[int] = []   # 1-basiert
-    ocr_pages: list[int] = []
-    ocr_low: list[str] = []
+    scan = _PageScan(ocr_error=ocr_error)
+    tb = scan.tb
     for pno, page in enumerate(doc):
         tb.start_page()
         do_ocr = pno in want_ocr
@@ -291,32 +303,40 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
         if do_ocr:
             if progress:
                 progress(want_ocr.index(pno), len(want_ocr))
-            added, error = _add_ocr_text(tb, pno, page, key, text_rects, ocr_low)
-            ocr_error = error or ocr_error
+            added, error = _add_ocr_text(tb, pno, page, key, text_rects, scan.ocr_low)
+            scan.ocr_error = error or scan.ocr_error
             if added:
-                ocr_pages.append(pno)
+                scan.ocr_pages.append(pno)
                 page_chars += added
             if progress:
                 progress(want_ocr.index(pno) + 1, len(want_ocr))
         if page_chars == 0:
-            pages_without_text.append(pno + 1)
-        if pno not in ocr_pages and pno in content_images:
-            pages_with_images.append(pno + 1)
+            scan.pages_without_text.append(pno + 1)
+        if pno not in scan.ocr_pages and pno in content_images:
+            scan.pages_with_images.append(pno + 1)
+    return scan
 
-    notices = _build_notices(extras, ocr, doc.page_count, ocr_pages, ocr_low, ocr_error,
-                             pages_without_text, pages_with_images)
+
+def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
+    doc, data, extras = _open_cleaned(path)
+    flags = fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP
+    raws = [page.get_text("rawdict", flags=flags) for page in doc]
+    want_ocr, key, ocr_error = _ocr_plan(doc, raws, data, ocr)
+    scan = _read_pages(doc, raws, want_ocr, key, ocr_error, progress)
+    notices = _build_notices(extras, ocr, doc.page_count, scan.ocr_pages, scan.ocr_low, scan.ocr_error,
+                             scan.pages_without_text, scan.pages_with_images)
     result = LoadedDocument(
         path=path,
         kind="pdf",
-        text=tb.text(),
+        text=scan.tb.text(),
         pdf_bytes=data,
-        char_boxes=tb.boxes,
+        char_boxes=scan.tb.boxes,
         page_count=doc.page_count,
-        page_offsets=tb.page_offsets,
+        page_offsets=scan.tb.page_offsets,
         warnings=[n.detail for n in notices],
         notices=notices,
-        ocr_pages=ocr_pages,
-        ocr_uncertain=len(ocr_low),
+        ocr_pages=scan.ocr_pages,
+        ocr_uncertain=len(scan.ocr_low),
     )
     doc.close()
     return result
@@ -324,7 +344,19 @@ def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
 
 def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int], ocr_low: list[str],
                    ocr_error: str, pages_without_text: list[int], pages_with_images: list[int]) -> list[Notice]:
-    """Hinweise zum Dokument (Texterkennung, Seiten ohne Text, Bereinigung, Formulare, Bilder)."""
+    """Hinweise zum Dokument in fester Reihenfolge: Texterkennung, Seiten ohne Text, nicht entfernbarer
+    verborgener Inhalt (alle kritisch), danach zur Information Bereinigung, Formulare, Bilder."""
+    hidden: HiddenReport = extras.get("hidden") or HiddenReport()
+    return [
+        *_ocr_notices(ocr_pages, ocr_low, ocr_error),
+        *_no_text_notices(pages_without_text, page_count, ocr),
+        *_hidden_notices(hidden),
+        *_removed_notices(extras, hidden),
+        *_form_and_image_notices(extras, pages_with_images),
+    ]
+
+
+def _ocr_notices(ocr_pages: list[int], ocr_low: list[str], ocr_error: str) -> list[Notice]:
     notices: list[Notice] = []
     if ocr_pages:
         pages_txt = _fmt_pages([p + 1 for p in ocr_pages])
@@ -340,6 +372,11 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
                               msg, list(ocr_pages), "OCR – Seite vollständig prüfen"))
     if ocr_error:
         notices.append(Notice("ocr_error", Level.CRITICAL, ocr_error, ocr_error))
+    return notices
+
+
+def _no_text_notices(pages_without_text: list[int], page_count: int, ocr: bool) -> list[Notice]:
+    notices: list[Notice] = []
     if pages_without_text:
         if len(pages_without_text) == page_count:
             off = "" if ocr else " Die Texterkennung (OCR) ist in den Einstellungen ausgeschaltet."
@@ -353,7 +390,12 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
                 "pages_no_text", Level.CRITICAL, f"{_seiten(pages_without_text)} ohne Text – nicht geprüft",
                 f"Seiten ohne Text (nicht geprüft): {pages_txt}", [p - 1 for p in pages_without_text],
                 "ohne Text – nicht geprüft"))
-    hidden: HiddenReport = extras.get("hidden") or HiddenReport()
+    return notices
+
+
+def _hidden_notices(hidden: HiddenReport) -> list[Notice]:
+    """Verborgener Inhalt, der sich nicht entfernen ließ und deshalb eingeblendet wurde bzw. geblieben ist."""
+    notices: list[Notice] = []
     show = ("Deshalb ist er hier eingeblendet: Er wird geprüft und steht sichtbar im Ergebnis. Was nicht "
             "hineingehört, bitte schwärzen (bei Bedarf einen Rahmen darum ziehen).")
     if hidden.layers_shown:
@@ -379,6 +421,12 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
             "nicht angezeigt und nicht geprüft, steckt aber im Ergebnis. Abhilfe: das PDF neu erzeugen (z. B. "
             "über „Drucken → Als PDF speichern“) und die neue Datei öffnen.",
             list(hidden.outside_left), "Inhalt neben dem Blatt"))
+    return notices
+
+
+def _removed_notices(extras: dict, hidden: HiddenReport) -> list[Notice]:
+    """Was beim Laden bereinigt wurde und im Ergebnis fehlt (Kommentare, Lesezeichen, Anhänge, verborgener Inhalt)."""
+    notices: list[Notice] = []
     removed = []
     if extras["annots"]:
         removed.append(_count(extras["annots"], "Kommentar/Markierung", "Kommentare/Markierungen")
@@ -401,6 +449,11 @@ def _build_notices(extras: dict, ocr: bool, page_count: int, ocr_pages: list[int
         notices.append(Notice("removed", Level.INFO, f"Wird beim Schwärzen entfernt: {short}",
                               "Wird beim Schwärzen entfernt: " + ", ".join(removed) + ".",
                               sorted(set(removed_pages)), "nicht sichtbarer Inhalt entfernt" if removed_pages else ""))
+    return notices
+
+
+def _form_and_image_notices(extras: dict, pages_with_images: list[int]) -> list[Notice]:
+    notices: list[Notice] = []
     if extras["widgets"]:
         notices.append(Notice(
             "widgets", Level.INFO,
