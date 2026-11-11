@@ -78,6 +78,12 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 294 Tests (Stand 11.11.2026; 0.8.7: 
   Strg+K, Rückfrage einmal pro Programmstart. Einstellungen `llm_*`, Schlüssel bevorzugt `PII_REDACT_LLM_KEY`;
   Vorgabe per `defaults.json` + `locked` (Vorlage `deploy/defaults.ki.example.json`). Arbeitsstand ohne
   KI-Begründungen, Protokollspalte „KI-Prüfung“. IT-Doku dazu technikneutral (OpenAI-kompatibel).
+- **API-Schlüssel der KI-Nachprüfung im Windows-Anmeldespeicher: vorerst nicht** (Entscheidung des Nutzers
+  11.11.2026). Grund: Der Anmeldespeicher gehört zum einzelnen Benutzerkonto und lässt sich von der IT nicht zentral
+  einstellen. Wird das Programm auf viele Geräte verteilt und nutzen alle denselben LLM-Endpunkt, muss der Zugang
+  zentral vorgegeben werden können (`defaults.json` + `locked`, `PII_REDACT_LLM_KEY`) – sonst ergibt es keinen Sinn.
+  Der Anmeldespeicher wäre nur etwas für Einzelanwender mit eigenem Modell und eigenem Endpunkt. **Idee für später,
+  erst wenn dieser Bedarf erkennbar ist** – nicht von sich aus wieder vorschlagen.
 - **Modellvergleich** `tools/ki_vergleich.py`/`.bat`: sechs erfundene Testfälle `tools/ki_testfaelle.json`;
   Bericht `ki_vergleich_<Datum>.md` (gitignored). Modellwahl ist Sache der IT.
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,
@@ -369,3 +375,5 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
    `ki_vergleich` wählen, `defaults.json` mit Sperre, Datenschutzfreigabe.
 3. Rechtlich bestätigen lassen: Mitlieferung des AFL-3.0-Modells neben dem AGPL-Programm.
 4. Später bei Bedarf: Sperre gegen gleichzeitige Bearbeitung desselben Zielordners.
+5. Idee für später, nur bei erkennbarem Bedarf: API-Schlüssel im Windows-Anmeldespeicher für Einzelanwender
+   (siehe „Entscheidungen“).
