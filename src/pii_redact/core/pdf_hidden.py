@@ -397,7 +397,11 @@ def _name(token: bytes) -> str:
     return raw.decode("latin-1")
 
 
-def _instructions(data: bytes):
+# Die beiden folgenden Funktionen zerlegen den Inhaltsstrom Zeichen für Zeichen. Jede Verzweigung ist eine Regel
+# der PDF-Syntax (Kommentar, Zeichenkette, Hex-Zeichenkette, Feld, Wörterbuch, Name, eingebettetes Bild); auf
+# mehrere Funktionen verteilt wäre die Abfolge der Regeln schwerer zu überblicken als an einer Stelle. Deshalb
+# bewusst von der Komplexitätsgrenze ausgenommen (Entscheidung zum Refactoring, 10.11.2026).
+def _instructions(data: bytes):  # noqa: C901
     """Inhaltsstrom in Anweisungen zerlegen: (Operanden, Operator). Zusammengesetzte Operanden (Zeichenkette,
     Feld, Wörterbuch) bleiben je ein Stück; ein eingebettetes Bild (``BI … EI``) ist eine Anweisung ``BI``."""
     operands: list[bytes] = []
@@ -455,7 +459,7 @@ def _instructions(data: bytes):
         yield operands, b""
 
 
-def _compound_end(data: bytes, i: int) -> int:
+def _compound_end(data: bytes, i: int) -> int:  # noqa: C901 – siehe Kommentar vor _instructions
     """Ende eines Felds ``[…]``, Wörterbuchs ``<<…>>`` oder einer Hex-Zeichenkette ``<…>`` ab Position ``i``."""
     n = len(data)
     depth = 0
