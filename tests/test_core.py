@@ -531,11 +531,10 @@ def test_verify_still_reports_real_text_next_to_cut_labels(tmp_path):
 
 @pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED])
 def test_verify_does_not_take_bar_labels_for_text(tmp_path, mode):
-    """Die Beschriftung eines Balkens ist kein Text des Dokuments: Ist das Wort „Person“ geschwärzt (etwa als
-    Teil von „Personalabteilung“ in einem frei gezogenen Rahmen), ist „[PERSON]“ auf einem anderen Balken kein
-    weiteres Vorkommen."""
+    """Die Beschriftung eines Balkens ist kein Text des Dokuments: Ist das Wort „Person“ von Hand geschwärzt,
+    ist „[PERSON]“ auf einem anderen Balken kein weiteres Vorkommen."""
     doc = _two_lines(tmp_path, "Zofia Jaeger schreibt.", "Personalabteilung")
-    used = [_find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")]
+    used = [_find(doc, "Zofia Jaeger"), _find(doc, "Person", "CUSTOM")]
     data = redact_pdf(doc, used, mode)
     text = pymupdf.open(stream=data)[0].get_text()
     assert "[PERSON" in text and "alabteilung" in text and "Zofia" not in text
@@ -549,16 +548,43 @@ def test_verify_still_reports_text_that_reads_like_a_label(tmp_path):
     anderer Stelle wird weiter gemeldet, auch wenn er wie eine Beschriftung aussieht."""
     doc = _two_lines(tmp_path, "Zofia Jaeger ist die zuständige Person im Haus.",
                      "Vermerk [PERSON] in der Akte, Person B.")
-    name, word = _find(doc, "Zofia Jaeger"), _find(doc, "Person", "AREA")
+    name, word = _find(doc, "Zofia Jaeger"), _find(doc, "Person", "CUSTOM")
     data = redact_pdf(doc, [name, word], ReplaceMode.PLACEHOLDER)
     text = pymupdf.open(stream=data)[0].get_text()
     assert "Vermerk [PERSON] in der Akte, Person B." in text
     assert verify_pdf(data, [name, word], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
     # zwei der drei Vorkommen bewusst abgewählt: das dritte (im Vermerk) wird weiter gemeldet
-    kept = [Finding(doc.text.index("Person B"), doc.text.index("Person B") + 6, "AREA", "Person", active=False)]
+    kept = [Finding(doc.text.index("Person B"), doc.text.index("Person B") + 6, "CUSTOM", "Person", active=False)]
     assert verify_pdf(data, [name, word, *kept], doc=doc) == ["Person – an anderer Stelle noch lesbar (Seite 1)"]
-    kept.append(Finding(doc.text.index("[PERSON]") + 1, doc.text.index("[PERSON]") + 7, "AREA", "PERSON", active=False))
+    kept.append(Finding(doc.text.index("[PERSON]") + 1, doc.text.index("[PERSON]") + 7, "CUSTOM", "PERSON",
+                        active=False))
     assert verify_pdf(data, [name, word, *kept], doc=doc) == []
+
+
+@pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.BLACKOUT])
+def test_verify_does_not_search_text_caught_in_an_area(tmp_path, mode):
+    """Text, der nur beim Schwärzen eines ganzen Bereichs mit erfasst wurde, sucht die Kontrolle nicht an anderer
+    Stelle: Gemeint war die Stelle auf der Seite, nicht das Wort „wir“. Mit geänderter Datenart ist es ein
+    Textfund wie jeder andere."""
+    doc = _two_lines(tmp_path, "Hiermit bestätigen wir den Eingang.", "Gern melden wir uns bei Zofia Jaeger.")
+    name, word = _find(doc, "Zofia Jaeger"), _find(doc, "wir", "AREA_SIGNATURE")
+    assert word.area_text and not name.area_text
+    data = redact_pdf(doc, [name, word], mode)
+    assert "Gern melden wir uns" in pymupdf.open(stream=data)[0].get_text()
+    assert verify_pdf(data, [name, word], doc=doc, mode=mode) == []
+    assert verify_pdf(data, [name, word]) == []
+    word.entity_type = "CUSTOM"
+    assert not word.area_text
+    data = redact_pdf(doc, [name, word], mode)
+    assert verify_pdf(data, [name, word], doc=doc, mode=mode) == ["wir – an anderer Stelle noch lesbar (Seite 1)"]
+
+
+def test_verify_still_checks_the_spot_of_text_caught_in_an_area(tmp_path):
+    """Die Stelle selbst wird weiter geprüft: Steht dort nach dem Schwärzen noch Text, wird das gemeldet."""
+    doc = _two_lines(tmp_path, "Hiermit bestätigen wir den Eingang.", "Gern melden wir uns.")
+    word = _find(doc, "wir", "AREA")
+    untouched = redact_pdf(doc, [], ReplaceMode.PLACEHOLDER)
+    assert verify_pdf(untouched, [word], doc=doc) == ["wir – an der geschwärzten Stelle noch vorhanden (Seite 1)"]
 
 
 @pytest.mark.parametrize("mode", [ReplaceMode.PLACEHOLDER, ReplaceMode.NUMBERED, ReplaceMode.BLACKOUT])
@@ -645,6 +671,21 @@ def test_further_occurrences_become_inactive_suggestions():
     kept = at("Kaya", "PERSON", nth=2, active=False)   # das „Kaya“ im Gruß
     assert [f.text for f in further_occurrences(text, findings + [kept])] == ["kaya", "KAYA"]
     assert further_occurrences(text, [at("Kaya", "PERSON", active=False)]) == []
+
+
+def test_further_occurrences_skip_text_caught_in_an_area():
+    """Text aus einem ganz geschwärzten Bereich wird nicht anderswo gesucht – weder das beiläufige Wort („Die“)
+    noch ein Bruchstück („Person“ aus „Personalabteilung“). Andere Funde bleiben davon unberührt; mit geänderter
+    Datenart zählt der Text wieder."""
+    from pii_redact.core.analyzer import further_occurrences
+
+    text = "Die Personalabteilung meldet: Die Person Zofia Jaeger kommt. Jaeger bringt die Akte."
+    name = Finding(text.index("Zofia"), text.index("Zofia") + 12, "PERSON", "Zofia Jaeger")
+    word = Finding(0, 3, "AREA", "Die", source="manuell", recognizer="Bereich")
+    piece = Finding(4, 10, "AREA_HANDWRITING", "Person", source="manuell", recognizer="Bereich")
+    assert [f.text for f in further_occurrences(text, [name, word, piece])] == ["Jaeger"]
+    word.entity_type = piece.entity_type = "CUSTOM"
+    assert [f.text for f in further_occurrences(text, [name, word, piece])] == ["Die", "Person", "Jaeger", "die"]
 
 
 def test_further_occurrences_surname_alone():

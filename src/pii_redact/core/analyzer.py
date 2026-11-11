@@ -504,9 +504,10 @@ def further_occurrences(text: str, findings: list[Finding]) -> list[Finding]:
     Datenart des Fundes.
 
     Stellen, die ein vorhandener Fund berührt, zählen nicht: aktive werden geschwärzt, abgewählte sind eine
-    bewusste Entscheidung (auch ein früher abgelehnter Vorschlag)."""
+    bewusste Entscheidung (auch ein früher abgelehnter Vorschlag). Nicht gesucht wird Text, der nur beim
+    Schwärzen eines ganzen Bereichs mit erfasst wurde (``Finding.area_text``)."""
     spots = _FreeSpots(text, findings)
-    active = [f for f in sorted(findings, key=lambda f: f.start) if f.active and f.area is None]
+    active = [f for f in sorted(findings, key=lambda f: f.start) if f.active and f.area is None and not f.area_text]
     seen: set[str] = set()
     out: list[Finding] = []
     for f, pattern in _whole_texts(active, seen):       # 1. der ganze Wortlaut

@@ -9,7 +9,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from .entities import DEFAULT_ENTITIES
+from .entities import DEFAULT_ENTITIES, info
 
 _ids = itertools.count(1)
 
@@ -40,6 +40,15 @@ class Finding:
     @property
     def is_area(self) -> bool:
         return self.area is not None
+
+    @property
+    def area_text(self) -> bool:
+        """Text, der beim Schwärzen eines ganzen Bereichs mit geschwärzt wurde (Textstelle mit der Datenart eines
+        Bereichs – „Unterschrift“, „Bereich“ …). Gemeint war die Stelle auf der Seite, nicht der Wortlaut: Was im
+        Rahmen lag, steht zeichengenau im Fund, oft als Bruchstück („Person“ aus „Personalabteilung“) oder als
+        beiläufiges Wort („Die“). Solche Funde werden deshalb nicht an anderer Stelle gesucht. Wer den Wortlaut
+        meint, ändert die Datenart (etwa auf „Person“) – dann ist es ein Textfund wie jeder andere."""
+        return self.area is None and info(self.entity_type).area
 
     @property
     def key(self) -> tuple[int, int]:

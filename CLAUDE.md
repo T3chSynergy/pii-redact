@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 294 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -212,8 +212,15 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   die den Balken berühren. Ohne `doc` unverändert. **Lehre:** Die Gegenprobe zu den Bruchstücken hatte nur die
   Meldungen aus (2) ausgewertet – bei solchen Versuchen immer alle Meldungen der Kontrolle gegen den Stand ohne
   Rahmen vergleichen und den Ablauf der Oberfläche nachstellen (`session.add_area` mit dem Text im Rahmen).
-  Bleibt (gewollt, Folge von (3)): Der zeichengenaue Text im Rahmen („Die“, „2026“) wird wie jeder Fundtext
-  anderswo gesucht – in der Oberfläche als Vorschlag der Kontrolle vor dem Speichern.
+  **Text aus einem ganz geschwärzten Bereich** (seit 11.11.2026, auf Wunsch des Nutzers): Bei „Ganzen
+  Bereich schwärzen“ wird der Text im Rahmen zeichengenau zum Textfund mit der Datenart des Bereichs
+  (`Finding.area_text`: kein Bereich, aber Datenart mit `area=True`; solche Datenarten bieten die Menüs für
+  Textfunde sonst nicht an). Gemeint ist die Stelle, nicht der Wortlaut – `further_occurrences` und (3) suchen
+  diese Texte deshalb nicht anderswo; (2) prüft die Stelle weiter. Ändert der Nutzer die Datenart (etwa auf
+  „Person“), ist es ein Textfund wie jeder andere. Messung mit 454 zufälligen Rahmen über Text in fünf
+  Beispiel-PDFs: vorher 10 mit Vorschlägen („Name“, „mich“, „2026“, „der“) und ebenso vielen Meldungen nach dem
+  Export, jetzt 0. Preis: Steht im Rahmen ein Name, der anderswo unerkannt blieb, schlägt die Kontrolle ihn nicht
+  mehr vor – dafür gibt es „Alle Vorkommen schwärzen als“ (Hilfe `#bereich`).
   **Rahmen über den Seitenrand** (seit 11.11.2026): `_PageWidget.mouseReleaseEvent` schneidet den Rahmen auf die
   Seite zu; sonst stand die Beschriftung teils außerhalb des Blattes (Meldung „Inhalt außerhalb“ und Reste nach (2)).
   Bereiche aus älteren Arbeitsständen werden nicht nachträglich beschnitten.

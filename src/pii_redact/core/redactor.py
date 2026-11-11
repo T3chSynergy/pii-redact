@@ -612,7 +612,9 @@ def _squash(text: str) -> str:
 def _other_occurrences(findings: list[Finding], page_texts: list[str], other: list[str],
                        reported: set[str]) -> list[str]:
     """Texte aktiver Funde, die im Ergebnis noch vorkommen – auf den Seiten öfter, als sie bewusst abgewählt
-    wurden, oder in Kommentaren, Formularfeldern, Lesezeichen und Metadaten."""
+    wurden, oder in Kommentaren, Formularfeldern, Lesezeichen und Metadaten. Text, der nur beim Schwärzen eines
+    ganzen Bereichs mit erfasst wurde (``Finding.area_text``), wird nicht gesucht – wie bei der Kontrolle vor dem
+    Speichern; ob an seiner Stelle noch etwas steht, prüft ``_unredacted_spots``."""
     kept: dict[str, int] = {}
     for f in findings:
         if not f.active and f.area is None:
@@ -622,7 +624,7 @@ def _other_occurrences(findings: list[Finding], page_texts: list[str], other: li
     rest = _squash("".join(other))
     out = []
     for f in findings:
-        if not f.active or f.area is not None or f.text in reported:
+        if not f.active or f.area is not None or f.area_text or f.text in reported:
             continue
         pattern = word_pattern(f.text)
         if pattern is None:

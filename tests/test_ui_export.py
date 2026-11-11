@@ -336,3 +336,40 @@ def test_open_path_reports_missing_folder(window, tmp_path, monkeypatch):
     window._open_path(tmp_path)
     assert [m[:2] for m in d.shown] == [("information", "Nicht vorhanden")] and "fehlt" in d.shown[0][2]
     assert [Path(p) for p in opened] == [tmp_path]
+
+
+def test_whole_area_over_a_word_does_not_start_a_search_for_that_word(window, monkeypatch, tmp_path):
+    """Rahmen über „Mit“ (aus „Mit freundlichen Grüßen“), „Ganzen Bereich schwärzen als Unterschrift“: Das Wort
+    steht auch an anderer Stelle („… mit dem Kennzeichen“). Gemeint war aber die Stelle, nicht das Wort – also
+    weder eine Rückfrage der Kontrolle vor dem Speichern noch eine Warnung nach dem Export. Mit geänderter
+    Datenart ist es ein Textfund wie jeder andere."""
+    import pymupdf
+    from PySide6.QtCore import QPoint
+
+    window.settings.analysis_mode = "schnell"
+    _open(window, SAMPLES / "beispiel.pdf")
+    s = window.session
+    start = s.doc.text.index("Mit freundlichen")
+    boxes = [s.doc.char_boxes[i] for i in range(start, start + 3)]
+    frame = pymupdf.Rect(min(b.rect[0] for b in boxes) - 2, min(b.rect[1] for b in boxes) - 2,
+                         max(b.rect[2] for b in boxes) + 1, max(b.rect[3] for b in boxes) + 2)
+    menus = []
+    monkeypatch.setattr(type(window), "_area_menu",
+                        lambda self, page, rect, pos, ranges: menus.append(self.build_area_menu(page, rect, ranges)))
+    window._on_area_selected(boxes[0].page, frame, QPoint())
+    sub = next(a.menu() for a in menus[0].actions() if a.menu() and a.text() == "Ganzen Bereich schwärzen als")
+    next(a for a in sub.actions() if a.text() == "Unterschrift").trigger()
+    word = next(f for f in s.findings if f.text == "Mit")
+    assert word.area_text and word.active
+
+    d = Dialogs(monkeypatch, tmp_path / "aus.pdf")
+    window.export_pdf()
+    assert (tmp_path / "aus.pdf").exists()
+    assert not d.boxes and not d.shown, (d.boxes, d.shown)
+    assert not [f for f in s.findings if f.source == "kontrolle"]
+
+    s.set_type([word.id], "CUSTOM")                       # jetzt ist der Wortlaut gemeint
+    d2 = Dialogs(monkeypatch, tmp_path / "aus2.pdf")
+    window.export_pdf()
+    assert [b["title"] for b in d2.boxes] == ["Kontrolle vor dem Speichern"]
+    assert [f.text for f in s.findings if f.source == "kontrolle"] == ["mit"]
