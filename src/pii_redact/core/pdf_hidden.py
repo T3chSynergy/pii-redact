@@ -85,32 +85,43 @@ def has_outside_content(page: fitz.Page, leftover: bool = False) -> bool:
         page.set_rotation(0)   # Positionen und sichtbarer Bereich im selben (ungedrehten) Koordinatensystem
     try:
         visible = page.rect
-        grown = fitz.Rect(visible.x0 - EDGE_TOLERANCE, visible.y0 - EDGE_TOLERANCE,
-                          visible.x1 + EDGE_TOLERANCE, visible.y1 + EDGE_TOLERANCE)
-        check_text = False
-        for kind, bbox, *_ in page.get_bboxlog():
-            r = fitz.Rect(bbox)
-            if kind.startswith("clip") and "text" not in kind:
-                continue
-            if r.is_infinite or r.is_empty or not r.is_valid:
-                continue   # zeichnet nichts (leerer Pfad) oder ohne Begrenzung
-            if "text" in kind:
-                check_text = check_text or not visible.contains(r)
-            elif grown.contains(r):
-                continue
-            elif (not r.intersects(visible)
-                  or ("image" in kind or "imgmask" in kind or "shade" in kind) and not leftover):
-                return True
-        if check_text:
-            for span in page.get_texttrace():
-                for char in span["chars"]:
-                    x0, y0, x1, y1 = char[3]
-                    if not visible.contains(fitz.Point((x0 + x1) / 2, (y0 + y1) / 2)):
-                        return True
-        return False
+        outside, check_text = _drawing_outside(page, visible, leftover)
+        return outside or (check_text and _text_outside(page, visible))
     finally:
         if rotation:
             page.set_rotation(rotation)
+
+
+def _drawing_outside(page: fitz.Page, visible: fitz.Rect, leftover: bool) -> tuple[bool, bool]:
+    """Zeichenschritte der Seite durchgehen. Rückgabe: Liegt eine Linie, Fläche oder ein Bild außerhalb? Und:
+    Ragt ein Textstück über den sichtbaren Bereich (dann entscheidet die Mitte der einzelnen Zeichen)?"""
+    grown = fitz.Rect(visible.x0 - EDGE_TOLERANCE, visible.y0 - EDGE_TOLERANCE,
+                      visible.x1 + EDGE_TOLERANCE, visible.y1 + EDGE_TOLERANCE)
+    check_text = False
+    for kind, bbox, *_ in page.get_bboxlog():
+        r = fitz.Rect(bbox)
+        if kind.startswith("clip") and "text" not in kind:
+            continue
+        if r.is_infinite or r.is_empty or not r.is_valid:
+            continue   # zeichnet nichts (leerer Pfad) oder ohne Begrenzung
+        if "text" in kind:
+            check_text = check_text or not visible.contains(r)
+        elif grown.contains(r):
+            continue
+        elif (not r.intersects(visible)
+              or ("image" in kind or "imgmask" in kind or "shade" in kind) and not leftover):
+            return True, check_text
+    return False, check_text
+
+
+def _text_outside(page: fitz.Page, visible: fitz.Rect) -> bool:
+    """Liegt die Mitte eines Zeichens außerhalb des sichtbaren Bereichs?"""
+    for span in page.get_texttrace():
+        for char in span["chars"]:
+            x0, y0, x1, y1 = char[3]
+            if not visible.contains(fitz.Point((x0 + x1) / 2, (y0 + y1) / 2)):
+                return True
+    return False
 
 
 def _remove_outside(pdf: fitz.Document, report: HiddenReport) -> bool:
@@ -302,6 +313,7 @@ class _LayerStripper:
             self.pdf.update_stream(xref, new)
 
     def _strip(self, data: bytes, holder: int | None) -> bytes:
+        """Inhaltsstrom ohne die zeichnenden Anweisungen ausgeblendeter Abschnitte."""
         parts: list[bytes | None] = []
         stack: list[bool] = []          # je offenem markiertem Abschnitt: ausgeblendet?
         path: list[int] = []            # Positionen der Pfad-Anweisungen seit dem letzten Zeichnen
@@ -309,47 +321,70 @@ class _LayerStripper:
         for operands, op in _instructions(data):
             hidden = any(stack)
             raw = operands[0] if op == b"BI" else b" ".join(operands + ([op] if op else []))
-            if op == b"BDC":
-                is_hidden = False
-                if len(operands) == 2 and operands[0] == b"/OC" and operands[1].startswith(b"/"):
-                    is_hidden = self.hidden(self._resource(holder, "Properties", operands[1]))
-                stack.append(is_hidden)
-            elif op == b"BMC":
-                stack.append(False)
-            elif op == b"EMC":
-                if stack:
-                    stack.pop()
+            if op in (b"BDC", b"BMC", b"EMC"):
+                self._marked_content(stack, op, operands, holder)
             elif op in _PATH_BUILD:
                 path.append(len(parts))
             elif op in (b"W", b"W*"):
                 clip = True
             elif op in _PATH_PAINT:
                 if hidden and op != b"n":
-                    if clip:
-                        raw = b"n"                      # Beschneidung behalten, nichts zeichnen
-                    else:
-                        for i in path:
-                            parts[i] = None
-                        raw = b""
+                    raw = _drop_path(parts, path, clip)
                 path, clip = [], False
             elif op == b"Do" and operands:
-                target = self._resource(holder, "XObject", operands[-1])
-                if hidden:
-                    raw = b""
-                elif target[0] == "xref":
-                    xref = int(target[1].split()[0])
-                    if self.hidden(self.pdf.xref_get_key(xref, "OC")):
-                        raw = b""
-                    elif self.pdf.xref_get_key(xref, "Subtype")[1] == "/Form":
-                        self._form(xref, holder)
-            elif hidden and op in (b"Tj", b"TJ", b"sh", b"BI"):
-                raw = b""
-            elif hidden and op == b"'":
-                raw = b"T*"
-            elif hidden and op == b'"' and len(operands) == 3:
-                raw = operands[0] + b" Tw " + operands[1] + b" Tc T*"
+                raw = self._xobject(operands[-1], holder, hidden, raw)
+            elif hidden:
+                raw = _without_text(op, operands, raw)
             parts.append(raw)
         return b"\n".join(p for p in parts if p)
+
+    def _marked_content(self, stack: list[bool], op: bytes, operands: list[bytes], holder: int | None) -> None:
+        """Beginn und Ende markierter Abschnitte mitführen; ``/OC … BDC`` entscheidet über „ausgeblendet“."""
+        if op == b"BDC":
+            is_hidden = False
+            if len(operands) == 2 and operands[0] == b"/OC" and operands[1].startswith(b"/"):
+                is_hidden = self.hidden(self._resource(holder, "Properties", operands[1]))
+            stack.append(is_hidden)
+        elif op == b"BMC":
+            stack.append(False)
+        elif stack:                     # EMC
+            stack.pop()
+
+    def _xobject(self, name: bytes, holder: int | None, hidden: bool, raw: bytes) -> bytes:
+        """``Do``: Bild oder Formular zeichnen – entfällt in ausgeblendeten Abschnitten und wenn das Objekt
+        selbst einer ausgeblendeten Ebene angehört; sichtbare Formulare werden ihrerseits bereinigt."""
+        target = self._resource(holder, "XObject", name)
+        if hidden:
+            return b""
+        if target[0] == "xref":
+            xref = int(target[1].split()[0])
+            if self.hidden(self.pdf.xref_get_key(xref, "OC")):
+                return b""
+            if self.pdf.xref_get_key(xref, "Subtype")[1] == "/Form":
+                self._form(xref, holder)
+        return raw
+
+
+def _drop_path(parts: list[bytes | None], path: list[int], clip: bool) -> bytes:
+    """Zeichnen eines Pfades in einem ausgeblendeten Abschnitt: Dient der Pfad zugleich als Beschneidung, bleibt
+    er stehen und wird nur nicht gezeichnet (``n``); sonst entfallen auch seine Pfad-Anweisungen."""
+    if clip:
+        return b"n"
+    for i in path:
+        parts[i] = None
+    return b""
+
+
+def _without_text(op: bytes, operands: list[bytes], raw: bytes) -> bytes:
+    """Text-, Verlaufs- und eingebettete Bild-Anweisungen eines ausgeblendeten Abschnitts: nichts zeichnen, aber
+    die Wirkung auf die Textposition erhalten (Zeilenwechsel, Abstände)."""
+    if op in (b"Tj", b"TJ", b"sh", b"BI"):
+        return b""
+    if op == b"'":
+        return b"T*"
+    if op == b'"' and len(operands) == 3:
+        return operands[0] + b" Tw " + operands[1] + b" Tc T*"
+    return raw
 
 
 def _strip_hidden_layers(pdf: fitz.Document) -> None:
