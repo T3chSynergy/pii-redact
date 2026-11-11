@@ -1,5 +1,14 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Kontrolle nach dem PDF-Export**
+- **Kein Fehlalarm mehr, wenn ein frei gezogener Bereich einen Textfund nur teilweise überdeckt:** Mit
+  Beschriftung im Balken meldete die Kontrolle dann „an der geschwärzten Stelle noch vorhanden“ – für den Bereich
+  und für den Textfund. Dort stand aber kein Text des Dokuments mehr, sondern nur ein abgeschnittenes Stück der
+  Beschriftung des jeweils anderen Balkens (etwa „[PER“). Solche Bruchstücke echter Balkenbeschriftungen gelten
+  jetzt als zulässig; stehen gebliebener Text wird weiterhin gemeldet.
+
 ## 0.8.6 – 10.11.2026
 
 **Kontrolle vor dem Speichern**
