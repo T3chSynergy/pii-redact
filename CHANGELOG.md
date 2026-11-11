@@ -2,6 +2,19 @@
 
 ## Unveröffentlicht
 
+**Einstellungen**
+- **Ungültige Werte in einer Einstellungsdatei werden übergangen und gemeldet:** Stand in einer von Hand
+  bearbeiteten `settings.json` oder in der `defaults.json` der IT ein Wert außerhalb des gültigen Bereichs,
+  übernahm ihn das Programm. Mit `"threshold": 45` (statt `0.45`) fand die Erkennung dann nichts mehr – „0 Funde“,
+  und die Kommandozeile exportierte die Datei ungeschwärzt mit Rückgabewert 0. `"analysis_mode": "gründlich"`
+  (statt `gruendlich`) lief ohne Meldung als „Schnell“, und ein Tippfehler in `entities` hieß: Diese Datenart
+  wird nicht gesucht. Solche Werte werden jetzt übergangen wie schon bisher Werte der falschen Art; es gilt die
+  Vorgabe der IT bzw. die Voreinstellung. Geprüft werden Schwelle (0 bis 1), Ersetzungsart, Analyse-Modus,
+  Datenarten (bei einer unbekannten gilt die ganze Liste nicht), Zoom und die Grenzwerte der KI-Nachprüfung.
+- **Der Fehler in der Datei fällt auf:** Die Kommandozeile nennt Schlüssel und Datei in der Fehlerausgabe
+  (auch bei `--selftest` – so lässt sich eine verteilte `defaults.json` prüfen), die Oberfläche schreibt sie ins
+  Programmprotokoll. Das gilt auch für Werte der falschen Art, die bisher stillschweigend übergangen wurden.
+
 **Kontrolle vor dem Speichern und nach dem Export**
 - **Text aus einem ganz geschwärzten Bereich wird nicht mehr an anderer Stelle gesucht:** Bei „Ganzen Bereich
   schwärzen“ trägt das Programm den Text im Rahmen zeichengenau als Fund ein, damit er auch im Text-Export fehlt.

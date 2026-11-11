@@ -88,6 +88,55 @@ def test_settings_with_wrong_types_fall_back(tmp_path):
     assert s.org_allow_list == []
 
 
+def test_settings_out_of_range_fall_back(tmp_path):
+    """Werte der richtigen Art, aber außerhalb des gültigen Bereichs: Mit „threshold“ 45 (statt 0.45) fände die
+    Erkennung nichts mehr, ein unbekannter Modus liefe still als „Schnell“. Sie werden übergangen wie Werte der
+    falschen Art – und vermerkt, damit der Fehler in der Datei auffällt."""
+    defaults = tmp_path / "defaults.json"
+    user = tmp_path / "settings.json"
+    defaults.write_text(json.dumps({"threshold": 0.6, "analysis_mode": "gründlich", "llm_timeout": 60,
+                                    "locked": ["analysis_mode"], "_hinweis": "kein Schlüssel des Programms"}),
+                        encoding="utf-8")
+    user.write_text(json.dumps({"threshold": 45, "replace_mode": "quatsch", "analysis_mode": "schnell",
+                                "entities": ["PERSONEN", "IBAN_CODE"], "zoom_mode": "riesig", "zoom_percent": 5000,
+                                "llm_timeout": 0, "llm_max_chars": -1, "pdf_labels": False}), encoding="utf-8")
+    s = Settings.load(user, defaults)
+    assert s.threshold == 0.6 and s.llm_timeout == 60            # Vorgabe der IT bleibt, nicht die Voreinstellung
+    fresh = Settings()
+    assert (s.replace_mode, s.entities, s.zoom_mode, s.zoom_percent, s.llm_max_chars) == (
+        fresh.replace_mode, fresh.entities, fresh.zoom_mode, fresh.zoom_percent, fresh.llm_max_chars)
+    # die ungültige Vorgabe der IT sperrt nichts – der gültige persönliche Wert gilt
+    assert s.analysis_mode == "schnell" and s.locked == []
+    assert s.pdf_labels is False                                  # der Rest der Datei gilt
+    assert sorted(s.ignored) == [
+        "analysis_mode (defaults.json)", "entities (settings.json)", "llm_max_chars (settings.json)",
+        "llm_timeout (settings.json)", "replace_mode (settings.json)", "threshold (settings.json)",
+        "zoom_mode (settings.json)", "zoom_percent (settings.json)"]
+    s.save(user)
+    saved = json.loads(user.read_text(encoding="utf-8"))
+    assert "ignored" not in saved and saved["threshold"] == 0.6   # nach dem Speichern steht ein gültiger Wert da
+    assert Settings.load(user, defaults).ignored == ["analysis_mode (defaults.json)"]
+
+
+@pytest.mark.parametrize("key, value", [
+    ("threshold", 0), ("threshold", 1), ("threshold", 0.05), ("replace_mode", "schwaerzen"),
+    ("analysis_mode", "gruendlich"), ("entities", []), ("entities", ["PERSON", "CUSTOM", "URL"]),
+    ("zoom_mode", "fest"), ("zoom_percent", 10), ("zoom_percent", 400), ("llm_timeout", 1), ("llm_max_chars", 2000),
+])
+def test_settings_valid_values_are_kept(tmp_path, key, value):
+    user = tmp_path / "settings.json"
+    user.write_text(json.dumps({key: value}), encoding="utf-8")
+    s = Settings.load(user)
+    assert getattr(s, key) == value and s.ignored == []
+
+
+def test_settings_wrong_types_are_noted(tmp_path):
+    user = tmp_path / "settings.json"
+    user.write_text(json.dumps({"threshold": "hoch", "ocr": "ja", "ignored": ["x"], "unbekannt": 1}), encoding="utf-8")
+    s = Settings.load(user)
+    assert s.ignored == ["threshold (settings.json)", "ocr (settings.json)"]
+
+
 def test_settings_save_keeps_old_file_on_error(tmp_path, monkeypatch):
     user = tmp_path / "settings.json"
     Settings(zoom_percent=150).save(user)

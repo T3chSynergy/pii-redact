@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 
@@ -51,6 +52,8 @@ from .window_ki import KiMixin
 from .window_view import ZOOM_PRESETS, ViewMixin
 from .worker import AnalysisRunner
 
+log = logging.getLogger(__name__)
+
 FILE_FILTER = ("Dokumente (*.pdf *.txt *.md *.markdown *.text *.log);;PDF (*.pdf);;Text (*.txt);;"
                "Markdown (*.md *.markdown)")
 
@@ -89,6 +92,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
     def __init__(self):
         super().__init__()
         self.settings = Settings.load(settings_path(), defaults_path())
+        for item in self.settings.ignored:
+            log.warning("Einstellungen: ungültiger Wert für %s – übergangen, es gilt die Vorgabe der IT bzw. die "
+                        "Voreinstellung", item)
         self._mode_fallback = False
         if self.settings.analysis_mode == AnalysisMode.THOROUGH and find_ner_model(self.settings.ner_model) is None:
             self.settings.analysis_mode = AnalysisMode.FAST  # Modell (noch) nicht installiert

@@ -6,10 +6,12 @@ import itertools
 import json
 import math
 import os
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
-from .entities import DEFAULT_ENTITIES, info
+from .entities import DEFAULT_ENTITIES, all_keys, info
 
 _ids = itertools.count(1)
 
@@ -110,8 +112,11 @@ class Settings:
     #: Von der IT festgelegte Einstellungen (defaults.json, Schlüssel "locked"): Wert aus defaults.json gilt,
     #: persönliche Änderung ist gesperrt.
     locked: list[str] = field(default_factory=list)
+    #: Beim Laden übergangene Werte der Einstellungsdateien („Schlüssel (Datei)“) – falsche Art oder außerhalb des
+    #: gültigen Bereichs. Die Kommandozeile meldet sie, die Oberfläche schreibt sie ins Protokoll.
+    ignored: list[str] = field(default_factory=list, compare=False)
 
-    _NOT_SAVED = ("org_allow_list", "org_deny_list", "locked")
+    _NOT_SAVED = ("org_allow_list", "org_deny_list", "locked", "ignored")
 
     @property
     def all_allow(self) -> list[str]:
@@ -127,20 +132,17 @@ class Settings:
         Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich; unter ``locked`` aufgeführte
         Einstellungen kommen immer aus defaults.json."""
         fallback = cls()
-
-        def usable(raw: dict) -> dict:
-            # Unpassende Werte je Datei übergehen – ein Fehler im Nutzerprofil verdrängt keine Vorgabe der IT
-            return {k: v for k, v in raw.items()
-                    if k in cls.__dataclass_fields__ and _same_kind(getattr(fallback, k), v)}
-
-        base = usable(_read_json(defaults_path)) if defaults_path else {}
-        user = usable(_read_json(path))
+        ignored: list[str] = []
+        # Unpassende Werte je Datei übergehen – ein Fehler im Nutzerprofil verdrängt keine Vorgabe der IT
+        base = _usable(_read_json(defaults_path), defaults_path, fallback, ignored) if defaults_path else {}
+        user = _usable(_read_json(path), path, fallback, ignored)
         locked = [k for k in base.get("locked", []) if k in base]
         data = {k: v for k, v in base.items() if k not in ("allow_list", "deny_list", "locked")}
         data.update({k: v for k, v in user.items() if k not in locked and k not in cls._NOT_SAVED})
         data["locked"] = locked
         data["org_allow_list"] = list(base.get("allow_list", []))
         data["org_deny_list"] = list(base.get("deny_list", []))
+        data["ignored"] = ignored
         return cls(**data)
 
     def save(self, path: Path) -> None:
@@ -159,6 +161,38 @@ def write_text_safely(path: Path, text: str) -> None:
     except OSError:
         tmp.unlink(missing_ok=True)
         raise
+
+
+#: Zulässige Werte je Einstellung (die Art des Werts prüft ``_same_kind`` vorher). Was nicht passt, wird beim Laden
+#: übergangen wie ein Wert der falschen Art – sonst fände die Erkennung mit ``"threshold": 45`` (statt 0.45) nichts
+#: mehr, und ``"analysis_mode": "gründlich"`` (statt ``gruendlich``) liefe ohne Meldung als „Schnell“.
+_ALLOWED: dict[str, Callable[[Any], bool]] = {
+    "threshold": lambda v: 0 <= v <= 1,
+    "replace_mode": lambda v: v in ReplaceMode.LABELS,
+    "analysis_mode": lambda v: v in AnalysisMode.LABELS,
+    # eine unbekannte Datenart (Tippfehler) hieße: Diese Art wird nicht gesucht – dann gilt die ganze Liste nicht
+    "entities": lambda v: set(v) <= set(all_keys()),
+    "zoom_mode": lambda v: v in ("breite", "seite", "fest"),
+    "zoom_percent": lambda v: 10 <= v <= 400,       # wie in der Oberfläche einstellbar
+    "llm_timeout": lambda v: v >= 1,
+    "llm_max_chars": lambda v: v >= 1,
+}
+
+
+def _usable(raw: dict, source: Path, fallback: Settings, ignored: list[str]) -> dict:
+    """Werte einer Einstellungsdatei, die sich übernehmen lassen. Unbekannte Schlüssel entfallen; Werte der
+    falschen Art oder außerhalb des gültigen Bereichs (von Hand bearbeitete Datei) werden übergangen und in
+    ``ignored`` vermerkt – dann gilt die Vorgabe der IT bzw. die Voreinstellung."""
+    out = {}
+    for key, value in raw.items():
+        if key not in Settings.__dataclass_fields__:
+            continue
+        check = _ALLOWED.get(key)
+        if _same_kind(getattr(fallback, key), value) and (check is None or check(value)):
+            out[key] = value
+        else:
+            ignored.append(f"{key} ({source.name})")
+    return out
 
 
 def _same_kind(default: object, value: object) -> bool:

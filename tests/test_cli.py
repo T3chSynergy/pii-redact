@@ -130,6 +130,29 @@ def test_broken_pdf_is_reported_and_run_continues(work, capsys):
 
 
 @needs_model
+def test_invalid_settings_values_are_reported_and_ignored(work, capsys, monkeypatch):
+    """Tippfehler in der Einstellungsdatei: „threshold“ 45 statt 0.45 ergäbe „0 Funde“ und eine ungeschwärzte
+    Ausgabe, „gründlich“ mit Umlaut liefe still als „Schnell“. Beides wird gemeldet und übergangen."""
+    from pii_redact import paths
+
+    settings = work / "dienstkonto.json"
+    settings.write_text(json.dumps({"threshold": 45}), encoding="utf-8")
+    assert cli.main([str(work / "brief.txt"), "--schnell", "--einstellungen", str(settings)]) == cli.OK
+    out = capsys.readouterr()
+    assert "ungültiger Wert für threshold (dienstkonto.json)" in out.err
+    assert "0 Funde" not in out.out and "Person" in out.out
+    assert "Jonas Weber" not in (work / "brief_anonymisiert.txt").read_text(encoding="utf-8")
+
+    # unbekannter Modus: es gilt die Voreinstellung „Gründlich“ – fehlt das Modell, fällt das wie sonst auf
+    settings.write_text(json.dumps({"analysis_mode": "gründlich"}), encoding="utf-8")
+    monkeypatch.setattr(paths, "find_ner_model", lambda name="": None)
+    args = [str(work / "brief.txt"), "--ueberschreiben", "--einstellungen", str(settings)]
+    assert cli.main(args) == cli.FAST_FALLBACK
+    err = capsys.readouterr().err
+    assert "ungültiger Wert für analysis_mode (dienstkonto.json)" in err and "Rückgabewert 4" in err
+
+
+@needs_model
 def test_missing_thorough_model_is_not_silent(work, capsys, monkeypatch):
     """„Gründlich“ eingestellt, Modell fehlt: Bearbeitung mit „Schnell“, aber eigener Rückgabewert."""
     from pii_redact import paths
