@@ -197,5 +197,18 @@ def test_page_search_counts_per_page_and_never_across_pages():
         pattern = word_pattern(term)
         expected = [pno for pno, text in enumerate(search.pages) for _ in pattern.finditer(text)]
         assert search.hits(term) == expected, term
+    # Ligaturen im Ergebnis („ﬀ“ als ein Zeichen) zählen wie die ausgeschriebenen Buchstaben des Fundtextes
+    assert _PageSearch(["Herr Ho\ufb00mann", "Pr\ufb01x, Scha\ufb04er"]).hits("Hoffmann") == [0]
     # ein Fundtext mit dem Trennzeichen der Seiten (kommt praktisch nicht vor) wird Seite für Seite gesucht
     assert _PageSearch(["a\x00bc d", "A\x00BC"]).hits("a\x00bc") == [0, 1]
+
+
+def test_control_after_export_reports_text_written_with_a_ligature():
+    """Beim Laden löst MuPDF Ligaturen auf – der Fund lautet „Hoffmann“. Steht der Name im Ergebnis noch einmal
+    mit „ﬀ“ als einem Zeichen (PDFs aus LaTeX), muss die Kontrolle ihn trotzdem melden."""
+    from pii_redact.core.redactor import _other_occurrences
+
+    name = Finding(5, 13, "PERSON", "Hoffmann")
+    assert _other_occurrences([name], ["Herr [PERSON] wohnt hier.\nAkte Hoﬀmann liegt bei."], [], set()) == [
+        "Hoffmann – an anderer Stelle noch lesbar (Seite 1)"]
+    assert _other_occurrences([name], ["Herr [PERSON] wohnt hier."], [], set()) == []

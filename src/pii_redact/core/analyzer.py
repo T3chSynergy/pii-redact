@@ -312,6 +312,8 @@ def _number_break_ranges(text: str) -> list[tuple[int, int, list[int]]]:
         else:
             out.append((a, b, [nl]))
     return out
+
+
 def _chunks(text: str, size: int) -> Iterable[tuple[int, int]]:
     """Zerlegt Text an Absatz-/Zeilengrenzen in Blöcke von höchstens ``size`` Zeichen."""
     n = len(text)

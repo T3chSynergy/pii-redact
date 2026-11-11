@@ -53,8 +53,8 @@ pii_redact = ["resources/*"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
-# Stilprüfung (in der CI: `ruff check src tests tools samples`). Bewusst nur Regeln, die sich ohne Umbau einhalten
-# lassen; Komplexitätsregeln (C90, PLR) und Typprüfung gehören zu einem eigenen Refactoring.
+# Stilprüfung (in der CI: `ruff check src tests tools samples`). Nicht eingeschaltet: Regeln zu Parameterzahl und
+# Funktionslänge (PLR). Die Typprüfung steht weiter unten ([tool.mypy]).
 [tool.ruff]
 line-length = 120
 target-version = "py312"

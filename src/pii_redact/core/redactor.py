@@ -647,6 +647,12 @@ def _other_occurrences(findings: list[Finding], page_texts: list[str], other: li
     return out
 
 
+#: Ligaturen, die im Ergebnis als ein Zeichen stehen können („Hoﬀmann“, typisch für PDFs aus LaTeX). Beim Laden
+#: löst MuPDF sie in Buchstaben auf – die Fundtexte lauten also „Hoffmann“; für die Suche im Ergebnis ebenso.
+_LIGATURES = str.maketrans({"\ufb00": "ff", "\ufb01": "fi", "\ufb02": "fl", "\ufb03": "ffi", "\ufb04": "ffl",
+                            "\ufb05": "st", "\ufb06": "st"})
+
+
 class _PageSearch:
     """Sucht Fundtexte in den Seitentexten des Ergebnisses – jeden Fundtext nur einmal und über ein
     Wortverzeichnis (``WordIndex``) statt je Fund einmal durch alle Seiten."""
@@ -656,7 +662,7 @@ class _PageSearch:
     SEPARATOR = "\x00"
 
     def __init__(self, page_texts: list[str]) -> None:
-        self.pages = [join_hyphenated(t) for t in page_texts]
+        self.pages = [join_hyphenated(t.translate(_LIGATURES)) for t in page_texts]
         self.starts: list[int] = []
         pos = 0
         for text in self.pages:

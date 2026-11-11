@@ -462,6 +462,7 @@ def _check(args) -> int:
                       file=sys.stderr)
                 return 2
             if args.behalten:
+                args.behalten.mkdir(parents=True, exist_ok=True)   # fehlte der Ordner, ging der ganze Lauf verloren
                 for f in ("alt.json", "neu.json"):
                     shutil.copy(tmp / f, args.behalten / f"ergebnis_{f}")
             return report(old, new)
