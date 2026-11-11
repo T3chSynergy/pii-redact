@@ -80,46 +80,62 @@ class FindingsModel(QAbstractTableModel):
             return None
         f = self._rows[index.row()]
         col = index.column()
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
+            return self._cell_text(f, col, tooltip=role == Qt.ItemDataRole.ToolTipRole)
+        if role == Qt.ItemDataRole.AccessibleTextRole:
+            # Bildschirmleser lesen nur die aktuelle Zelle vor – der Status gehört deshalb in jede Zelle
+            if col == COL_ON:
+                return status_text(f.active)
+            return f"{self.data(index)}, {status_text(f.active)}"
+        if role == Qt.ItemDataRole.ForegroundRole:
+            return self._text_color(f, col)
+        if role == Qt.ItemDataRole.UserRole:  # Sortierschlüssel
+            return {COL_ON: int(f.active), COL_TYPE: info(f.entity_type).label, COL_TEXT: f.text.casefold(),
+                    COL_WHERE: f.start, COL_SCORE: f.score, COL_SOURCE: f.source}[col]
+        return self._cell_value(f, col, role)
+
+    def _cell_text(self, f, col: int, tooltip: bool):
+        """Angezeigter Text einer Zelle bzw. ihr Hinweistext (``tooltip``); None für die Spalte mit dem Häkchen."""
+        if col == COL_TYPE:
+            return info(f.entity_type).label
+        if col == COL_TEXT:
+            if f.is_area:
+                return area_description(f)
+            return f.text.replace("\n", " ⏎ ")
+        if col == COL_WHERE:
+            if tooltip and self.session.doc.is_ocr(f.start, f.end):
+                return ("Per Texterkennung (OCR) gelesen – der Text kann falsch gelesen sein. "
+                        "Bitte mit der Seitenansicht vergleichen.")
+            return self._where(f)
+        if col == COL_SCORE:
+            return f"{f.score:.2f}"
+        if col == COL_SOURCE:
+            if tooltip:
+                return f.recognizer
+            return {"manuell": "manuell", "ki": "KI", "kontrolle": "Kontrolle"}.get(f.source, "auto")
+        return None
+
+    def _text_color(self, f, col: int):
+        """Grau für abgewählte Funde, Orange für die Fundstelle auf per Texterkennung gelesenen Seiten."""
+        if not f.active:
+            return QBrush(QColor(134, 142, 150))
+        if col == COL_WHERE and self.session.doc.is_ocr(f.start, f.end):
+            return QBrush(QColor(232, 89, 12))
+        return None
+
+    @staticmethod
+    def _cell_value(f, col: int, role):
+        """Werte ohne Anzeigetext: Kennung, Bereich ja/nein, Häkchen, Datenart zum Bearbeiten, Farbmarke."""
         if role == ID_ROLE:
             return f.id
         if role == AREA_ROLE:
             return f.is_area
         if role == Qt.ItemDataRole.CheckStateRole and col == COL_ON:
             return Qt.CheckState.Checked if f.active else Qt.CheckState.Unchecked
-        if role == Qt.ItemDataRole.AccessibleTextRole:
-            # Bildschirmleser lesen nur die aktuelle Zelle vor – der Status gehört deshalb in jede Zelle
-            if col == COL_ON:
-                return status_text(f.active)
-            return f"{self.data(index)}, {status_text(f.active)}"
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
-            if col == COL_TYPE:
-                return info(f.entity_type).label
-            if col == COL_TEXT:
-                if f.is_area:
-                    return area_description(f)
-                return f.text.replace("\n", " ⏎ ")
-            if col == COL_WHERE:
-                if role == Qt.ItemDataRole.ToolTipRole and self.session.doc.is_ocr(f.start, f.end):
-                    return ("Per Texterkennung (OCR) gelesen – der Text kann falsch gelesen sein. "
-                            "Bitte mit der Seitenansicht vergleichen.")
-                return self._where(f)
-            if col == COL_SCORE:
-                return f"{f.score:.2f}"
-            if col == COL_SOURCE:
-                if role == Qt.ItemDataRole.ToolTipRole:
-                    return f.recognizer
-                return {"manuell": "manuell", "ki": "KI", "kontrolle": "Kontrolle"}.get(f.source, "auto")
         if role == Qt.ItemDataRole.EditRole and col == COL_TYPE:
             return f.entity_type
-        if role == Qt.ItemDataRole.ForegroundRole and not f.active:
-            return QBrush(QColor(134, 142, 150))
-        if role == Qt.ItemDataRole.ForegroundRole and col == COL_WHERE and self.session.doc.is_ocr(f.start, f.end):
-            return QBrush(QColor(232, 89, 12))
         if role == Qt.ItemDataRole.DecorationRole and col == COL_TYPE:
             return QColor(info(f.entity_type).color)
-        if role == Qt.ItemDataRole.UserRole:  # Sortierschlüssel
-            return {COL_ON: int(f.active), COL_TYPE: info(f.entity_type).label, COL_TEXT: f.text.casefold(),
-                    COL_WHERE: f.start, COL_SCORE: f.score, COL_SOURCE: f.source}[col]
         return None
 
     def flags(self, index):

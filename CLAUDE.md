@@ -257,8 +257,9 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   (erledigt: `_open_cleaned`, `_ocr_plan`, `_read_pages`, Hinweise je Gruppe in eigener Funktion) · 3 Kontrolle (erledigt: `_texts_for_check`, `_structure_problems`; `further_occurrences` über `_FreeSpots`,
   `_whole_texts`, `_surnames`) · 4 `pdf_hidden`
   (erledigt: `_drawing_outside`, `_text_outside`; `_strip` mit `_marked_content`, `_xobject`, `_drop_path`,
-  `_without_text` – zusätzlich alt gegen neu bytegleich auf 17 264 echten und 40 000 erzeugten Inhaltsströmen) · 5 Oberfläche Logik (`findings_panel.data`, `export_pdf`,
-  `export_unreviewed`, `_refresh_views`; Klicktest des Nutzers) · 6 Oberfläche Aufbau (`_build_ui`,
+  `_without_text` – zusätzlich alt gegen neu bytegleich auf 17 264 echten und 40 000 erzeugten Inhaltsströmen) · 5 Oberfläche Logik (erledigt: `FindingsModel.data` mit `_cell_text`, `_text_color`, `_cell_value` – alt gegen
+  neu gleich in 17 136 Zellenwerten; `_refresh_views` mit `_refresh_text_preview`, `_refresh_page_overlays`;
+  `export_unreviewed` mit `_export_unreviewed_file`; `export_pdf` bleibt, Folge von Abbruchbedingungen) · 6 Oberfläche Aufbau (`_build_ui`,
   `_build_actions`, Einstellungsdialog) · 7 ruff C901 mit Grenze 12 einschalten. Bewusst ausgenommen: der Zerleger
   für PDF-Inhaltsströme (`_instructions`, `_compound_end`) – begründete Ausnahme statt Umbau; Regel zur Parameterzahl.
 - **Ergebnisvergleich** `tools/ergebnis_vergleich.py` (seit 10.11.2026): `pruefen --basis <Git-Stand>` checkt die

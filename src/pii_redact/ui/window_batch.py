@@ -341,20 +341,16 @@ class BatchMixin:
             dlg.setValue(i)
             QApplication.processEvents()
             try:
-                if e.rel == self.batch_rel and self.session is not None:
-                    held += not self._export_auto(e.rel, self.session.findings, self.session.doc)
-                else:
-                    doc = self._load(self.batch.abs(e.rel))
-                    findings = self.batch.restore_findings(e.rel, doc)
-                    if findings is None:  # Text passt nicht mehr → neu analysieren, dann exportieren
-                        self.runner.enqueue_file(self.batch.abs(e.rel), e.rel, self.settings, self.batch_id)
-                        waiting.append(e)
-                        requeued += 1
-                        continue
-                    held += not self._export_auto(e.rel, findings, doc)
+                outcome = self._export_unreviewed_file(e)
             except Exception as exc:  # noqa: BLE001
                 failed += 1
                 self.batch.set_error(e.rel, f"Export fehlgeschlagen: {exc}")
+                continue
+            if outcome is None:
+                waiting.append(e)
+                requeued += 1
+            else:
+                held += not outcome
         dlg.setValue(len(ready))
         if waiting and not dlg.wasCanceled():
             self._auto_export = True
@@ -367,6 +363,18 @@ class BatchMixin:
             + (f", {len(ocr_skipped)} mit Texterkennung bleiben zur Prüfung stehen" if ocr_skipped else "")
             + (f", {held} hält die Kontrolle zur Prüfung zurück (geschwärzter Text steht noch an anderer Stelle)"
                if held else "") + ".")
+
+    def _export_unreviewed_file(self, e) -> bool | None:
+        """Eine ungeprüfte Datei automatisch exportieren. True = exportiert, False = von der Kontrolle
+        zurückgehalten, None = der Text passt nicht mehr zum Arbeitsstand: neu analysieren, danach exportieren."""
+        if e.rel == self.batch_rel and self.session is not None:
+            return self._export_auto(e.rel, self.session.findings, self.session.doc)
+        doc = self._load(self.batch.abs(e.rel))
+        findings = self.batch.restore_findings(e.rel, doc)
+        if findings is None:
+            self.runner.enqueue_file(self.batch.abs(e.rel), e.rel, self.settings, self.batch_id)
+            return None
+        return self._export_auto(e.rel, findings, doc)
 
     def _requeue_batch(self) -> None:
         """Nach Änderung von Modus/Einstellungen: noch nicht analysierte Dateien mit neuen Einstellungen."""
