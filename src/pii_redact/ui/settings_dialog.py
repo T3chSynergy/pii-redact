@@ -49,7 +49,35 @@ class SettingsDialog(QDialog):
         self._orig = settings
         s = copy.deepcopy(settings)
 
-        # ---- Erkennung
+        # Die Reihenfolge der Schritte bestimmt die Tab-Reihenfolge im Dialog – beim Umstellen beachten.
+        general = self._build_general(s)
+        ent_box = self._build_entities(s)
+        lists = self._build_lists(s)
+        middle = QHBoxLayout()
+        middle.addWidget(ent_box, 1)
+        middle.addWidget(lists, 2)
+
+        buttons = german_buttons(
+            QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        ki_page = self._build_ki(s)
+        self._apply_locks(s)
+
+        main_page = QWidget()
+        ml = QVBoxLayout(main_page)
+        ml.addWidget(general)
+        ml.addLayout(middle, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(main_page, "Allgemein")
+        self.tabs.addTab(ki_page, "KI-Nachprüfung")
+        lay = QVBoxLayout(self)
+        lay.addWidget(self.tabs, 1)
+        lay.addWidget(buttons)
+
+    def _build_general(self, s: Settings) -> QGroupBox:
+        """Gruppe „Allgemein“: Erkennung, Modelle, Ersetzung und Schalter."""
         self.threshold = QDoubleSpinBox(minimum=0.05, maximum=1.0, singleStep=0.05, decimals=2, value=s.threshold)
         self.threshold.setToolTip(
             "Funde mit geringerer Sicherheit werden ignoriert. Niedriger = mehr Funde, mehr Fehlalarme.")
@@ -66,6 +94,24 @@ class SettingsDialog(QDialog):
         for key, label in AnalysisMode.LABELS.items():
             self.analysis.addItem(label, key)
         self.analysis.setCurrentIndex(max(0, self.analysis.findData(s.analysis_mode)))
+        self._build_ner_model(s)
+        self._build_switches(s)
+
+        form = QFormLayout()
+        form.addRow("Mindest-Score:", self.threshold)
+        form.addRow("spaCy-Modell:", self.model)
+        form.addRow("Analyse-Modus:", self.analysis)
+        form.addRow("Transformer-Modell:", self.ner_model)
+        form.addRow("Ersetzung:", self.mode)
+        form.addRow("", self.pdf_labels)
+        form.addRow("", self.ocr)
+        form.addRow("", self.compact)
+        general = QGroupBox("Allgemein")
+        general.setLayout(form)
+        return general
+
+    def _build_ner_model(self, s: Settings) -> None:
+        """Auswahl des Transformer-Modells; ohne installiertes Modell ist „Gründlich“ nicht wählbar."""
         self.ner_model = QComboBox()
         models = list_ner_models()
         for m in models:
@@ -79,6 +125,8 @@ class SettingsDialog(QDialog):
             self.ner_model.setEnabled(False)
             self.analysis.model().item(1).setEnabled(False)
         self.ner_model.setCurrentIndex(max(0, self.ner_model.findData(s.ner_model)))
+
+    def _build_switches(self, s: Settings) -> None:
         self.pdf_labels = QCheckBox("Platzhalter im PDF-Schwärzungsbalken anzeigen", checked=s.pdf_labels)
         self.ocr = QCheckBox("Gescannte PDF-Seiten per Texterkennung (OCR) lesen", checked=s.ocr)
         self.ocr.setToolTip(
@@ -93,19 +141,8 @@ class SettingsDialog(QDialog):
             "Die Rückfrage vor dem Export von Seiten aus der Texterkennung bleibt immer."
         )
 
-        form = QFormLayout()
-        form.addRow("Mindest-Score:", self.threshold)
-        form.addRow("spaCy-Modell:", self.model)
-        form.addRow("Analyse-Modus:", self.analysis)
-        form.addRow("Transformer-Modell:", self.ner_model)
-        form.addRow("Ersetzung:", self.mode)
-        form.addRow("", self.pdf_labels)
-        form.addRow("", self.ocr)
-        form.addRow("", self.compact)
-        general = QGroupBox("Allgemein")
-        general.setLayout(form)
-
-        # ---- Entitäten
+    def _build_entities(self, s: Settings) -> QGroupBox:
+        """Gruppe „Gesuchte Datenarten“ mit Häkchen je Datenart."""
         self.entities = QListWidget()
         for key in all_keys():
             if key == "CUSTOM" or not info(key).searchable:
@@ -117,8 +154,10 @@ class SettingsDialog(QDialog):
             self.entities.addItem(item)
         ent_box = QGroupBox("Gesuchte Datenarten")
         QVBoxLayout(ent_box).addWidget(self.entities)
+        return ent_box
 
-        # ---- Listen
+    def _build_lists(self, s: Settings) -> QWidget:
+        """Ausnahmen und Sperrliste; darüber der Hinweis auf zentrale Vorgaben, falls es welche gibt."""
         self.allow = QPlainTextEdit("\n".join(s.allow_list))
         self.allow.setPlaceholderText("z. B. Firmenname, eigene Ortsangaben …")
         self.deny = QPlainTextEdit("\n".join(s.deny_list))
@@ -136,19 +175,10 @@ class SettingsDialog(QDialog):
         ll.addWidget(self.allow)
         ll.addWidget(QLabel("<b>Sperrliste</b> – immer schwärzen (ein Begriff pro Zeile):"))
         ll.addWidget(self.deny)
+        return lists
 
-        middle = QHBoxLayout()
-        middle.addWidget(ent_box, 1)
-        middle.addWidget(lists, 2)
-
-        buttons = german_buttons(
-            QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel))
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        ki_page = self._build_ki(s)
-
-        # Von der IT gesperrte Einstellungen (defaults.json → "locked")
+    def _apply_locks(self, s: Settings) -> None:
+        """Von der IT gesperrte Einstellungen (defaults.json → "locked") ausgrauen."""
         widgets = {"threshold": self.threshold, "spacy_model": self.model, "replace_mode": self.mode,
                    "analysis_mode": self.analysis, "ner_model": self.ner_model, "pdf_labels": self.pdf_labels,
                    "ocr": self.ocr, "compact_notices": self.compact, "entities": self.entities,
@@ -159,17 +189,6 @@ class SettingsDialog(QDialog):
             if w is not None:
                 w.setEnabled(False)
                 w.setToolTip("Von der IT festgelegt")
-
-        main_page = QWidget()
-        ml = QVBoxLayout(main_page)
-        ml.addWidget(general)
-        ml.addLayout(middle, 1)
-        self.tabs = QTabWidget()
-        self.tabs.addTab(main_page, "Allgemein")
-        self.tabs.addTab(ki_page, "KI-Nachprüfung")
-        lay = QVBoxLayout(self)
-        lay.addWidget(self.tabs, 1)
-        lay.addWidget(buttons)
 
     def _build_ki(self, s: Settings) -> QWidget:
         page = QWidget()

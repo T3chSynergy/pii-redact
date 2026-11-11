@@ -122,7 +122,27 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
 
     # ================================================================== Aufbau
     def _build_ui(self) -> None:
-        # Startseite
+        """Fensterinhalt anlegen. Die Reihenfolge der Schritte bestimmt die Tab-Reihenfolge und die Anordnung
+        der Bereiche – beim Umstellen beachten."""
+        welcome = self._build_welcome()
+        doc_view = self._build_document_view()
+        self.stack = QStackedWidget()
+        self.stack.addWidget(welcome)
+        self.stack.addWidget(doc_view)
+        self.setCentralWidget(self.stack)
+        self._build_findings_dock()
+        self._build_ki_dock()
+        self._build_batch_dock()
+        self._build_status_bar()
+        self._build_zoom_controls()
+        self._connect_selection()
+        self._connect_tooltips()
+        self._connect_sync()
+        self._refresh_timer = QTimer(self, singleShot=True, interval=0)
+        self._refresh_timer.timeout.connect(self._refresh_views)
+
+    def _build_welcome(self) -> QWidget:
+        """Startseite: Hinweistext und drei Schaltflächen."""
         welcome = QWidget()
         wl = QVBoxLayout(welcome)
         wl.addStretch(1)
@@ -143,8 +163,10 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         wl.addWidget(btn2, 0, Qt.AlignmentFlag.AlignHCenter)
         wl.addWidget(btn3, 0, Qt.AlignmentFlag.AlignHCenter)
         wl.addStretch(2)
+        return welcome
 
-        # Dokumentansicht
+    def _build_document_view(self) -> QWidget:
+        """Dokumentansicht: Original und bearbeitete Fassung nebeneinander, darüber Prüfleiste und Hinweiszeile."""
         self.left = DocPanel("Original", "original")
         self.right = DocPanel("Bearbeitet (Vorschau)", "redacted")
         self.edit_btn = QPushButton("Frei bearbeiten")
@@ -177,13 +199,10 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         dl.addWidget(self.review_bar)
         dl.addWidget(self.notice_bar)
         dl.addWidget(splitter, 1)
+        return doc_view
 
-        self.stack = QStackedWidget()
-        self.stack.addWidget(welcome)
-        self.stack.addWidget(doc_view)
-        self.setCentralWidget(self.stack)
-
-        # Fundliste
+    def _build_findings_dock(self) -> None:
+        """Fundliste rechts."""
         self.findings = FindingsPanel()
         dock = QDockWidget("Funde", self)
         dock.setObjectName("findings")
@@ -194,7 +213,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.resizeDocks([dock], [520], Qt.Orientation.Horizontal)
         self.findings_dock = dock
 
-        # KI-Nachprüfung (optional) – als Reiter neben den Funden
+    def _build_ki_dock(self) -> None:
+        """KI-Nachprüfung (optional) – als Reiter neben den Funden."""
+        dock = self.findings_dock
         self.ki_panel = KiReviewPanel()
         self.ki_dock = QDockWidget("KI-Bewertung", self)
         self.ki_dock.setObjectName("ki")
@@ -208,7 +229,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.ki_panel.activateAll.connect(lambda: self._ki_set_all(True))
         self.ki_panel.discardAll.connect(self._ki_discard)
 
-        # Arbeitsliste (Ordner-Bearbeitung)
+    def _build_batch_dock(self) -> None:
+        """Arbeitsliste der Ordner-Bearbeitung links (anfangs ausgeblendet)."""
         self.batch_panel = BatchPanel()
         self.batch_dock = QDockWidget("Arbeitsliste", self)
         self.batch_dock.setObjectName("batch")
@@ -226,7 +248,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self._batch_save_timer = QTimer(self, singleShot=True, interval=800)
         self._batch_save_timer.timeout.connect(self._save_batch)
 
-        # Statusleiste
+    def _build_status_bar(self) -> None:
+        """Statusleiste: Meldung, Zähler der Hinweise, Fortschritt, Analyse-Modus."""
         self.status_label = QLabel("Bereit")
         self.status_label.setAccessibleName("Status")
         self.status_label.linkActivated.connect(self._on_status_link)
@@ -242,7 +265,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.statusBar().addPermanentWidget(self.notice_btn)
         self.statusBar().addPermanentWidget(self.progress)
         self.statusBar().addPermanentWidget(self.mode_label)
-        # Zoom der Seitenansicht (unten rechts, wie in Office-Programmen)
+
+    def _build_zoom_controls(self) -> None:
+        """Zoom der Seitenansicht (unten rechts, wie in Office-Programmen)."""
         self.zoom_out_btn = QToolButton(text="−", autoRaise=True, toolTip="Verkleinern (Strg+Minus)")
         self.zoom_in_btn = QToolButton(text="+", autoRaise=True, toolTip="Vergrößern (Strg+Plus)")
         self.zoom_box = QComboBox()
@@ -266,7 +291,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self._zoom_timer.timeout.connect(self._apply_zoom)
         self._update_zoom_box()
 
-        # Signale
+    def _connect_selection(self) -> None:
+        """Auswählen und Bearbeiten: Fundliste, Textansichten und Seitenansichten melden an das Fenster."""
         self.findings.findingActivated.connect(lambda fid: self.select([fid], reveal=True, from_table=True))
         self.findings.contextRequested.connect(lambda ids, pos: self._finding_menu(ids, pos))
         self.left.text.clickedAt.connect(self._on_left_text_click)
@@ -285,12 +311,17 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
             panel.pages.viewResized.connect(self._on_view_resized)
         self.left.pages.areaSelected.connect(self._on_area_selected)
         self.right.pages.areaSelected.connect(self._on_area_selected)
-        # Tooltips: was steckt hinter einer Markierung bzw. einem Platzhalter?
+
+    def _connect_tooltips(self) -> None:
+        """Tooltips: was steckt hinter einer Markierung bzw. einem Platzhalter?"""
         self.left.text.tooltip_provider = lambda off: self._ids_tooltip(
             [f.id for f in self.session.findings_at(off)] if self.session else [])
         self.right.text.tooltip_provider = self._redacted_tooltip
         self.left.pages.tooltip_provider = self._ids_tooltip
         self.right.pages.tooltip_provider = self._ids_tooltip
+
+    def _connect_sync(self) -> None:
+        """Beide Seiten des Vergleichs zeigen dieselbe Ansicht und dieselbe Stelle."""
         self.left.setVisible(self.settings.show_original)
         self.left.tabs.currentChanged.connect(lambda i: self._sync_tabs(self.right, i))
         self.right.tabs.currentChanged.connect(lambda i: self._sync_tabs(self.left, i))
@@ -298,9 +329,6 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.right.text.verticalScrollBar().valueChanged.connect(lambda _v: self._sync_text_scroll(self.right))
         self.left.pages.verticalScrollBar().valueChanged.connect(lambda v: self._sync_page_scroll(self.right, v))
         self.right.pages.verticalScrollBar().valueChanged.connect(lambda v: self._sync_page_scroll(self.left, v))
-
-        self._refresh_timer = QTimer(self, singleShot=True, interval=0)
-        self._refresh_timer.timeout.connect(self._refresh_views)
 
     def _welcome_html(self) -> str:
         if llm_review.is_configured(self.settings):
@@ -315,21 +343,28 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
                 "<p style='color:gray'>Hilfe: <b>F1</b> oder <b>Hilfe → Anwenderhilfe</b></p>")
 
     def _build_actions(self) -> None:
+        self.actions_ = {}
+        self._create_actions()
+        self._build_menus()
+        self._build_toolbar()
+
+    def _add_action(self, key, text, slot, shortcut=None, icon=None, tip=None) -> QAction:
+        """Aktion anlegen und unter ``key`` in ``self.actions_`` ablegen."""
+        action = QAction(text, self)
+        if shortcut:
+            action.setShortcut(QKeySequence(shortcut))
+        if icon is not None:
+            action.setIcon(self.style().standardIcon(icon))
+        if tip:
+            action.setToolTip(tip)
+        action.triggered.connect(slot)
+        self.actions_[key] = action
+        return action
+
+    def _create_actions(self) -> None:
         st = self.style()
-        a = self.actions_ = {}
-
-        def act(key, text, slot, shortcut=None, icon=None, tip=None):
-            action = QAction(text, self)
-            if shortcut:
-                action.setShortcut(QKeySequence(shortcut))
-            if icon is not None:
-                action.setIcon(st.standardIcon(icon))
-            if tip:
-                action.setToolTip(tip)
-            action.triggered.connect(slot)
-            a[key] = action
-            return action
-
+        a = self.actions_
+        act = self._add_action
         SP = QStyle.StandardPixmap
         act("open", "Ö&ffnen …", self.open_dialog, QKeySequence.StandardKey.Open, SP.SP_DialogOpenButton)
         act("open_folder", "&Ordner bearbeiten …", lambda: self.open_folder_dialog(), "Ctrl+Shift+O",
@@ -371,7 +406,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         a["sync"] = QAction("Scrollen ko&ppeln", self, checkable=True, checked=self.settings.sync_scroll)
         a["sync"].toggled.connect(self._set_sync)
 
-        # Menüs
+    def _build_menus(self) -> None:
+        a = self.actions_
         mb = self.menuBar()
         m = mb.addMenu("&Datei")
         m.addActions([a["open"], a["open_folder"], a["resume_folder"]])
@@ -407,7 +443,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         m.addSeparator()
         m.addAction(a["about"])
 
-        # Werkzeugleiste
+    def _build_toolbar(self) -> None:
+        a = self.actions_
         tb = QToolBar("Werkzeuge")
         tb.setObjectName("main_toolbar")
         tb.setIconSize(QSize(18, 18))
@@ -440,7 +477,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         tb.addSeparator()
         export_btn_menu = QMenu(self)
         export_btn_menu.addActions([a["export_pdf"], a["export_text"]])
-        self.export_action = QAction(st.standardIcon(SP.SP_DialogSaveButton), "E&xportieren", self)
+        self.export_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton),
+                                     "E&xportieren", self)
         self.export_action.setMenu(export_btn_menu)
         self.export_action.triggered.connect(self._export_default)
         tb.addAction(self.export_action)
