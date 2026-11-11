@@ -4,9 +4,9 @@ Lokaler Desktop-Client (Python 3.14, PySide6), der PDF/TXT/Markdown auf personen
 schwärzt – offline, nur Deutsch. Überblick und Bedienung: `README.md`, Änderungen: `CHANGELOG.md`,
 IT-Anleitung: `packaging/README.md`.
 
-**Stand:** v0.8.6 (Kontrolle vor dem Speichern schlägt auch den Nachnamen allein vor; KI-Anfrage folgt keinen
+**Stand:** v0.8.7 (drei Fehlalarme der Kontrolle nach dem PDF-Export behoben – Bruchstücke und Wortlaut von Balkenbeschriftungen, Rahmen über den Seitenrand; Refactoring abgeschlossen: zu große Funktionen zerlegt, Vergleichswerkzeug `tools/ergebnis_vergleich.py`, ruff C901 mit Grenze 12); davor v0.8.6 (Kontrolle vor dem Speichern schlägt auch den Nachnamen allein vor; KI-Anfrage folgt keinen
 Weiterleitungen; Text-Export/Einstellungen über `.tmp`, Fehlermeldung beim Text-Export; neue Funde in der Fundliste
-ausgewählt; strengere ruff-Regeln; 61 neue Oberflächentests, 89 % Abdeckung); davor v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
+ausgewählt; strengere ruff-Regeln; 61 neue Oberflächentests, 89 % Abdeckung); v0.8.5 (Kontrolle je geschwärzter Stelle und vor dem Speichern mit Vorschlägen in der Fundliste, ohne
 Rückfrage wird zurückgehalten; Namen/Orte in Großbuchstaben, geschützte Leerzeichen, Stern-Datum, Postfach;
 Kommandozeile: Rückgabewert 4, OCR-Einzeldateien nicht exportiert, defekte PDFs; deutsche Schaltflächen);
 v0.8.4 (nicht angezeigter PDF-Inhalt – außerhalb des Seitenbereichs, ausgeblendete Ebenen – wird entfernt;
@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 289 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise

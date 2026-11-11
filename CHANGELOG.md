@@ -1,6 +1,6 @@
 # Änderungen
 
-## Unveröffentlicht
+## 0.8.7 – 11.11.2026
 
 **Kontrolle nach dem PDF-Export**
 - **Kein Fehlalarm mehr, wenn ein frei gezogener Bereich einen Textfund nur teilweise überdeckt:** Mit
@@ -20,6 +20,18 @@
 - **Rahmen enden am Seitenrand:** Wurde ein Rahmen mit der Maus über den Rand der Seite hinaus gezogen, reichte der
   Bereich über das Blatt hinaus. Die Beschriftung des Balkens stand dann teils außerhalb der Seite, und die
   Kontrolle meldete „Inhalt außerhalb des sichtbaren Bereichs“ sowie Reste an der geschwärzten Stelle.
+
+In allen drei Fällen war die Schwärzung selbst in Ordnung: Im Ergebnis stand kein Text des Dokuments mehr, nur die
+Meldung der Kontrolle war falsch.
+
+**Intern**
+- Zu große Funktionen in kleinere, benannte Schritte zerlegt (Kommandozeile, Laden von PDFs, Kontrolle, Entfernen
+  nicht angezeigten PDF-Inhalts, Fundliste, Aufbau von Hauptfenster und Einstellungsdialog) – ohne geändertes
+  Verhalten. Jeder Schritt wurde gegen den Stand davor verglichen: Funde, geschwärzte PDFs, Meldungen der Kontrolle
+  und Ausgaben der Kommandozeile für alle Beispieldateien in beiden Modi, beim Aufbau der Oberfläche der gesamte
+  Fensteraufbau samt Tastenkürzeln und Tab-Reihenfolge.
+- Neues Werkzeug `tools/ergebnis_vergleich.py` für diesen Vergleich; auch für Paket-Updates gedacht.
+- ruff prüft jetzt zusätzlich die Zahl der Verzweigungen je Funktion (höchstens 12; Ausnahmen mit Begründung).
 
 ## 0.8.6 – 10.11.2026
 
