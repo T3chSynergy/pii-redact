@@ -1,5 +1,20 @@
 # Änderungen
 
+## Unveröffentlicht
+
+**Kontrolle vor dem Speichern und nach dem Export**
+- **Text aus einem ganz geschwärzten Bereich wird nicht mehr an anderer Stelle gesucht:** Bei „Ganzen Bereich
+  schwärzen“ trägt das Programm den Text im Rahmen zeichengenau als Fund ein, damit er auch im Text-Export fehlt.
+  Die Kontrolle suchte diesen Text dann wie jeden Fundtext im übrigen Dokument – und schlug Stellen mit beiläufigen
+  Wörtern vor („Die“, „mit“, „2026“, „Name“) oder meldete sie nach dem Export als „an anderer Stelle noch lesbar“;
+  ohne Rückfrage (automatischer Export, Kommandozeile) blieb die Datei deshalb stehen. Beim Schwärzen eines
+  Bereichs ist aber die Stelle gemeint, nicht der Wortlaut. Solcher Text – in der Fundliste an der Datenart des
+  Bereichs zu erkennen, etwa „Unterschrift“ – wird jetzt nicht mehr anderswo gesucht. Die Stelle selbst wird
+  weiter geprüft.
+  Wer den Wortlaut meint, wählt wie bisher „Alle Vorkommen schwärzen als“ oder ändert beim eingetragenen Text die
+  Datenart (etwa auf „Person“); dann behandelt ihn die Kontrolle wie jeden anderen Fund. Hilfe: „Bereich
+  schwärzen“ und „Kontrolle vor dem Speichern“.
+
 ## 0.8.7 – 11.11.2026
 
 **Kontrolle nach dem PDF-Export**
