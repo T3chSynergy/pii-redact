@@ -5,11 +5,17 @@ from __future__ import annotations
 import bisect
 import logging
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from typing import TYPE_CHECKING
 
 from .hyphenation import dehyphenate, join_hyphenated
 from .models import AnalysisMode, Finding, Settings
 from .recognizers_de import LANG, build_recognizers
+
+if TYPE_CHECKING:  # nur für die Typprüfung – Presidio wird erst beim Laden der Engine importiert
+    from pathlib import Path
+
+    from presidio_analyzer import AnalyzerEngine
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +39,7 @@ class ModelMissingError(RuntimeError):
 
 
 class ThoroughModelMissingError(RuntimeError):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             "Für den Modus „Gründlich“ ist kein Transformer-Modell installiert.\n\n"
             "Entwicklung: tools\\modelle_testen.bat ausführen (lädt und wandelt das Modell um).\n"
@@ -51,8 +57,8 @@ class PiiAnalyzer:
         self.model_name = model_name
         self.mode = mode
         self.ner_model = ner_model
-        self._engine = None
-        self.ner_model_dir = None
+        self._engine: AnalyzerEngine | None = None
+        self.ner_model_dir: Path | None = None
 
     def matches(self, settings: Settings) -> bool:
         return (self.model_name, self.mode, self.ner_model) == (
@@ -141,6 +147,8 @@ class PiiAnalyzer:
     def _run(self, text: str, entities: list[str], threshold: float,
              progress: ProgressFn | None = None) -> list[Finding]:
         """Presidio-Analyse in Blöcken; Positionen bezogen auf ``text``."""
+        engine = self._engine
+        assert engine is not None, "erst load() aufrufen"
         raw: list[Finding] = []
         size = CHUNK_SIZE if self.mode == AnalysisMode.FAST else CHUNK_SIZE_THOROUGH
         chunks = list(_chunks(text, size))
@@ -150,7 +158,7 @@ class PiiAnalyzer:
             chunk = text[c_start:c_end]
             if not chunk.strip() or not entities:
                 continue
-            results = self._engine.analyze(text=chunk, language=LANG, entities=entities, score_threshold=threshold)
+            results = engine.analyze(text=chunk, language=LANG, entities=entities, score_threshold=threshold)
             for r in results:
                 s, e = r.start + c_start, r.end + c_start
                 rec = (r.recognition_metadata or {}).get("recognizer_name", "")
@@ -530,7 +538,8 @@ class _FreeSpots:
                 self.marked[f.start:f.end] = b"\x01" * (f.end - f.start)
         self.joined, self.hmap = dehyphenate(plain_spaces(text))
 
-    def find(self, pattern: re.Pattern, entity_type: str, why: str, accept=None) -> list[Finding]:
+    def find(self, pattern: re.Pattern, entity_type: str, why: str,
+             accept: Callable[[str, int, int], bool] | None = None) -> list[Finding]:
         """Vorschläge für alle freien Fundstellen des Musters; ``accept(text, start, end)`` kann Stellen
         ausschließen."""
         out = []
@@ -546,7 +555,7 @@ class _FreeSpots:
         return out
 
 
-def _whole_texts(active: list[Finding], seen: set[str]):
+def _whole_texts(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, re.Pattern]]:
     """Je unterschiedlichem Fundtext einmal: Fund und Suchmuster für den ganzen Wortlaut."""
     for f in active:
         key = re.sub(r"\s+", "", join_hyphenated(plain_spaces(f.text))).casefold()
@@ -558,7 +567,7 @@ def _whole_texts(active: list[Finding], seen: set[str]):
             yield f, pattern
 
 
-def _surnames(active: list[Finding], seen: set[str]):
+def _surnames(active: list[Finding], seen: set[str]) -> Iterator[tuple[Finding, re.Pattern]]:
     """Je Nachname eines mehrteiligen Personennamens einmal: Fund und Suchmuster – sofern der Nachname nicht
     schon als ganzer Fundtext gesucht wurde."""
     for f in active:

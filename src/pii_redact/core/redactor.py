@@ -7,6 +7,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pymupdf as fitz  # PyMuPDF
 
@@ -16,6 +17,9 @@ from .hyphenation import join_hyphenated
 from .loaders import LoadedDocument, strip_pdf_extras
 from .models import Finding, ReplaceMode, Settings
 from .pdf_hidden import has_layers, has_outside_content
+
+if TYPE_CHECKING:  # nur für die Typprüfung – die Texterkennung wird erst bei Bedarf importiert
+    from .ocr import OcrWord
 
 BLACK_CHAR = "█"
 
@@ -36,7 +40,7 @@ class RedactedText:
     text: str
     segments: list[Segment] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self._orig_starts = [s.orig_start for s in self.segments]
         self._red_starts = [s.red_start for s in self.segments]
 
@@ -186,8 +190,9 @@ def _compute_rects(doc: LoadedDocument, start: int, end: int) -> list[tuple[int,
     groups: dict[tuple[int, int], fitz.Rect] = {}
     chars: dict[tuple[int, int], list[fitz.Rect]] = {}
     ocr_groups: set[tuple[int, int]] = set()
-    for i in range(max(start, 0), min(end, len(doc.char_boxes))):
-        box = doc.char_boxes[i]
+    boxes = doc.char_boxes or []
+    for i in range(max(start, 0), min(end, len(boxes))):
+        box = boxes[i]
         if box is None:
             continue
         r = fitz.Rect(box.rect)
@@ -255,7 +260,7 @@ def _add_bars(pdf: fitz.Document, plan: list) -> dict[int, list[fitz.Rect]]:
     """Schwärzungsbalken (mit Beschriftung) als Schwärzungs-Annotationen anlegen. Rückgabe: Rechtecke je Seite."""
     pages: dict[int, list[fitz.Rect]] = {}
     for page_no, rect, label, _ids in plan:
-        kwargs = {"fill": (0, 0, 0)}
+        kwargs: dict[str, Any] = {"fill": (0, 0, 0)}
         if label:
             fs = label_fontsize(rect, label)
             if fs:
@@ -267,6 +272,7 @@ def _add_bars(pdf: fitz.Document, plan: list) -> dict[int, list[fitz.Rect]]:
 
 
 def area_rect(f: Finding) -> tuple[int, fitz.Rect]:
+    assert f.area is not None, "nur für frei gezogene Bereiche"
     page, x0, y0, x1, y1 = f.area
     return int(page), fitz.Rect(x0, y0, x1, y1)
 
@@ -486,7 +492,7 @@ def _text_without_labels(page: fitz.Page, entries: list) -> str:
     return "".join(out)
 
 
-def _ocr_text_without_labels(word, entries: list) -> str:
+def _ocr_text_without_labels(word: OcrWord, entries: list) -> str:
     """Text eines erneut gelesenen Wortes ohne die Beschriftung eines Balkens, den es berührt – die
     Texterkennung liest auch die Beschriftungen, mitunter zusammen mit dem Wort daneben („geb.[DATUM]“)."""
     text = word.text

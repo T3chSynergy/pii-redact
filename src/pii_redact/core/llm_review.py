@@ -23,7 +23,10 @@ import secrets
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from http.client import HTTPMessage
+from typing import IO
 from urllib.parse import urlparse
 
 from .loaders import LoadedDocument
@@ -155,7 +158,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Weiterleitungen nicht folgen: urllib schickte sonst bei 301/302/303 den API-Schlüssel an die neue
     Adresse (auch an einen anderen Server) und machte aus der Anfrage ein GET ohne Inhalt."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(self, req: urllib.request.Request, fp: IO[bytes], code: int, msg: str,
+                         headers: HTTPMessage, newurl: str) -> None:
         return None
 
 
@@ -263,7 +267,8 @@ def chunks(doc: LoadedDocument, red: RedactedText, max_chars: int) -> list[tuple
     else:
         pages = [(0, n, 0)]
     out: list[tuple[int, int, str]] = []
-    cur_s, cur_e, first, last = None, None, 0, 0
+    cur_s: int | None = None      # Anfang des Stücks, das gerade gefüllt wird
+    cur_e, first, last = 0, 0, 0  # sein Ende und die Seiten – gelten nur, solange cur_s gesetzt ist
     for s, e, p in pages:
         if cur_s is not None and e - cur_s > max_chars:
             out.append((cur_s, cur_e, _label(first, last, len(pages))))
@@ -288,7 +293,8 @@ def _label(first: int, last: int, total: int) -> str:
     return f"Seite {first} von {total}" if first == last else f"Seiten {first}–{last} von {total}"
 
 
-def review(doc: LoadedDocument, findings: list[Finding], settings: Settings, progress=None) -> ReviewResult:
+def review(doc: LoadedDocument, findings: list[Finding], settings: Settings,
+           progress: Callable[[int, int], None] | None = None) -> ReviewResult:
     """Geschwärztes Ergebnis bewerten lassen (läuft im Hintergrund-Thread)."""
     if not is_configured(settings):
         raise LlmError("Die KI-Nachprüfung ist nicht eingerichtet (Einstellungen → KI-Nachprüfung).")
@@ -322,7 +328,7 @@ def review(doc: LoadedDocument, findings: list[Finding], settings: Settings, pro
     if progress:
         progress(len(parts), len(parts))
     known = [r for r in risks if r in RISK_ORDER]
-    overall = max(known, key=RISK_ORDER.get) if known else "unklar"
+    overall = max(known, key=RISK_ORDER.__getitem__) if known else "unklar"
     return ReviewResult(overall, "\n".join(summaries), _dedupe(hints), settings.llm_model.strip(),
                         host_of(settings), len(parts), time.time() - t0)
 

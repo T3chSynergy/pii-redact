@@ -78,7 +78,7 @@ def aggregate(
     spans: list[NerSpan] = []
     cur: list | None = None  # [start, end, typ, [scores]]
 
-    def close():
+    def close() -> None:
         nonlocal cur
         if cur is not None:
             spans.append(NerSpan(cur[0], cur[1], LABEL_MAP[cur[2]], float(np.mean(cur[3]))))

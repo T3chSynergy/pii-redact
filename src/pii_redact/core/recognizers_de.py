@@ -8,9 +8,14 @@ eigene Muster für Anschriften, Geburtsdaten und Namen nach Anrede.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 from presidio_analyzer import EntityRecognizer, Pattern, PatternRecognizer
 from presidio_analyzer import predefined_recognizers as pr
+
+if TYPE_CHECKING:  # nur für die Typprüfung
+    from presidio_analyzer import RecognizerResult
+    from presidio_analyzer.nlp_engine import NlpArtifacts
 
 LANG = "de"
 _FLAGS = re.MULTILINE  # bewusst OHNE IGNORECASE: Groß-/Kleinschreibung trägt Information
@@ -57,7 +62,7 @@ class DeAddressRecognizer(PatternRecognizer):
     ]
     CONTEXT = ["anschrift", "adresse", "wohnhaft", "wohnort", "straße", "strasse", "postanschrift", "wohnt"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             supported_entity="DE_ADDRESS",
             patterns=self.PATTERNS,
@@ -99,7 +104,7 @@ class DeDateRecognizer(PatternRecognizer):
     ]
     CONTEXT = ["geboren", "geb", "geburtsdatum", "geburtstag", "geburtsort", "jahrgang", "verstorben", "gestorben"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             supported_entity="DATE_TIME",
             patterns=self.PATTERNS,
@@ -125,7 +130,7 @@ class DeTitledPersonRecognizer(PatternRecognizer):
         ),
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             supported_entity="PERSON",
             patterns=self.PATTERNS,
@@ -141,7 +146,7 @@ class DePhoneRecognizer(pr.PhoneRecognizer):
 
     SCORE = 0.55
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             supported_language=LANG,
             supported_regions=("DE", "AT", "CH"),
@@ -151,8 +156,10 @@ class DePhoneRecognizer(pr.PhoneRecognizer):
 
     _DATE_LIKE = re.compile(r"^\d{1,2}\.\d{1,2}\.\d{2,4}$")
 
-    def analyze(self, text, entities, nlp_artifacts=None):
-        results = super().analyze(text, entities, nlp_artifacts)
+    def analyze(self, text: str, entities: list[str],
+                nlp_artifacts: NlpArtifacts | None = None) -> list[RecognizerResult]:
+        # Presidio nennt für nlp_artifacts keinen Typ mit None, obwohl None dort der Vorgabewert ist
+        results = super().analyze(text, entities, nlp_artifacts)  # type: ignore[arg-type]
         # libphonenumber hält „02.09.2026“ gelegentlich für eine Nummer
         return [r for r in results if not self._DATE_LIKE.match(text[r.start:r.end].strip())]
 
@@ -161,7 +168,7 @@ class DeSocialSecuritySpacedRecognizer(PatternRecognizer):
     """Rentenversicherungsnummer in der üblichen Schreibweise mit Leerzeichen
     („65 170839 J 00 3“) – Presidio erkennt nur die zusammengeschriebene Form."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             supported_entity="DE_SOCIAL_SECURITY",
             patterns=[Pattern("RVNR mit Leerzeichen", r"\b\d{2}[ ]\d{6}[ ]?[A-Z][ ]?\d{2}[ ]?\d\b", 0.5)],
@@ -172,7 +179,7 @@ class DeSocialSecuritySpacedRecognizer(PatternRecognizer):
         )
         self._checker = pr.DeSocialSecurityRecognizer()
 
-    def validate_result(self, pattern_text: str):
+    def validate_result(self, pattern_text: str) -> bool | None:
         return self._checker.validate_result(pattern_text.replace(" ", ""))
 
 
@@ -182,7 +189,7 @@ class OfflineEmailRecognizer(pr.EmailRecognizer):
     Public-Suffix-Liste aus dem Internet laden will. Für eine rein lokale Anwendung
     ersetzen wir das durch eine einfache Offline-Prüfung."""
 
-    def validate_result(self, pattern_text: str):
+    def validate_result(self, pattern_text: str) -> bool:
         return bool(re.search(r"@[\w.-]+\.[A-Za-z]{2,}$", pattern_text))
 
 
