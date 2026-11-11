@@ -309,6 +309,12 @@ Vorlage: `deploy\defaults.example.json`.
   Beispiel – Texterkennung erzwingen und kompakte Hinweise verbieten:
   `"ocr": true, "compact_notices": false, "locked": ["ocr", "compact_notices"]`.
   Ein Schlüssel wird nur gesperrt, wenn er in `defaults.json` auch einen Wert hat.
+* **Ungültige Werte werden übergangen:** falsche Art (Text statt Zahl) oder außerhalb des gültigen Bereichs –
+  etwa `"threshold": 45` statt `0.45`, `"analysis_mode": "gründlich"` mit Umlaut oder eine unbekannte Datenart in
+  `entities` (dann gilt die ganze Liste nicht). Für diesen Schlüssel gilt die Voreinstellung des Programms; er
+  wird auch nicht gesperrt. **Prüfen nach dem Verteilen:** `pii-redact-cli.exe --selftest` nennt jeden
+  übergangenen Schlüssel samt Datei in der Fehlerausgabe (ebenso jeder andere Aufruf der Kommandozeile); die
+  Oberfläche schreibt ihn beim Start ins Programmprotokoll (`pii-redact.log`, siehe Tabelle unten).
 
 Zusätzliche Modelle können – ohne neues Installationspaket – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
 abgelegt werden.

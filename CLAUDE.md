@@ -334,7 +334,14 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   als GET ohne Inhalt, aber **mit** `Authorization` – auch zu einem anderen Server. `llm_review._opener` folgt
   deshalb keiner Weiterleitung; Meldung nennt das Ziel. (307/308 folgte urllib bei POST ohnehin nie.)
 - Textdateien, die eine vorhandene ersetzen (Text-Export, `Settings.save`), über `models.write_text_safely`
-  (`.tmp` + Umbenennen). `Settings.load` übergeht Werte der falschen Art je Datei (`_same_kind`).
+  (`.tmp` + Umbenennen). `Settings.load` übergeht je Datei Werte der falschen Art (`_same_kind`) und – seit
+  11.11.2026 – Werte außerhalb des gültigen Bereichs (`models._ALLOWED`: Schwelle 0–1, Ersetzungsart, Analyse-Modus,
+  Datenarten nur aus `all_keys()` – bei einer unbekannten gilt die ganze Liste nicht –, Zoom, KI-Grenzwerte).
+  Anlass: `"threshold": 45` ergab „0 Funde“ und einen ungeschwärzten Export mit Rückgabewert 0,
+  `"analysis_mode": "gründlich"` lief still als „Schnell“. Übergangene Schlüssel stehen in `Settings.ignored`
+  („Schlüssel (Datei)“, wird nicht gespeichert): Die Kommandozeile meldet sie auf stderr (auch bei `--selftest`),
+  das Hauptfenster im Protokoll. Eine ungültige Vorgabe der IT sperrt nichts (`locked` greift nur bei gültigem Wert).
+  Neue Einstellung mit begrenztem Wertebereich → in `_ALLOWED` eintragen.
 - Arbeitsstand mit „..“ im Pfad (von Hand verändert) ist unkritisch: `sync_with_disk` setzt alles, was der
   Abgleich im Quellordner nicht findet, auf „fehlt“; Kommandozeile und Oberfläche übergehen diese Einträge (Test).
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in

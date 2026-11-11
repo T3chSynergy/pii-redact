@@ -103,6 +103,9 @@ def load_settings(args, p: _Parser) -> tuple[Settings, bool]:
     if args.einstellungen is not None and not args.einstellungen.is_file():
         p.error(f"Einstellungsdatei nicht gefunden: {args.einstellungen}")
     settings = Settings.load(args.einstellungen or settings_path(), defaults_path())
+    for item in settings.ignored:   # nicht stillschweigend: Die Datei enthält einen Fehler, der sonst nie auffiele
+        print(f"⚠ Einstellungen: ungültiger Wert für {item} – übergangen, es gilt die Vorgabe der IT bzw. die "
+              "Voreinstellung.", file=sys.stderr)
     if args.ohne_ocr:
         settings.ocr = False
     if args.gruendlich:

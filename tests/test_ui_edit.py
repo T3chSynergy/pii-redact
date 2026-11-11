@@ -506,6 +506,21 @@ def test_settings_dialog_returns_changed_values(window):
     assert settings_dialog.needs_reanalysis(orig, new)
 
 
+def test_invalid_settings_value_is_logged_at_start(tmp_path, monkeypatch, caplog):
+    """Ungültiger Wert in der Einstellungsdatei: Es gilt die Voreinstellung, das Protokoll nennt Schlüssel und Datei."""
+    from pii_redact.ui import main_window
+
+    (tmp_path / "settings.json").write_text('{"threshold": 45, "pdf_labels": false}', encoding="utf-8")
+    monkeypatch.setattr(main_window, "settings_path", lambda: tmp_path / "settings.json")
+    monkeypatch.setattr(main_window, "defaults_path", lambda: tmp_path / "defaults.json")
+    _app = QApplication.instance() or QApplication([])
+    with caplog.at_level("WARNING", logger="pii_redact.ui.main_window"):
+        w = main_window.MainWindow()
+    assert w.settings.threshold == Settings().threshold and w.settings.pdf_labels is False
+    assert "ungültiger Wert für threshold (settings.json)" in caplog.text
+    w.close()
+
+
 def test_settings_dialog_locked_values_and_missing_model(window, monkeypatch):
     s = Settings(locked=["threshold", "llm_url", "gibt_es_nicht"], org_allow_list=["Stadt"], org_deny_list=["A", "B"])
     dlg = SettingsDialog(s, window)
