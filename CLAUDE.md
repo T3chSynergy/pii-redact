@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 330 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 331 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -261,7 +261,8 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   Fundtexte, die weder mit einem Buchstaben noch mit einer Dezimalziffer beginnen („+49“ – das Muster hat dann vorn
   keine Wortgrenze), und für das griechische Iota (gleicht U+0345, das kein Buchstabe ist; `_IOTA`).
   Kontrolle (3): `redactor._PageSearch` – ein Verzeichnis über alle Seiten, getrennt durch `\x00` (kein Treffer
-  reicht über eine Seitengrenze), je Fundtext nur eine Suche. `_upper_case`: Binärsuche (`_overlaps`) statt je
+  reicht über eine Seitengrenze), je Fundtext nur eine Suche; Ligaturen im Ergebnis („Hoﬀmann“) werden wie beim
+  Laden aufgelöst (`_LIGATURES` – sonst blieb ein zweites Vorkommen mit Ligatur in (3) unbemerkt). `_upper_case`: Binärsuche (`_overlaps`) statt je
   Zeile alle Großwörter durchzugehen (200 Seiten: 3,6 s → 0,06 s).
 - **Schwärzung in drei Durchgängen** (`redact_pdf`, seit 10.11.2026): MuPDF entfernt jedes Zeichen, dessen Rahmen
   (ohne ca. 10 % oben/unten, gemessen mit 1.28.2) das Rechteck überlappt; die Rahmen reichen über Ober-/Unterlänge
@@ -270,6 +271,14 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   senkrechter Text – je Zeichen ein Band; OCR-Stellen volle Höhe), (2) frei gezogene Bereiche wie bisher inkl.
   Vektorgrafik, (3) Balken/Beschriftung in voller Höhe mit `text=PDF_REDACT_TEXT_NONE` und Bildpunkt-Entfernung.
   Vorschau und `pdf_redaction_plan` unverändert. Nach PyMuPDF-Updates: `test_tight_line_spacing_…` beachten.
+  **Grenze** (Gegenprobe 11.11.2026, 360 Zufalls-PDFs; kein Zeichen eines Fundes blieb stehen): Bei gleicher
+  Schriftgröße trifft die Schwärzung die Nachbarzeilen erst unter etwa 0,75 × Schriftgröße Zeilenabstand (dann
+  liegt ihr Text ohnehin unter dem Balken). Bei **gemischten Größen mit knappem Abstand** (kleine Zeile dicht über
+  einer großen, Abstand unter der großen Schriftgröße) gibt es zwei Restfälle: Aus der großen Nachbarzeile
+  verschwinden still Zeichen (2 von 60 Zufallsdokumenten), oder die Kontrolle meldet „an der geschwärzten Stelle
+  noch vorhanden“, obwohl der Fund weg ist – unter dem Balken liegt Text der Nachbarzeile. Ab Zeilenabstand =
+  Schriftgröße trat beides nicht auf (120 Dokumente). Bewusst nicht geändert (Entscheidung 11.11.2026); falls es in
+  echten Dokumenten auffällt: nach dem Schwärzen die Zeichen außerhalb der Balken mit dem Stand davor vergleichen.
 - **Großschrift** (`PiiAnalyzer._upper_case`, seit 10.11.2026): Zeilen mit Wörtern in Großbuchstaben (ab 3
   Buchstaben, `normal_case` – längenneutral) werden zusätzlich in normaler Schreibweise geprüft; übernommen nur
   von `CASE_RECOGNIZERS` (NER, Anschrift, Name nach Anrede), nur mit mindestens einem solchen Wort, nur noch
@@ -320,8 +329,10 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   `disallow_untyped_defs`, `check_untyped_defs`, `warn_unused_ignores`; geprüft auch mit `--platform win32` und
   `--python-version 3.14`. Ausgangslage: 42 Meldungen, davon 27 fehlende Typangaben. PyMuPDF wird nicht verfolgt
   (`follow_imports = "skip"`): Seine Typangaben sind lückenhaft (Dokument nicht iterierbar, Konstanten
-  `PDF_REDACT_*` fehlen) – alles aus `fitz` gilt deshalb als `Any`. Drei `# type: ignore` mit Begründung, alle wegen
-  Presidio (Vorgabewert `None` ohne `None` im Typ; `name` der Basisklasse). Importe nur für die Typprüfung stehen
+  `PDF_REDACT_*` fehlen) – alles aus `fitz` gilt deshalb als `Any`. Vier `# type: ignore`: drei mit Begründung wegen
+  Presidio (Vorgabewert `None` ohne `None` im Typ; `name` der Basisklasse), einer in `loaders._open_cleaned`
+  (`extras["hidden"]` – das Wörterbuch aus `strip_pdf_extras` ist als `dict[str, int]` erklärt, trägt aber auch
+  Seitenlisten und den Bericht). Importe nur für die Typprüfung stehen
   unter `TYPE_CHECKING`, damit Presidio und die Texterkennung weiter erst bei Bedarf geladen werden. Drei
   `assert … is not None` an Stellen, die vorher mit einem Fehler an `None` abgebrochen wären (Engine nicht geladen,
   `area_rect` ohne Bereich, Modell nicht geladen). Nicht eingeschaltet: `--strict` (weitere 53 Meldungen, vor allem

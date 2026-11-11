@@ -51,6 +51,14 @@ pytest
 Die Oberflächentests laufen ohne Bildschirm (sie setzen `QT_QPA_PLATFORM=offscreen` selbst). Zwei Tests
 werden je nach Umgebung übersprungen – das ist normal.
 
+Die automatische Prüfung verlangt außerdem Stil- und Typprüfung ohne Befund (Regeln in `pyproject.toml`):
+
+```bash
+pip install "ruff>=0.17,<0.18" "mypy>=2.4,<2.5"
+ruff check src tests tools samples
+mypy
+```
+
 Den fertigen Programmordner baut `build.bat` (Windows); Details in [packaging/README.md](packaging/README.md).
 
 ## Ablauf für Änderungen

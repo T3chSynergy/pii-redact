@@ -34,6 +34,10 @@
   Text wird nur noch dort geprüft, wo ein Wort passend beginnt: 0,2 und 0,1 Sekunden, bei 1000 Seiten mit
   8000 Funden je gut eine Sekunde. Gefunden wird dasselbe wie bisher – verglichen mit der bisherigen Suche in
   900 Fällen über alle Beispieldateien. Ebenso beschleunigt: die Vorarbeit für Namen in Großbuchstaben.
+- **Kontrolle nach dem Export erkennt Ligaturen:** Stand ein geschwärzter Name an anderer Stelle mit einer
+  Ligatur im PDF – „ff“, „fi“ oder „fl“ als ein Zeichen, typisch für Dokumente aus LaTeX („Hoﬀmann“) –, meldete
+  die Kontrolle nach dem Export ihn nicht als „an anderer Stelle noch lesbar“. Die Kontrolle vor dem Speichern
+  fand solche Stellen schon bisher.
 
 ## 0.8.7 – 11.11.2026
 
