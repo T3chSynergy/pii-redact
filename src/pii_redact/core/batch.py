@@ -17,7 +17,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from .analyzer import CHECK_SOURCE, further_occurrences
+from .analyzer import CHECK_SOURCE, PiiAnalyzer, ProgressFn, further_occurrences
 from .entities import info
 from .loaders import OCR_WARNING_PREFIX, SUPPORTED_SUFFIXES, LoadedDocument
 from .models import Finding, Settings
@@ -106,7 +106,7 @@ def findings_from_compact(items: list[dict], text: str) -> list[Finding]:
     return out
 
 
-def csv_safe(value):
+def csv_safe(value: object) -> object:
     """Zelle für das Protokoll: Text, der mit ``=``, ``+``, ``-`` oder ``@`` beginnt, liest eine Tabellenkalkulation
     als Formel (z. B. ein Dateiname „=Summe.pdf“). Ein vorangestelltes Hochkomma macht daraus reinen Text."""
     if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
@@ -508,7 +508,8 @@ class Workspace:
             os.replace(tmp, alt)
 
 
-def analyze_file(path: Path, analyzer, settings: Settings, progress=None) -> dict:
+def analyze_file(path: Path, analyzer: PiiAnalyzer, settings: Settings,
+                 progress: ProgressFn | None = None) -> dict:
     """Datei laden, Prüfsumme bilden, analysieren – läuft im Hintergrund-Thread."""
     from .loaders import load_document
 

@@ -10,6 +10,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pymupdf as fitz  # PyMuPDF
 
@@ -200,7 +201,7 @@ def _add_page_text(tb: _TextBuilder, pno: int, raw: dict, collect_rects: bool) -
     return page_chars, text_rects
 
 
-def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key, text_rects: list[fitz.Rect],
+def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key: str | None, text_rects: list[fitz.Rect],
                   ocr_low: list[str]) -> tuple[int, str]:
     """Texterkennung einer Seite anhängen (Wörter, die schon als echter Text vorliegen, nicht doppelt).
     Rückgabe: Anzahl hinzugefügter Zeichen und ggf. eine Fehlermeldung."""
@@ -237,7 +238,7 @@ def _add_ocr_text(tb: _TextBuilder, pno: int, page: fitz.Page, key, text_rects: 
     return added, error
 
 
-def _reopen(doc: fitz.Document, **save) -> tuple[fitz.Document, bytes]:
+def _reopen(doc: fitz.Document, **save: Any) -> tuple[fitz.Document, bytes]:
     data = doc.tobytes(**save)
     doc.close()
     return fitz.open(stream=data, filetype="pdf"), data
@@ -266,7 +267,8 @@ def _open_cleaned(path: Path) -> tuple[fitz.Document, bytes, dict]:
     return doc, data, extras
 
 
-def _ocr_plan(doc: fitz.Document, raws: list[dict], data: bytes, ocr: bool) -> tuple[list[int], object, str]:
+def _ocr_plan(doc: fitz.Document, raws: list[dict], data: bytes,
+              ocr: bool) -> tuple[list[int], str | None, str]:
     """Welche Seiten brauchen Texterkennung? (vorab, damit der Fortschritt stimmt) Rückgabe: Seiten, Schlüssel
     des Zwischenspeichers und ggf. eine Fehlermeldung."""
     if not ocr:
@@ -290,8 +292,8 @@ class _PageScan:
     ocr_error: str = ""
 
 
-def _read_pages(doc: fitz.Document, raws: list[dict], want_ocr: list[int], key, ocr_error: str,
-                progress) -> _PageScan:
+def _read_pages(doc: fitz.Document, raws: list[dict], want_ocr: list[int], key: str | None, ocr_error: str,
+                progress: Callable[[int, int], None] | None) -> _PageScan:
     """Textebene aller Seiten übernehmen, wo nötig ergänzt um die Texterkennung."""
     content_images = _content_image_pages(doc)
     scan = _PageScan(ocr_error=ocr_error)
@@ -317,7 +319,8 @@ def _read_pages(doc: fitz.Document, raws: list[dict], want_ocr: list[int], key, 
     return scan
 
 
-def _load_pdf(path: Path, ocr: bool = True, progress=None) -> LoadedDocument:
+def _load_pdf(path: Path, ocr: bool = True,
+              progress: Callable[[int, int], None] | None = None) -> LoadedDocument:
     doc, data, extras = _open_cleaned(path)
     flags = fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_MEDIABOX_CLIP
     raws = [page.get_text("rawdict", flags=flags) for page in doc]
@@ -506,7 +509,7 @@ def strip_pdf_extras(pdf: fitz.Document) -> dict[str, int]:
             page.delete_annot(annot)
     if counts["toc"]:
         pdf.set_toc([])
-    counts["widget_pages"] = widget_pages  # type: ignore[assignment]
+    counts["widget_pages"] = widget_pages
     return counts
 
 

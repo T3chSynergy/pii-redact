@@ -16,6 +16,7 @@ import hashlib
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
+from typing import Any
 
 import pymupdf as fitz
 
@@ -54,7 +55,7 @@ def is_available() -> bool:
     return True
 
 
-def _get_engine():
+def _get_engine() -> Any:
     global _engine
     if _engine is None:
         try:
@@ -148,7 +149,7 @@ def ocr_page_text(page: fitz.Page, key: str | None = None) -> str:
     return "\n".join(" ".join(w.text for w in line) for line in ocr_page(page, key))
 
 
-def _rect(quad, m: fitz.Matrix) -> tuple[float, float, float, float]:
+def _rect(quad: Any, m: fitz.Matrix) -> tuple[float, float, float, float]:
     pts = [fitz.Point(float(x), float(y)) * m for x, y in quad]
     r = fitz.Rect(pts[0], pts[0])
     for p in pts[1:]:

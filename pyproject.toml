@@ -87,3 +87,25 @@ max-complexity = 12
 [tool.ruff.lint.flake8-bugbear]
 # Qt-Schreibweise für Modellklassen: `parent=QModelIndex()` – der Wert ist unveränderlich
 extend-immutable-calls = ["PySide6.QtCore.QModelIndex"]
+
+[tool.mypy]
+# Typprüfung für den Kern (Erkennung, Laden, Schwärzen, Kontrolle) – dort hängt die Sicherheit des Ergebnisses.
+# Oberfläche und Hilfsskripte sind bewusst nicht dabei (PySide6 ist dynamisch, der Nutzen dort gering).
+# Aufruf ohne Argumente: `mypy`.
+files = ["src/pii_redact/core"]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_untyped_defs = true        # jede Funktion im Kern nennt ihre Typen
+disallow_incomplete_defs = true
+warn_unused_ignores = true          # eine Ausnahme, die nicht mehr nötig ist, fällt auf
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# PyMuPDF bringt Typangaben mit, sie sind aber lückenhaft (ein Dokument gilt nicht als Folge von Seiten, die
+# Konstanten PDF_REDACT_* fehlen). Geprüft wird deshalb der eigene Umgang mit den Werten, nicht die Aufrufe selbst.
+module = ["pymupdf.*"]
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime.*"]          # ohne Typangaben
+ignore_missing_imports = true

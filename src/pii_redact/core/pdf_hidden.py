@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import pymupdf as fitz
@@ -401,7 +402,7 @@ def _name(token: bytes) -> str:
 # der PDF-Syntax (Kommentar, Zeichenkette, Hex-Zeichenkette, Feld, Wörterbuch, Name, eingebettetes Bild); auf
 # mehrere Funktionen verteilt wäre die Abfolge der Regeln schwerer zu überblicken als an einer Stelle. Deshalb
 # bewusst von der Komplexitätsgrenze ausgenommen (Entscheidung zum Refactoring, 10.11.2026).
-def _instructions(data: bytes):  # noqa: C901
+def _instructions(data: bytes) -> Iterator[tuple[list[bytes], bytes]]:  # noqa: C901
     """Inhaltsstrom in Anweisungen zerlegen: (Operanden, Operator). Zusammengesetzte Operanden (Zeichenkette,
     Feld, Wörterbuch) bleiben je ein Stück; ein eingebettetes Bild (``BI … EI``) ist eine Anweisung ``BI``."""
     operands: list[bytes] = []
