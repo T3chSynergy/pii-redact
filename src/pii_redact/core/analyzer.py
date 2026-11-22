@@ -241,7 +241,7 @@ class PiiAnalyzer:
             a, b, joints = ranges[k]
             off = a - starts[k]
             s, e = f.start + off, f.end + off
-            if e > b or not any(s <= j < e for j in joints):
+            if e > b or not _contains_any(joints, s, e):
                 continue
             if all(covered[i] or text[i].isspace() for i in range(s, e)):
                 continue
@@ -288,6 +288,13 @@ def _overlaps(starts: list[int], ends: list[int], start: int, end: int) -> bool:
     return i < len(starts) and starts[i] < end
 
 
+def _contains_any(points: list[int], start: int, end: int) -> bool:
+    """Liegt eine der Stellen (aufsteigend) im Bereich ``start``–``end``? Binärsuche – nicht je Fund alle
+    Stellen durchgehen (ein großer Absatz mit Nummern hat Zehntausende Zeilenumbrüche)."""
+    i = bisect.bisect_left(points, start)
+    return i < len(points) and points[i] < end
+
+
 def plain_spaces(text: str) -> str:
     """Sonder-Leerzeichen durch normale ersetzen – Zeichen für Zeichen, alle Positionen bleiben gleich."""
     return text.translate(_SPACES)
@@ -308,7 +315,9 @@ def _number_break_ranges(text: str) -> list[tuple[int, int, list[int]]]:
         b = text.find("\n", nl + 1)
         b = len(text) if b == -1 else b
         if out and a < out[-1][1]:
-            out[-1] = (out[-1][0], b, out[-1][2] + [nl])
+            first, _end, joints = out[-1]
+            joints.append(nl)       # anhängen statt die Liste zu kopieren – sonst quadratischer Aufwand
+            out[-1] = (first, b, joints)
         else:
             out.append((a, b, [nl]))
     return out

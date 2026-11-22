@@ -224,7 +224,11 @@ class _Unsupported(Exception):
     """Aufbau, den das Entfernen nicht sicher beherrscht → Ebenen einblenden."""
 
 
-_NUMBER = re.compile(rb"[+-]?(?:\d+\.?\d*|\.\d+)\Z")
+# Possessive Quantoren (``++``, ``?+``, ``*+``): Das Muster gibt einmal Erkanntes nicht wieder her. Mit ``\d+\.?\d*``
+# probierte die Suche bei einer langen Ziffernfolge ohne Abschluss („111…1x“) jede Aufteilung der Ziffern auf
+# ``\d+`` und ``\d*`` durch – quadratischer Aufwand, bei einer Million Ziffern rund eine Stunde. Erkannt werden
+# dieselben Zahlen wie vorher (Test).
+_NUMBER = re.compile(rb"[+-]?(?:\d++\.?+\d*+|\.\d++)\Z")
 _WS = b"\x00\t\n\x0c\r "
 _DELIMS = b"()<>[]{}/%"
 _INLINE_IMAGE_END = re.compile(rb"[\x00\t\n\x0c\r ]EI(?=[\x00\t\n\x0c\r ]|\Z)")
