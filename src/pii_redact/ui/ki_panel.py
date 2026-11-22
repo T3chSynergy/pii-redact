@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ..core.batch import ki_summary
 from ..core.entities import info
 from ..core.llm_review import ReviewResult
+from .safe_text import plain_text
 
 RISK_COLORS = {"gering": "#2b8a3e", "mittel": "#e8590c", "hoch": "#c92a2a", "unklar": "#868e96"}
 
@@ -35,7 +36,10 @@ class KiReviewPanel(QWidget):
         self.meta = QLabel()
         self.meta.setStyleSheet("color: gray")
         self.meta.setWordWrap(True)
+        # Modell, Server, Fehlermeldung und Begründung kommen vom KI-Server bzw. aus dem Arbeitsstand – nie als HTML
+        self.meta.setTextFormat(Qt.TextFormat.PlainText)
         self.summary = QLabel()
+        self.summary.setTextFormat(Qt.TextFormat.PlainText)
         self.summary.setWordWrap(True)
         self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.list = QListWidget()
@@ -112,7 +116,7 @@ class KiReviewPanel(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, ids)
             if not hint.found:
                 item.setForeground(Qt.GlobalColor.gray)
-            item.setToolTip(hint.reason or hint.quote)
+            item.setToolTip(plain_text(hint.reason or hint.quote))
             self.list.addItem(item)
         if not res.hints:
             self.list.addItem(QListWidgetItem("Keine Hinweise."))

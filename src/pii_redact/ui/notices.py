@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QToolBut
 
 from ..core.loaders import Notice
 from .pdf_view import ORANGE, PageMark
+from .safe_text import plain_text
 
 #: Hilfekapitel je Hinweisart
 HELP_ANCHOR = {"ocr": "ocr", "ocr_error": "ocr", "no_text": "ocr", "pages_no_text": "ocr"}
@@ -90,7 +91,7 @@ class NoticeBar(QFrame):
         anchor = help_anchor(self.notices[0])
         self.label.setText(f"⚠ {'  ·  '.join(parts)}  <a href='{anchor}' style='color:#a33a00'>Mehr …</a>")
         full = "\n\n".join(n.detail for n in self.notices)
-        self.setToolTip(full)
+        self.setToolTip(plain_text(full))
         self.setAccessibleDescription(full)
         self.label.setAccessibleName(" · ".join(n.short for n in self.notices))
         self.label.setAccessibleDescription(full)
@@ -172,8 +173,8 @@ class NoticeButton(QToolButton):
         critical = any(x.critical for x in self.notices)
         self.setText(f"{'⚠' if critical else 'ⓘ'} {n} {'Hinweis' if n == 1 else 'Hinweise'}")
         self.setStyleSheet(f"color:{ORANGE}; font-weight:bold;" if critical else "")
-        self.setToolTip("\n".join(("⚠ " if x.critical else "ⓘ ") + x.short for x in self.notices)
-                        + "\n\nKlicken für Details")
+        self.setToolTip(plain_text("\n".join(("⚠ " if x.critical else "ⓘ ") + x.short for x in self.notices)
+                                   + "\n\nKlicken für Details"))
         self.setAccessibleName(f"{n} {'Hinweis' if n == 1 else 'Hinweise'} zum Dokument")
         self.setAccessibleDescription("; ".join(x.short for x in self.notices))
         self.show()

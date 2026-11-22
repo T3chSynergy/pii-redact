@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressD
 from ..core import UnsupportedFileError
 from ..core.batch import Status, Workspace, export_document, held_for_check
 from .batch_panel import NewBatchDialog, confirm_auto_export, status_style
+from .safe_text import plain_text
 from .window_export import ELSEWHERE
 
 OCR_NOT_AUTO = "Texterkennung (OCR) – wird nicht automatisch exportiert, bitte einzeln prüfen"
@@ -43,13 +44,13 @@ class BatchMixin:
                 if ws.source != src.resolve():
                     QMessageBox.warning(
                         self, "Anderer Arbeitsstand",
-                        f"Im Zielordner liegt bereits ein Arbeitsstand für den Quellordner\n{ws.source}\n\n"
-                        "Bitte einen anderen Zielordner wählen.")
+                        plain_text(f"Im Zielordner liegt bereits ein Arbeitsstand für den Quellordner\n{ws.source}\n\n"
+                                   "Bitte einen anderen Zielordner wählen."))
                     return
             else:
                 ws = Workspace.create(src, tgt, recursive)
         except (OSError, ValueError, KeyError) as exc:
-            QMessageBox.warning(self, "Ordner kann nicht bearbeitet werden", str(exc))
+            QMessageBox.warning(self, "Ordner kann nicht bearbeitet werden", plain_text(str(exc)))
             return
         self._activate_batch(ws)
 
@@ -61,13 +62,13 @@ class BatchMixin:
     def resume_folder(self, target: Path) -> None:
         if not Workspace.exists_in(target):
             QMessageBox.information(self, "Kein Arbeitsstand",
-                                    f"In {target} wurde kein pii-redact-Arbeitsstand gefunden.")
+                                    plain_text(f"In {target} wurde kein pii-redact-Arbeitsstand gefunden."))
             self._forget_recent(target)
             return
         try:
             ws = Workspace.load(target)
         except (OSError, ValueError, KeyError) as exc:
-            QMessageBox.warning(self, "Arbeitsstand kann nicht geladen werden", str(exc))
+            QMessageBox.warning(self, "Arbeitsstand kann nicht geladen werden", plain_text(str(exc)))
             return
         self._activate_batch(ws)
 
@@ -82,7 +83,7 @@ class BatchMixin:
             ws.save()
         except OSError as exc:
             QApplication.restoreOverrideCursor()
-            QMessageBox.warning(self, "Ordner kann nicht bearbeitet werden", str(exc))
+            QMessageBox.warning(self, "Ordner kann nicht bearbeitet werden", plain_text(str(exc)))
             return
         QApplication.restoreOverrideCursor()
         self.batch = ws
@@ -228,7 +229,7 @@ class BatchMixin:
         if ("Sprachmodell" in message or "Transformer-Modell" in message) and not self._model_error_shown:
             self._model_error_shown = True
             self.runner.cancel_batch(self.batch_id)
-            QMessageBox.critical(self, "Analyse nicht möglich", message)
+            QMessageBox.critical(self, "Analyse nicht möglich", plain_text(message))
         self._batch_save_timer.start()
         self._update_actions()
         self._refresh_batch()
@@ -275,7 +276,7 @@ class BatchMixin:
             leftovers = self._export_entry(rel, True, self.session.findings, self.session.doc)
         except Exception as exc:  # noqa: BLE001
             QApplication.restoreOverrideCursor()
-            QMessageBox.critical(self, "Export fehlgeschlagen", f"{rel}:\n{exc}")
+            QMessageBox.critical(self, "Export fehlgeschlagen", plain_text(f"{rel}:\n{exc}"))
             return
         QApplication.restoreOverrideCursor()
         self.session.dirty = False
@@ -285,8 +286,8 @@ class BatchMixin:
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",
-                f"{rel} wurde exportiert, aber die Kontrolle hat im Ergebnis noch Folgendes gefunden:\n\n• "
-                + "\n• ".join(leftovers[:20]) + "\n\nDer Hinweis steht im Protokoll.")
+                plain_text(f"{rel} wurde exportiert, aber die Kontrolle hat im Ergebnis noch Folgendes gefunden:\n\n• "
+                           + "\n• ".join(leftovers[:20]) + "\n\nDer Hinweis steht im Protokoll."))
         nxt = self.batch.next_open(rel)
         if nxt:
             self._open_batch_file(nxt)

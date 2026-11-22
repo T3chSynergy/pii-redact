@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from . import __version__
     from .ui.main_window import MainWindow
+    from .ui.safe_text import plain_text
 
     app = QApplication(argv)
     app.setApplicationName("pii-redact")
@@ -78,7 +79,8 @@ def main(argv: list[str] | None = None) -> int:
         log.error("Unerwarteter Fehler:\n%s", "".join(traceback.format_exception(exc_type, exc, tb)))
         QMessageBox.critical(
             None, "Unerwarteter Fehler",
-            f"{exc_type.__name__}: {exc}\n\nDetails stehen im Protokoll:\n{log_path or '(nicht verfügbar)'}")
+            plain_text(f"{exc_type.__name__}: {exc}\n\n"
+                       f"Details stehen im Protokoll:\n{log_path or '(nicht verfügbar)'}"))
 
     sys.excepthook = excepthook
     log.info("pii-redact %s startet", __version__)

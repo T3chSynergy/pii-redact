@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QMessageBox
 
 from ..core import llm_review
 from . import dialogs
+from .safe_text import plain_text
 
 
 class _KiBridge(QObject):
@@ -84,7 +85,7 @@ class KiMixin:
             return
         self.ki_panel.clear(text=f"Fehlgeschlagen: {message}")
         self.status_label.setText("KI-Nachprüfung fehlgeschlagen.")
-        QMessageBox.warning(self, "KI-Nachprüfung fehlgeschlagen", message)
+        QMessageBox.warning(self, "KI-Nachprüfung fehlgeschlagen", plain_text(message))
 
     def _on_ki_done(self, session, res) -> None:
         self._ki_session = None
