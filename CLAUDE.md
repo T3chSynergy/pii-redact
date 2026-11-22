@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 331 Tests (Stand 11.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 335 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -190,6 +190,12 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
     und entfernt zwischen `/OC … BDC` und `EMC` sowie bei XObjects mit `/OC` nur die zeichnenden Anweisungen;
     danach `OCProperties` löschen (wirkt erst nach `tobytes` + Öffnen). Prüfung: `_snapshot` (Zeichenschritte +
     Seitenbild) muss gleich dem Stand vorher sein.
+    Zahlenmuster `_NUMBER` mit possessiven Quantoren (`\d++\.?+\d*+`, seit 22.11.2026, Sicherheitsprüfung): Das
+    frühere `\d+\.?\d*` brauchte bei einer langen Ziffernfolge ohne Abschluss („111…1x“) quadratisch lange –
+    80 000 Ziffern 24 s, eine Million rund eine Stunde; das Programm hing beim Laden. Gleichheit geprüft für alle
+    Wörter bis Länge 7 (Test) und mit 40 000 zufälligen Inhaltsströmen plus Beispiel-PDFs (alt gegen neu gleich).
+    **Lehre:** Muster auf Eingaben ohne Längengrenze nie mit zwei aufeinanderfolgenden Quantoren über dieselbe
+    Zeichenklasse – possessiv (`++`, `*+`, ab Python 3.11) oder so, dass nur ein Weg passt.
   - Rückfall, wenn die Prüfung scheitert: einblenden (Ebenen sichtbar bzw. CropBox = MediaBox per `xref_set_key`;
     `set_cropbox` scheitert bei versetztem Nullpunkt) + kritischer Hinweis `layers_shown`/`cropped`/`outside_left`.
     OCMD (zusammengesetzte Sichtbarkeit) geht immer in den Rückfall – MuPDF wertet sie anders aus als die Norm.
@@ -387,6 +393,10 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   zusätzlich analysiert; übernommen nur Muster-Treffer (keine NER), die über den Umbruch reichen und noch nicht
   von einem Muster-Fund abgedeckte Zeichen enthalten (Adressblöcke bleiben zwei Funde). Nicht abgedeckt: Zahl ohne
   Leerzeichen mitten umbrochen (Steuer-ID „86095⏎742719“) – kommt bei Fließtext praktisch nicht vor.
+  Linearer Aufwand (seit 22.11.2026, Sicherheitsprüfung): `_number_break_ranges` hängt Umbrüche an, statt die Liste
+  je Umbruch zu kopieren (100 000 Zeilen „1“: 16 s → 0,03 s); `_cross_line` prüft „reicht über einen Umbruch“ per
+  Binärsuche (`_contains_any`) statt je Fund alle Umbrüche (20 000 Zeilen „+49 171 …“: 10 s weniger). Was bleibt,
+  ist die Analyse selbst – der Prüftext ist bei solchen Blöcken so lang wie der ganze Text (linear).
 - **Telemetrie von onnxruntime** (gefunden 26.10.2026): Windows-Wheels protokollieren über ETW (ProcessInfo beim
   Laden; SessionCreation u. a. mit `modelFileName`, RuntimeError mit Meldung), Linux-Wheels (mind. 1.30) haben einen
   eigenen Sende-Client an `mobile.events.data.microsoft.com` mit Geräte-ID unter

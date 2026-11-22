@@ -2,6 +2,17 @@
 
 ## Unveröffentlicht
 
+**Sicherheit**
+- **Kein Hängenbleiben mehr bei präparierten PDFs:** Stand im Inhalt einer Seite mit ausgeblendeten Ebenen eine
+  sehr lange Ziffernfolge, wuchs die Zeit zum Laden quadratisch – bei einer Million Ziffern rund eine Stunde. Das
+  Programm reagierte so lange nicht, und ein Ordnerlauf blieb an dieser Datei stehen, auch nach einem Neustart.
+  Jetzt ist das Zerlegen des Seiteninhalts auch dann in Bruchteilen einer Sekunde erledigt; erkannt wird dasselbe
+  wie bisher.
+- **Lange Blöcke mit Nummern:** Die Suche nach Nummern über eine Zeilengrenze hinweg (seit 0.8.2) brauchte bei
+  Absätzen aus sehr vielen Zeilen, die mit Ziffern beginnen und enden, quadratisch wachsende Zeit – 100 000 solche
+  Zeilen kosteten zusätzlich 16 Sekunden, 20 000 Zeilen mit Telefonnummern weitere 10 Sekunden. Jetzt wächst der
+  Aufwand nur noch mit der Länge des Textes; gefunden wird dasselbe wie bisher.
+
 **Einstellungen**
 - **Ungültige Werte in einer Einstellungsdatei werden übergangen und gemeldet:** Stand in einer von Hand
   bearbeiteten `settings.json` oder in der `defaults.json` der IT ein Wert außerhalb des gültigen Bereichs,

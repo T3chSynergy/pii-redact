@@ -1,6 +1,10 @@
 """Nicht angezeigter PDF-Inhalt: außerhalb des Seitenbereichs (Zuschnitt, neben dem Blatt) und auf
 ausgeblendeten Ebenen. Er wird beim Laden entfernt; gelingt das nicht nachweislich, wird er eingeblendet."""
 
+import itertools
+import re
+import time
+
 import pymupdf
 import pytest
 
@@ -236,3 +240,26 @@ def test_instructions_keep_compound_operands_together():
     assert got[6][0] == [b"[(A) -20 <4142> (B)]"]
     assert got[9][0] == [b"/Span", b"<</ActualText (x) /Lang (de)>>"]
     assert got[11][0][0].startswith(b"BI /W 2") and got[11][0][0].endswith(b"\xff EI")
+
+
+def test_number_pattern_unchanged():
+    """Das Zahlenmuster ohne Rückverfolgung erkennt dieselben Wörter wie das frühere – geprüft für alle Wörter bis
+    zur Länge 7 aus Vorzeichen, Punkt, Ziffer und einem anderen Zeichen."""
+    old = re.compile(rb"[+-]?(?:\d+\.?\d*|\.\d+)\Z")
+    for n in range(8):
+        for chars in itertools.product(b"+-.1x", repeat=n):
+            word = bytes(chars)
+            assert bool(pdf_hidden._NUMBER.match(word)) == bool(old.match(word)), word
+
+
+def test_long_digit_run_is_read_quickly(tmp_path):
+    """Lange Ziffernfolge ohne Abschluss („111…1x“) im Inhaltsstrom einer Seite mit ausgeblendeter Ebene: Mit dem
+    früheren Zahlenmuster wuchs die Zeit für das Zerlegen quadratisch (100 000 Ziffern: über eine halbe Minute,
+    eine Million: rund eine Stunde) – das Programm hing beim Laden, ein Ordnerlauf blieb stehen."""
+    pdf = pymupdf.open(stream=_layered_pdf())
+    xref = pdf[0].get_contents()[-1]
+    pdf.update_stream(xref, pdf.xref_stream(xref) + b"\n" + b"1" * 100_000 + b"x\n")
+    start = time.perf_counter()
+    doc = _load(tmp_path, pdf.tobytes())
+    assert time.perf_counter() - start < 5
+    assert "Bergenthaler" not in doc.text and _notices(doc)["removed"].pages == [0]

@@ -1,5 +1,7 @@
 """Tests der Kernlogik (ohne Oberfläche)."""
 
+import random
+import time
 from pathlib import Path
 
 import pymupdf
@@ -382,6 +384,29 @@ def test_numbers_across_lines_redacted_in_pdf(analyzer):
     for rest in ("DE89", "3704", "0044", "0532", "0130", "040", "55512345", "170839", "J"):
         assert rest not in words, rest
     assert {"4711", "2026", "Seite", "Aktenzeichen"} <= words   # keine personenbezogenen Daten
+
+
+def test_number_break_ranges_long_block():
+    """Ein Absatz aus lauter Zeilen mit Nummern wird ein Bereich mit allen Umbrüchen – in linearer Zeit. Vorher
+    wurde die Liste der Umbrüche bei jedem weiteren kopiert: 100 000 Zeilen ≈ 16 s, quadratisch wachsend."""
+    from pii_redact.core.analyzer import _number_break_ranges
+
+    text = "1\n" * 100_000
+    start = time.perf_counter()
+    ranges = _number_break_ranges(text)
+    assert time.perf_counter() - start < 2
+    assert ranges == [(0, len(text) - 1, list(range(1, len(text) - 1, 2)))]
+
+
+def test_contains_any_like_linear_search():
+    from pii_redact.core.analyzer import _contains_any
+
+    rnd = random.Random(7)
+    for _ in range(3000):
+        points = sorted(rnd.sample(range(60), rnd.randint(0, 12)))
+        start = rnd.randint(0, 62)
+        end = rnd.randint(start, 64)
+        assert _contains_any(points, start, end) == any(start <= j < end for j in points), (points, start, end)
 
 
 # ---------------------------------------------------------------- Sonder-Leerzeichen, Stern-Datum, Postfach
