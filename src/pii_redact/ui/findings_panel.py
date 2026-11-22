@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.entities import AREA_KEYS, all_keys, info
+from .safe_text import plain_text
 from .session import DocumentSession
 
 COL_ON, COL_TYPE, COL_TEXT, COL_WHERE, COL_SCORE, COL_SOURCE = range(6)
@@ -80,8 +81,11 @@ class FindingsModel(QAbstractTableModel):
             return None
         f = self._rows[index.row()]
         col = index.column()
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
-            return self._cell_text(f, col, tooltip=role == Qt.ItemDataRole.ToolTipRole)
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._cell_text(f, col, tooltip=False)
+        if role == Qt.ItemDataRole.ToolTipRole:   # Dokumenttext und Begründung der KI – nie als HTML
+            tip = self._cell_text(f, col, tooltip=True)
+            return plain_text(tip) if tip else tip
         if role == Qt.ItemDataRole.AccessibleTextRole:
             # Bildschirmleser lesen nur die aktuelle Zelle vor – der Status gehört deshalb in jede Zelle
             if col == COL_ON:

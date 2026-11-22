@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from ..core import save_redacted_pdf
 from ..core.analyzer import further_occurrences
 from ..core.models import write_text_safely
+from .safe_text import plain_text
 
 #: Kennzeichen der Kontrollmeldung für weitere Vorkommen (siehe core.redactor.verify_pdf)
 ELSEWHERE = " – an anderer Stelle noch lesbar"
@@ -52,7 +53,8 @@ class ExportMixin:
             write_text_safely(Path(path), self.session.output_text())
         except OSError as exc:   # Ziel schreibgeschützt, Netzlaufwerk getrennt, Datenträger voll
             QMessageBox.critical(self, "Export fehlgeschlagen",
-                                 f"Die Datei konnte nicht gespeichert werden:\n{path}\n\n{exc.strerror or exc}")
+                                 plain_text(f"Die Datei konnte nicht gespeichert werden:\n{path}\n\n"
+                                            f"{exc.strerror or exc}"))
             return
         self.session.dirty = False
         self._update_title()
@@ -92,7 +94,7 @@ class ExportMixin:
             leftovers = self._run_busy("Schwärze und kontrolliere …", work)
         except Exception as exc:  # noqa: BLE001
             QApplication.restoreOverrideCursor()
-            QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
+            QMessageBox.critical(self, "Export fehlgeschlagen", plain_text(str(exc)))
             return
         QApplication.restoreOverrideCursor()
         self.session.dirty = False
@@ -102,9 +104,9 @@ class ExportMixin:
         if leftovers:
             QMessageBox.warning(
                 self, "Prüfung: Reste gefunden",
-                "Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden:\n\n• "
-                + "\n• ".join(leftovers[:20])
-                + "\n\nWas die Meldungen bedeuten, steht in der Hilfe unter „Häufige Fragen“.",
+                plain_text("Das PDF wurde gespeichert, aber die Kontrolle hat darin noch Folgendes gefunden:\n\n• "
+                           + "\n• ".join(leftovers[:20])
+                           + "\n\nWas die Meldungen bedeuten, steht in der Hilfe unter „Häufige Fragen“."),
             )
         else:
             # Erfolg: keine Rückfrage, nur eine Meldung in der Statusleiste (Details im Tooltip)
@@ -182,9 +184,9 @@ class ExportMixin:
     def _show_saved(self, path: Path, what: str, details: str = "") -> None:
         """Erfolgsmeldung in der Statusleiste mit Link zum Zielordner (statt eines Dialogs)."""
         self._saved_path = path
-        self.status_label.setText(f"✓ {html.escape(path.name)} – {html.escape(what)} · "
-                                  "<a href='open-folder'>Ordner öffnen</a>")
-        self.status_label.setToolTip(details or f"Gespeichert: {path}")
+        self.status_label.set_html(f"✓ {html.escape(path.name)} – {html.escape(what)} · "
+                                   "<a href='open-folder'>Ordner öffnen</a>")
+        self.status_label.setToolTip(plain_text(details or f"Gespeichert: {path}"))
 
     def _on_status_link(self, link: str) -> None:
         if link == "open-folder" and getattr(self, "_saved_path", None):

@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 335 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 343 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -362,6 +362,18 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   deshalb über `ui/dialogs.ask_yes_no` (in Tests `dialogs.ask_yes_no` ersetzen, nicht `QMessageBox.question`),
   Schaltflächenleisten über `german_buttons`; `app.main` lädt zusätzlich `qtbase_de` (Kontextmenüs u. Ä.) – ob
   die Datei im gebauten Programm liegt, zeigt die Log-Zeile beim Start.
+- **Fremder Text nie als HTML** (`ui/safe_text.py`, seit 22.11.2026, Sicherheitsprüfung): Bei `AutoText`
+  (Vorgabe von `QLabel`, `QMessageBox.warning` u. Ä., Tooltips, `ToolTipRole`) entscheidet Qt per
+  `mightBeRichText` – Tag-artiges bis zum ersten Zeilenumbruch –, ob ein Text HTML ist. Ein eingeschleustes
+  `<img src="//server/…">` lädt Qt dann; unter Windows meldet sich das System dabei mit dem Konto des Nutzers am
+  fremden Server an. Betroffen waren Begründung/Fehler des KI-Servers, Dokumenttext in Tooltips, Namen und Vermerke
+  aus dem Arbeitsstand, Fehlermeldungen. **Regeln für neuen Code:** Beschriftung mit fremdem Text und ohne HTML →
+  `setTextFormat(PlainText)`; statische Meldungsfenster und Tooltips mit fremdem Text → `plain_text()` (unverdächtiger
+  Text bleibt gleich, sonst maskiertes HTML, das den Text wörtlich zeigt – Tests vergleichen weiter den Klartext);
+  eigenes HTML → fremde Teile mit `html.escape`. Statuszeile = `StatusLabel`: `setText` immer reiner Text,
+  `set_html` nur für die Erfolgsmeldung mit Link. `mightBeRichText` liegt in PySide6 in `QtGui.Qt`, nicht in
+  `QtCore.Qt`. Tests: `tests/test_ui_text.py` (u. a. Beleg, dass Qt ein `<img>` aus einer Datei wirklich lädt;
+  ohne die Änderung schlagen die Oberflächentests dort fehl).
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.

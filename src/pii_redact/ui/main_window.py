@@ -42,6 +42,7 @@ from .findings_panel import FindingsPanel
 from .ki_panel import KiReviewPanel
 from .notices import NoticeBar, NoticeButton, page_marks
 from .pdf_view import Overlay, PdfPagesView
+from .safe_text import StatusLabel, plain_text
 from .session import DocumentSession
 from .settings_dialog import SettingsDialog, needs_reanalysis
 from .text_view import HighlightTextView
@@ -256,7 +257,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
 
     def _build_status_bar(self) -> None:
         """Statusleiste: Meldung, Zähler der Hinweise, Fortschritt, Analyse-Modus."""
-        self.status_label = QLabel("Bereit")
+        self.status_label = StatusLabel("Bereit")   # immer reiner Text, außer der Erfolgsmeldung mit Link
         self.status_label.setAccessibleName("Status")
         self.status_label.linkActivated.connect(self._on_status_link)
         self.progress = QProgressBar()
@@ -509,7 +510,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         try:
             doc = self._load(path)
         except (UnsupportedFileError, OSError, RuntimeError) as exc:
-            QMessageBox.warning(self, "Datei kann nicht geöffnet werden", str(exc))
+            QMessageBox.warning(self, "Datei kann nicht geöffnet werden", plain_text(str(exc)))
             return
         if self.batch:
             self.close_batch(show_welcome=False)
@@ -595,7 +596,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.progress.hide()
         self.status_label.setText("Analyse fehlgeschlagen")
         self._update_actions()
-        QMessageBox.critical(self, "Analyse fehlgeschlagen", message)
+        QMessageBox.critical(self, "Analyse fehlgeschlagen", plain_text(message))
 
     # ================================================================== Anzeige
     def _on_session_changed(self) -> None:
@@ -907,7 +908,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         from PySide6.QtGui import QDesktopServices
 
         if not path.exists():
-            QMessageBox.information(self, "Nicht vorhanden", f"{path} existiert (noch) nicht.")
+            QMessageBox.information(self, "Nicht vorhanden", plain_text(f"{path} existiert (noch) nicht."))
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 

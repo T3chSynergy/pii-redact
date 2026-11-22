@@ -12,6 +12,12 @@
   Absätzen aus sehr vielen Zeilen, die mit Ziffern beginnen und enden, quadratisch wachsende Zeit – 100 000 solche
   Zeilen kosteten zusätzlich 16 Sekunden, 20 000 Zeilen mit Telefonnummern weitere 10 Sekunden. Jetzt wächst der
   Aufwand nur noch mit der Länge des Textes; gefunden wird dasselbe wie bisher.
+- **Text von außen wird nie als HTML angezeigt:** Qt zeigt Text in Beschriftungen, Meldungen und Hinweistexten
+  (Tooltips) als HTML an, sobald er danach aussieht. So konnten Begründungen und Fehlermeldungen des KI-Servers,
+  Text aus dem Dokument (etwa im Hinweistext der Fundliste), Fehlermeldungen sowie Datei- und Ordnernamen und
+  Vermerke der Ordnerbearbeitung Formatierungen und Bilder einschleusen – unter Windows auch ein Bild auf einem
+  fremden Server, bei dessen Abruf sich Windows dort mit dem Konto des Nutzers anmeldet. Solcher Text erscheint
+  jetzt überall wörtlich.
 
 **Einstellungen**
 - **Ungültige Werte in einer Einstellungsdatei werden übergangen und gemeldet:** Stand in einer von Hand

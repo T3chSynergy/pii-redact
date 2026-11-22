@@ -224,6 +224,7 @@ class SettingsDialog(QDialog):
         self.test_btn.clicked.connect(self._test_llm)
         self.test_result = QLabel()
         self.test_result.setWordWrap(True)
+        self.test_result.setTextFormat(Qt.TextFormat.PlainText)    # Fehlermeldungen kommen auch vom Server
         form = QFormLayout()
         form.addRow("", self.llm_enabled)
         form.addRow("Server-Adresse:", self.llm_url)

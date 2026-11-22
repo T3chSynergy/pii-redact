@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from ..core.batch import Status, Workspace, scan_folder
 from .dialogs import german_buttons
+from .safe_text import plain_text
 
 STATUS_STYLE = {
     # Status: (Symbol, Text, Farbe)
@@ -144,7 +146,7 @@ class NewBatchDialog(QDialog):
             try:
                 files = scan_folder(src, self.recursive.isChecked(), exclude=Path(tgt) if tgt else None)
             except OSError as exc:
-                files, msg = [], f"Ordner kann nicht gelesen werden: {exc}"
+                files, msg = [], plain_text(f"Ordner kann nicht gelesen werden: {exc}")
             else:
                 msg = f"<b>{len(files)}</b> Datei(en) gefunden (PDF, TXT, Markdown)."
                 ok = bool(files)
@@ -234,12 +236,13 @@ class BatchPanel(QWidget):
     def load(self, ws: Workspace) -> None:
         self.tree.clear()
         self._items = {}
-        self.title.setText(f"<b>{ws.source.name}</b> → {ws.target.name}")
-        self.title.setToolTip(f"Quelle: {ws.source}\nZiel: {ws.target}")
+        # Namen und Pfade stammen aus dem Arbeitsstand bzw. dem Dateisystem – maskiert bzw. als reiner Text
+        self.title.setText(f"<b>{html.escape(ws.source.name)}</b> → {html.escape(ws.target.name)}")
+        self.title.setToolTip(plain_text(f"Quelle: {ws.source}\nZiel: {ws.target}"))
         for e in ws.ordered():
             it = QTreeWidgetItem([e.rel, "", ""])
             it.setData(0, Qt.ItemDataRole.UserRole, e.rel)
-            it.setToolTip(0, e.rel)
+            it.setToolTip(0, plain_text(e.rel))
             self.tree.addTopLevelItem(it)
             self._items[e.rel] = it
         self.refresh(ws, current=None, running=None, pending=set())
@@ -261,7 +264,7 @@ class BatchPanel(QWidget):
             if e.reviewed_by:
                 tips.append(f"geprüft von {e.reviewed_by} am {e.reviewed_at.replace('T', ' ')}")
             tips += e.warnings + [x for x in (e.note, e.export_note, e.error.splitlines()[0] if e.error else "") if x]
-            it.setToolTip(2, "\n".join(tips))
+            it.setToolTip(2, plain_text("\n".join(tips)))
             f = it.font(0)
             f.setBold(e.rel == current)
             for c in range(3):
@@ -337,7 +340,7 @@ class ReviewBar(QWidget):
         lay.addWidget(self.btn_ok)
 
     def set_file(self, index: int, total: int, rel: str, status_text: str, color: str, can_confirm: bool) -> None:
-        self.label.setText(f"<b>Datei {index} von {total}:</b> {rel}")
+        self.label.setText(f"<b>Datei {index} von {total}:</b> {html.escape(rel)}")
         self.state.setText(f"<span style='color:{color}'>{status_text}</span>")
         self.btn_ok.setEnabled(can_confirm)
 
