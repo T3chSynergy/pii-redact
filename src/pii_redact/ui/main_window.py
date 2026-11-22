@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import threading
 from pathlib import Path
@@ -31,11 +32,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core import AnalysisMode, ReplaceMode, Settings, UnsupportedFileError, llm_review, load_document
-from ..core.loaders import SUPPORTED_SUFFIXES
+from ..core import AnalysisMode, ReplaceMode, UnsupportedFileError, llm_review, load_document
+from ..core.loaders import SUPPORTED_SUFFIXES, Level, Notice
 from ..core.redactor import pdf_redaction_plan, rects_of
 from ..paths import find_ner_model, ner_model_info
-from ..settings_store import defaults_path, settings_path
+from ..settings_store import load_settings, settings_path
 from . import dialogs
 from .batch_panel import BatchPanel, ReviewBar
 from .findings_panel import FindingsPanel
@@ -92,7 +93,12 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
 
     def __init__(self):
         super().__init__()
-        self.settings = Settings.load(settings_path(), defaults_path())
+        self.settings, warnings = load_settings(settings_path())
+        # Vorgaben bzw. Modelle der IT, die nicht gelten, weil sie nicht geschützt sind: Protokoll, Startseite und
+        # Hinweisleiste – die Nutzerin soll es der IT melden können
+        self.trust_notices = [Notice("it_vorgaben", Level.CRITICAL, w.short, w.detail) for w in warnings]
+        for w in warnings:
+            log.warning("%s", w.detail)
         for item in self.settings.ignored:
             log.warning("Einstellungen: ungültiger Wert für %s – übergangen, es gilt die Vorgabe der IT bzw. die "
                         "Voreinstellung", item)
@@ -156,6 +162,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         hint = QLabel(self._welcome_html())
         self.welcome_label = hint
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setWordWrap(bool(self.trust_notices))      # die Warnung zu den Vorgaben der IT ist lang
+        hint.linkActivated.connect(self.show_help)
         btn = QPushButton("Datei öffnen …")
         btn.setFixedWidth(220)
         btn.clicked.connect(self.open_dialog)
@@ -347,7 +355,9 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
                 "<p>PDF-, TXT- oder Markdown-Datei (oder einen ganzen Ordner) hierher ziehen<br>"
                 "oder <b>Datei → Öffnen</b> (Strg+O).</p>"
                 f"<p style='color:gray'>{local}</p>"
-                "<p style='color:gray'>Hilfe: <b>F1</b> oder <b>Hilfe → Anwenderhilfe</b></p>")
+                "<p style='color:gray'>Hilfe: <b>F1</b> oder <b>Hilfe → Anwenderhilfe</b></p>"
+                + "".join(f"<p style='color:#a33a00'><b>⚠ {html.escape(n.short)}</b><br>{html.escape(n.detail)} "
+                          "<a href='it-vorgaben'>Mehr …</a></p>" for n in self.trust_notices))
 
     def _build_actions(self) -> None:
         self.actions_ = {}
@@ -693,7 +703,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
     def _show_notices(self, doc) -> None:
         """Hinweise zum Dokument verteilen: kritische als einzeilige Leiste (außer bei „Kompakte
         Hinweise“), alle im Zähler der Statusleiste, seitenbezogene als Symbol in der Seitenansicht."""
-        notices = doc.notices if doc else []
+        notices = self.trust_notices + (doc.notices if doc else [])
         self.notice_bar.set_notices([] if self.settings.compact_notices else notices)
         self.notice_btn.set_notices(notices)
         marks = page_marks(notices)

@@ -127,14 +127,16 @@ class Settings:
         return self.org_deny_list + self.deny_list
 
     @classmethod
-    def load(cls, path: Path, defaults_path: Path | None = None) -> Settings:
+    def load(cls, path: Path, defaults_path: Path | None = None, defaults: dict | None = None) -> Settings:
         """Zentrale Vorgaben (defaults.json) als Grundlage, persönliche Einstellungen darüber.
         Ausnahme-/Sperrlisten der Organisation gelten immer zusätzlich; unter ``locked`` aufgeführte
-        Einstellungen kommen immer aus defaults.json."""
+        Einstellungen kommen immer aus defaults.json. ``defaults`` ist der schon gelesene Inhalt von
+        ``defaults_path`` (``settings_store.load_settings`` prüft die Datei und liest sie in einem Schritt)."""
         fallback = cls()
         ignored: list[str] = []
+        raw_defaults = defaults if defaults is not None else _read_json(defaults_path)
         # Unpassende Werte je Datei übergehen – ein Fehler im Nutzerprofil verdrängt keine Vorgabe der IT
-        base = _usable(_read_json(defaults_path), defaults_path, fallback, ignored) if defaults_path else {}
+        base = _usable(raw_defaults, defaults_path, fallback, ignored) if defaults_path else {}
         user = _usable(_read_json(path), path, fallback, ignored)
         locked = [k for k in base.get("locked", []) if k in base]
         data = {k: v for k, v in base.items() if k not in ("allow_list", "deny_list", "locked")}
@@ -213,7 +215,15 @@ def _read_json(path: Path | None) -> dict:
     if path is None:
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+        return json_object(path.read_bytes())
+    except OSError:
         return {}
+
+
+def json_object(data: bytes) -> dict:
+    """Inhalt einer Einstellungsdatei; leer, wenn er kein JSON-Objekt ist (auch mit BOM lesbar)."""
+    try:
+        value = json.loads(data.decode("utf-8-sig"))
+    except ValueError:              # auch UnicodeDecodeError
+        return {}
+    return value if isinstance(value, dict) else {}

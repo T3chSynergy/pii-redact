@@ -13,6 +13,8 @@ import os
 import sys
 from pathlib import Path
 
+from .machine_trust import program_data, replaceable_problem, tree_problem
+
 APP_NAME = "pii-redact"
 
 
@@ -35,10 +37,23 @@ def resource_dir() -> Path:
 
 
 def machine_config_dir() -> Path:
-    """Zentrale, von der IT verwaltete Konfiguration (für Nutzer meist nur lesbar)."""
+    """Zentrale, von der IT verwaltete Konfiguration. Was darin liegt, gilt nur, wenn es geschützt ist
+    (``machine_trust``) – einfache Benutzer dürfen unter Windows in ProgramData Ordner anlegen."""
     if sys.platform == "win32":
-        return Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / APP_NAME
+        return program_data() / APP_NAME
     return Path("/etc") / APP_NAME
+
+
+def machine_models_problem() -> str | None:
+    """Warum der Modellordner der IT nicht genutzt wird – None, wenn es ihn nicht gibt oder er geschützt ist.
+    Geschützt heißt: Ordner und alles darin gehört Administratoren/SYSTEM bzw. root, kein anderes Konto darf
+    etwas ändern oder anlegen, und der übergeordnete Ordner lässt sich nicht austauschen."""
+    base = machine_config_dir()
+    models = base / "models"
+    if not models.is_dir():
+        return None
+    problem = replaceable_problem(base)
+    return f"{base}: {problem}" if problem else tree_problem(models)
 
 
 def model_dirs() -> list[Path]:
@@ -47,10 +62,13 @@ def model_dirs() -> list[Path]:
     for extra in filter(None, os.environ.get("PII_REDACT_MODEL_DIR", "").split(os.pathsep)):
         if Path(extra).is_dir():
             out.append(Path(extra))
-    for base in (resource_dir(), app_dir(), machine_config_dir()):
+    for base in (resource_dir(), app_dir()):
         d = base / "models"
         if d.is_dir() and d not in out:
             out.append(d)
+    machine = machine_config_dir() / "models"     # nur, wenn geschützt (sonst warnt settings_store.load_settings)
+    if machine.is_dir() and machine not in out and machine_models_problem() is None:
+        out.append(machine)
     return out
 
 

@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 343 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 358 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -75,7 +75,7 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 343 Tests (Stand 22.11.2026; 0.8.7: 
   Original; PDFs seitenweise bis `llm_max_chars` (24 000). Nur wörtlich belegte Zitate → nicht aktivierte Funde
   `source="ki"` (Datenart `CONTEXT` „Kontext (indirekt)“). Zweiteilige **Prüfkennung** erkennt gekürzte
   Anfragen; *Verbindung testen* mit Anfrage in voller Länge. Code `core/llm_review.py`, `ui/ki_panel.py`,
-  Strg+K, Rückfrage einmal pro Programmstart. Einstellungen `llm_*`, Schlüssel bevorzugt `PII_REDACT_LLM_KEY`;
+  Strg+K, Rückfrage einmal pro Programmstart und erneut bei anderem Server (`_ki_confirmed_host`). Einstellungen `llm_*`, Schlüssel bevorzugt `PII_REDACT_LLM_KEY`;
   Vorgabe per `defaults.json` + `locked` (Vorlage `deploy/defaults.ki.example.json`). Arbeitsstand ohne
   KI-Begründungen, Protokollspalte „KI-Prüfung“. IT-Doku dazu technikneutral (OpenAI-kompatibel).
 - **API-Schlüssel der KI-Nachprüfung im Windows-Anmeldespeicher: vorerst nicht** (Entscheidung des Nutzers
@@ -376,6 +376,21 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   ohne die Änderung schlagen die Oberflächentests dort fehl).
 - `Settings.save` speichert alle Felder → IT-Vorgaben wirken nur bis zur ersten persönlichen Einstellung
   (daher `locked`).
+- **Vorgaben der IT nur aus geschützten Dateien** (`machine_trust.py`, seit 22.11.2026, Sicherheitsprüfung): Unter
+  Windows dürfen einfache Benutzer in `%ProgramData%` Ordner und Dateien anlegen – ohne Prüfung konnte jeder Nutzer
+  eines Terminalservers `defaults.json` (mit `locked`, Listen der Organisation, `llm_*`) oder Modelle für alle
+  ablegen. `settings_store.load_settings()` (Kommandozeile, Hauptfenster, `tools/ki_vergleich.py`) liest
+  `defaults.json` nur über `read_protected`: Prüfung an der geöffneten Datei, dann Lesen aus derselben (kein
+  Austausch dazwischen). Geschützt = Besitzer SYSTEM/Administratoren/TrustedInstaller und kein anderes Konto mit
+  Schreib-, Lösch- oder Rechteänderungsrecht (`WRITE_RIGHTS`); Linux/macOS: root, kein Schreibrecht für Gruppe und
+  andere. `paths.model_dirs()` nimmt `…\pii-redact\models` nur, wenn der ganze Baum geschützt ist (auch kein
+  Anlegen) und der Ordner darüber nicht austauschbar (`replaceable_problem`: Anlegen erlaubt, Löschen/Rechte nicht).
+  Sonst `TrustWarning` → stderr, Programmprotokoll, Startseite und Hinweisleiste (`MainWindow.trust_notices`, Hilfe
+  `#it-vorgaben`). **Entscheidung des Nutzers: übergehen und warnen**, nicht den Start verweigern. Bewusst streng:
+  Schreibrecht für eine Gruppe der IT → gilt nicht (steht in der IT-Anleitung mit den `icacls`-Befehlen). Ordner
+  ProgramData über `SHGetKnownFolderPath` statt Umgebungsvariable. Windows-Teil (ctypes) nur in der Windows-CI
+  testbar: `tests/test_machine_trust.py` legt per `net user` ein einfaches Konto an, setzt Besitzer und Rechte mit
+  `icacls` und schlägt in der CI fehl statt zu überspringen; der Linux-Teil läuft als root in der Cloud.
 - Manche LLM-Server kürzen zu lange Anfragen stillschweigend → Prüfkennung.
 - **Weiterleitungen bei der KI-Anfrage** (nachgestellt 10.11.2026): urllib folgt bei POST den Codes 301/302/303
   als GET ohne Inhalt, aber **mit** `Authorization` – auch zu einem anderen Server. `llm_review._opener` folgt

@@ -26,7 +26,7 @@ class _KiBridge(QObject):
 class KiMixin:
     def _init_ki(self) -> None:
         self._ki_session = None                    # Sitzung, deren KI-Nachprüfung gerade läuft
-        self._ki_confirmed = False                 # Senden an den Server in dieser Sitzung bestätigt
+        self._ki_confirmed_host = ""               # Server, an den das Senden in dieser Sitzung bestätigt ist
         self._ki_bridge = _KiBridge(self)
         self._ki_bridge.done.connect(self._on_ki_done)
         self._ki_bridge.failed.connect(self._on_ki_failed)
@@ -42,18 +42,19 @@ class KiMixin:
             QMessageBox.information(self, "KI-Nachprüfung", "Die KI-Nachprüfung ist nicht eingerichtet "
                                     "(Einstellungen → KI-Nachprüfung).")
             return
-        if not self._ki_confirmed:
-            host = llm_review.host_of(self.settings)
+        host = llm_review.host_of(self.settings)
+        if host != self._ki_confirmed_host:        # erneut fragen, wenn sich der Server geändert hat
             ok = dialogs.ask_yes_no(
                 self, "KI-Nachprüfung",
                 f"Der geschwärzte Text wird an <b>{html.escape(host)}</b> "
                 f"(Modell {html.escape(self.settings.llm_model)}) gesendet.<br><br>"
                 "Das Original verlässt den Rechner nicht – übersehene Angaben im Ergebnis aber schon. "
-                "Fortfahren?<br><span style='color:gray'>(Diese Frage erscheint einmal pro Programmstart.)</span>",
+                "Fortfahren?<br><span style='color:gray'>(Diese Frage erscheint einmal pro Programmstart "
+                "und erneut, wenn sich der Server ändert.)</span>",
             )
             if not ok:
                 return
-            self._ki_confirmed = True
+            self._ki_confirmed_host = host
         self._ki_session = s
         doc, findings, settings = s.doc, [f for f in s.findings], self.settings
         self.ki_dock.show()

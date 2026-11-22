@@ -170,7 +170,7 @@ python tools/benchmark_models.py --nur spacy:de_core_news_md onnx:all app:schnel
 (auch im Stapelbetrieb mit Auffüllung). Modelle landen in `models/ner/` (nicht im Git).
 
 Modelle werden gesucht in: `models/` im Programmpaket → `models/` neben der EXE →
-`%ProgramData%\pii-redact\models` (sowie zusätzlich `PII_REDACT_MODEL_DIR`).
+`%ProgramData%\pii-redact\models`, nur wenn geschützt (sowie zusätzlich `PII_REDACT_MODEL_DIR`).
 
 ## Zentrale Vorgaben (Softwareverteilung)
 
@@ -179,7 +179,10 @@ Standard-Modus, Schwelle, Ersetzung usw. gelten als Grundeinstellung; persönlic
 `allow_list`/`deny_list` der Organisation gelten **immer zusätzlich** zu den persönlichen Listen.
 Unter `"locked"` aufgeführte Schlüssel legt die IT fest (in den Einstellungen ausgegraut).
 Ungültige Werte (falsche Art oder außerhalb des Bereichs, z. B. `"threshold": 45`) werden übergangen und gemeldet –
-prüfen mit `pii-redact-cli --selftest`.
+prüfen mit `pii-redact-cli --selftest`. `defaults.json` und Modelle aus `%ProgramData%\pii-redact` gelten nur, wenn
+sie Administratoren bzw. SYSTEM gehören und kein anderes Konto sie ändern darf – sonst könnte auf einem gemeinsam
+genutzten Rechner jeder Nutzer Vorgaben für alle ablegen. Befehle zum Anlegen und Sperren des Ordners:
+`packaging/README.md`, Abschnitt „Zentrale Vorgaben“.
 
 ### KI-Nachprüfung (optional, ab 0.5.0)
 

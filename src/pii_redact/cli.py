@@ -40,7 +40,8 @@ from .core import (
 )
 from .core.batch import CHECK_NOT_AUTO, export_document, held_for_check
 from .core.entities import info
-from .settings_store import defaults_path, settings_path
+from .settings_store import load_settings as load_stored_settings
+from .settings_store import settings_path
 
 OK, ERROR, LEFTOVERS, OCR_SKIPPED, FAST_FALLBACK = 0, 1, 2, 3, 4
 #: Fehler an einer einzelnen Datei – melden und mit der nächsten weitermachen. RuntimeError deckt Fehler der
@@ -102,7 +103,9 @@ def load_settings(args, p: _Parser) -> tuple[Settings, bool]:
     mit „Schnell“ gearbeitet, obwohl „Gründlich“ eingestellt ist (Modell fehlt)."""
     if args.einstellungen is not None and not args.einstellungen.is_file():
         p.error(f"Einstellungsdatei nicht gefunden: {args.einstellungen}")
-    settings = Settings.load(args.einstellungen or settings_path(), defaults_path())
+    settings, warnings = load_stored_settings(args.einstellungen or settings_path())
+    for w in warnings:              # Vorgaben bzw. Modelle der IT, die nicht gelten, weil sie nicht geschützt sind
+        print(f"⚠ {w.detail}", file=sys.stderr)
     for item in settings.ignored:   # nicht stillschweigend: Die Datei enthält einen Fehler, der sonst nie auffiele
         print(f"⚠ Einstellungen: ungültiger Wert für {item} – übergangen, es gilt die Vorgabe der IT bzw. die "
               "Voreinstellung.", file=sys.stderr)
