@@ -18,6 +18,17 @@
   Vermerke der Ordnerbearbeitung Formatierungen und Bilder einschleusen – unter Windows auch ein Bild auf einem
   fremden Server, bei dessen Abruf sich Windows dort mit dem Konto des Nutzers anmeldet. Solcher Text erscheint
   jetzt überall wörtlich.
+- **Vorgaben der IT nur aus geschützten Dateien:** `defaults.json` und zusätzliche Modelle unter
+  `C:\ProgramData\pii-redact` gelten nur noch, wenn sie SYSTEM, Administratoren oder TrustedInstaller gehören und
+  kein anderes Konto sie ändern darf. Unter Windows dürfen einfache Benutzer in ProgramData Ordner anlegen; auf
+  einem gemeinsam genutzten Rechner (Terminalserver) konnte so jeder Nutzer eigene „Vorgaben der IT“ für alle
+  anderen ablegen – mit gesperrten Einstellungen, einer Ausnahmeliste oder einem eigenen Server für die
+  KI-Nachprüfung. Ungeschützte Dateien werden jetzt übergangen; Startseite, Hinweisleiste, Programmprotokoll und
+  Kommandozeile (auch `--selftest`) nennen Datei und Grund. **Für die IT:** den Ordner immer anlegen und sperren,
+  auch ohne `defaults.json` – Befehle in der IT-Anleitung (`packaging/README.md`, „Zentrale Vorgaben“). Den Ordner
+  ProgramData fragt das Programm bei Windows ab statt aus der Umgebungsvariablen.
+- **KI-Nachprüfung fragt bei einem anderen Server erneut:** Die Rückfrage vor dem Senden kam bisher einmal pro
+  Programmstart. Jetzt kommt sie erneut, wenn sich der Server seitdem geändert hat.
 
 **Einstellungen**
 - **Ungültige Werte in einer Einstellungsdatei werden übergangen und gemeldet:** Stand in einer von Hand

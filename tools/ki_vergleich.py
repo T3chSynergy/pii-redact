@@ -166,7 +166,7 @@ def report(models: dict[str, list[CaseResult]], settings: Settings, repeats: int
 
 
 def main(argv=None) -> int:
-    from pii_redact.settings_store import defaults_path, settings_path
+    from pii_redact.settings_store import load_settings
 
     ap = argparse.ArgumentParser(description="Sprachmodelle für die KI-Nachprüfung vergleichen.")
     ap.add_argument("--modell", action="append", help="Modellname (mehrfach möglich); Standard: aus den Einstellungen")
@@ -177,7 +177,9 @@ def main(argv=None) -> int:
     ap.add_argument("--ausgabe", type=Path, help="Berichtsdatei (Standard: ki_vergleich_<Datum>.md)")
     args = ap.parse_args(argv)
 
-    settings = Settings.load(settings_path(), defaults_path())
+    settings, warnings = load_settings()
+    for w in warnings:   # ungeschützte Vorgaben der IT gelten nicht
+        print(f"⚠ {w.detail}", file=sys.stderr)
     settings.llm_enabled = True
     if args.url:
         settings.llm_url = args.url

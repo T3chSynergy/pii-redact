@@ -18,7 +18,7 @@ from .pdf_view import ORANGE, PageMark
 from .safe_text import plain_text
 
 #: Hilfekapitel je Hinweisart
-HELP_ANCHOR = {"ocr": "ocr", "ocr_error": "ocr", "no_text": "ocr", "pages_no_text": "ocr"}
+HELP_ANCHOR = {"ocr": "ocr", "ocr_error": "ocr", "no_text": "ocr", "pages_no_text": "ocr", "it_vorgaben": "it-vorgaben"}
 DEFAULT_ANCHOR = "hinweise"
 
 

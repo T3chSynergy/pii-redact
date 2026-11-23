@@ -397,7 +397,7 @@ def test_ki_review_not_configured_or_declined(editor, monkeypatch):
     monkeypatch.setattr(dialogs, "ask_yes_no", lambda *a, **k: asked.append(a[2]) and False)
     window.start_ki_review()
     assert "llm.intern.example" in asked[0] and "einmal pro Programmstart" in asked[0]
-    assert window._ki_session is None and not window._ki_confirmed and not called
+    assert window._ki_session is None and not window._ki_confirmed_host and not called
 
     monkeypatch.setattr(type(window.runner), "busy", property(lambda self: True))
     window.start_ki_review()                                              # während einer Analyse: nichts
@@ -508,11 +508,12 @@ def test_settings_dialog_returns_changed_values(window):
 
 def test_invalid_settings_value_is_logged_at_start(tmp_path, monkeypatch, caplog):
     """Ungültiger Wert in der Einstellungsdatei: Es gilt die Voreinstellung, das Protokoll nennt Schlüssel und Datei."""
+    from pii_redact import settings_store
     from pii_redact.ui import main_window
 
     (tmp_path / "settings.json").write_text('{"threshold": 45, "pdf_labels": false}', encoding="utf-8")
     monkeypatch.setattr(main_window, "settings_path", lambda: tmp_path / "settings.json")
-    monkeypatch.setattr(main_window, "defaults_path", lambda: tmp_path / "defaults.json")
+    monkeypatch.setattr(settings_store, "defaults_path", lambda: tmp_path / "defaults.json")
     _app = QApplication.instance() or QApplication([])
     with caplog.at_level("WARNING", logger="pii_redact.ui.main_window"):
         w = main_window.MainWindow()

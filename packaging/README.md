@@ -316,8 +316,33 @@ Vorlage: `deploy\defaults.example.json`.
   übergangenen Schlüssel samt Datei in der Fehlerausgabe (ebenso jeder andere Aufruf der Kommandozeile); die
   Oberfläche schreibt ihn beim Start ins Programmprotokoll (`pii-redact.log`, siehe Tabelle unten).
 
+**Ordner schützen (Pflicht, auch ohne `defaults.json`):** Unter `C:\ProgramData` dürfen einfache Benutzer
+standardmäßig Ordner und Dateien anlegen. Das Programm übernimmt `defaults.json` und Modelle aus
+`C:\ProgramData\pii-redact` deshalb nur, wenn sie **SYSTEM, Administratoren oder TrustedInstaller gehören und kein
+anderes Konto sie ändern darf** (beim Modellordner auch: nichts darin anlegen). Sonst gelten sie nicht, und das
+Programm warnt – auf der Startseite, als orange Hinweiszeile, im Programmprotokoll und in der Fehlerausgabe der
+Kommandozeile. Ohne diese Prüfung könnte auf einem gemeinsam genutzten Rechner (Terminalserver, Citrix) jeder
+Nutzer eigene „Vorgaben der IT“ für alle anderen ablegen. Den Ordner deshalb immer anlegen und sperren – auch wenn
+(noch) keine Vorgaben verteilt werden, sonst kann ein Nutzer ihn zuerst anlegen (Eingabeaufforderung als
+Administrator):
+
+```bat
+mkdir C:\ProgramData\pii-redact
+icacls C:\ProgramData\pii-redact /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX
+icacls C:\ProgramData\pii-redact /setowner *S-1-5-32-544 /T
+```
+
+(`S-1-5-18` = SYSTEM, `S-1-5-32-544` = Administratoren, `S-1-5-32-545` = Benutzer – die Kennungen gelten in jeder
+Sprache.) Per SCCM, Paket oder GPO verteilte Dateien gehören SYSTEM und erben die Rechte des Ordners – das passt.
+Wer Dateien von Hand hineinkopiert, setzt danach den zweiten `icacls`-Befehl erneut ab. Schreibrechte für weitere Konten
+oder Gruppen – auch solche der IT – führen dazu, dass die Datei nicht gilt: Ändern dürfen nur SYSTEM und
+Administratoren.
+**Prüfen:** `pii-redact-cli.exe --selftest` nennt in der Fehlerausgabe jede Datei, die nicht gilt, samt Grund
+(Besitzer bzw. Konto mit Schreibrecht).
+
 Zusätzliche Modelle können – ohne neues Installationspaket – unter `C:\ProgramData\pii-redact\models\ner\<name>\`
-abgelegt werden.
+abgelegt werden. Der Ordner `models` gilt nur, wenn er samt Inhalt geschützt ist (siehe oben, „Ordner schützen“) –
+nach dem Kopieren den zweiten `icacls`-Befehl erneut absetzen.
 
 ## KI-Nachprüfung (optional)
 
@@ -385,7 +410,7 @@ statt zu einer scheinbar harmlosen Bewertung.
 | Pfad | Inhalt |
 |---|---|
 | `C:\Program Files\pii-redact\` (bzw. Zielordner der IT) | Programm (schreibgeschützt für Nutzer) |
-| `C:\ProgramData\pii-redact\defaults.json` | zentrale Vorgaben (optional) |
+| `C:\ProgramData\pii-redact\defaults.json` | zentrale Vorgaben (optional; gilt nur, wenn nur Administratoren schreiben dürfen) |
 | `%APPDATA%\pii-redact\settings.json` | persönliche Einstellungen |
 | `%LOCALAPPDATA%\pii-redact\logs\pii-redact.log` | Programmprotokoll für den Support (keine Dokumentinhalte) |
 | Zielordner der Ordner-Bearbeitung | Ergebnisse, `pii-redact-protokoll.csv`, `pii-redact-arbeitsstand.json` |
