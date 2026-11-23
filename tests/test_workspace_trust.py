@@ -14,6 +14,7 @@ import csv
 import hashlib
 import json
 import os
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from pii_redact.core.batch import (
     WORKSPACE_NAME,
     Status,
     Workspace,
+    export_document,
     is_generated,
     layout_sha,
     text_sha,
@@ -221,3 +223,98 @@ def test_confirmed_sources_survive_saving(tmp_path):
     s = Settings(confirmed_sources={os.path.normcase(str(tmp_path)): {"source": "/quelle", "recursive": True}})
     s.save(tmp_path / "settings.json")
     assert Settings.load(tmp_path / "settings.json").confirmed_sources == s.confirmed_sources
+
+
+# ------------------------------------------------------------------ Ergebnisse als ZIP
+def _export(ws: Workspace, rel: str) -> Path:
+    doc = load_document(ws.abs(rel))
+    findings = ws.restore_findings(rel, doc)
+    out = ws.out(rel)
+    export_document(doc, findings, Settings(), out)
+    ws.mark_done(rel, reviewed=True, exported_as=out, leftovers=[], findings=findings)
+    ws.save()
+    return out
+
+
+def test_zip_holds_only_exported_results(notes, tmp_path):
+    (notes / "unter").mkdir()
+    (notes / "unter" / "zweit.txt").write_text(NOTE, encoding="utf-8")
+    target = tmp_path / "ziel"
+    ws = _analyzed(notes, target)                                  # „unter/zweit.txt“ bleibt offen
+    _export(ws, "termin.txt")
+    (target / "fremd_geschwaerzt.pdf").write_bytes(b"untergeschoben")
+    (tmp_path / "geheim_anonymisiert.txt").write_text("außerhalb", encoding="utf-8")
+    assert ws.result_files() == (["termin_anonymisiert.txt"], 1)
+
+    dest = tmp_path / "weitergeben.zip"
+    assert ws.pack_results(dest) == ["termin_anonymisiert.txt"]
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == ["termin_anonymisiert.txt"]
+        assert "Kaya" not in z.read("termin_anonymisiert.txt").decode("utf-8")
+    ws.pack_results(dest, with_protocol=True)
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == ["termin_anonymisiert.txt", PROTOCOL_NAME]
+    with pytest.raises(ValueError, match="außerhalb des Zielordners"):
+        ws.pack_results(target / "im_ziel.zip")
+    assert not (target / "im_ziel.zip").exists()
+
+
+@pytest.mark.parametrize("pointer", ["../geheim_anonymisiert.txt", WORKSPACE_NAME, PROTOCOL_NAME,
+                                     "fehlt_anonymisiert.txt"])
+def test_zip_ignores_manipulated_export_paths(notes, tmp_path, pointer):
+    """Wer den Arbeitsstand ändert, kann „Exportiert als“ auf beliebige Dateien zeigen lassen – ins ZIP kommt nur,
+    was wie ein Ergebnis heißt und im Zielordner liegt."""
+    target = tmp_path / "ziel"
+    ws = _analyzed(notes, target)
+    _export(ws, "termin.txt")
+    (tmp_path / "geheim_anonymisiert.txt").write_text("außerhalb", encoding="utf-8")
+    ws.entries["termin.txt"].exported_as = pointer
+    assert ws.result_files()[0] == []
+
+
+def test_zip_ignores_link_out_of_target(notes, tmp_path):
+    target = tmp_path / "ziel"
+    ws = _analyzed(notes, target)
+    _export(ws, "termin.txt")
+    secret = tmp_path / "geheim.txt"
+    secret.write_text("außerhalb", encoding="utf-8")
+    link = target / "verweis_anonymisiert.txt"
+    try:
+        os.symlink(secret, link)
+    except OSError:
+        pytest.skip("Verknüpfungen nicht erlaubt (Windows ohne Entwicklermodus)")
+    ws.entries["termin.txt"].exported_as = link.name
+    assert ws.result_files()[0] == []
+
+
+@needs_model
+def test_window_offers_and_saves_zip(window, notes, tmp_path, monkeypatch):
+    from test_ui_export import Dialogs
+
+    window.settings.analysis_mode = "schnell"
+    target = tmp_path / "ziel"
+    window._activate_batch(_analyzed(notes, target))
+    dest = tmp_path / "weitergeben.zip"
+    d = Dialogs(monkeypatch, target=dest)
+    window.save_results_zip()                                      # noch nichts fertig
+    assert d.shown == [("information", "Ergebnisse als ZIP speichern",
+                        "Es gibt noch keine fertigen Ergebnisse – erst Dateien prüfen und exportieren.")]
+    window.confirm_and_next()                                      # letzte Datei → Abschluss mit Angebot
+    assert d.boxes[-1]["title"] == "Ordner bearbeitet" and "Als ZIP speichern …" in d.boxes[-1]["buttons"]
+    assert not dest.exists()                                       # „OK“ ist voreingestellt
+
+    window.save_results_zip()
+    ask = d.boxes[-1]
+    assert ask["title"] == "Ergebnisse als ZIP speichern" and ask["default"] == "Speichern …"
+    assert d.asked_for_file[-1] == str(target.parent / "ziel.zip")
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == ["termin_anonymisiert.txt"]       # Protokoll ist voreingestellt nicht dabei
+    assert "1 Ergebnis(se) als ZIP" in window.status_label.text()
+
+    monkeypatch.setattr(type(window), "_ask_zip", lambda self, n, pending: True)
+    window.save_results_zip()
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == ["termin_anonymisiert.txt", PROTOCOL_NAME]
+    assert window.actions_["zip_results"].isEnabled()
+    window.close_batch()
+    assert not window.actions_["zip_results"].isEnabled()

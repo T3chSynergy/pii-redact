@@ -120,7 +120,8 @@ Im Zielordner:
 | `pii-redact-protokoll.csv` | je Datei: Status, geprüft von/am, Anzahl Funde je Datenart, manuelle Änderungen, Analyse-Modus, Hinweise – **ohne** die gefundenen Daten selbst (öffnet direkt in Excel) |
 | `pii-redact-arbeitsstand (nicht weitergeben).json` | Arbeitsstand zum Fortsetzen – **kein Klartext**, aber Lage und Länge der geschwärzten Stellen; nicht weitergeben |
 
-Weitergeben sollte man nur die bearbeiteten Dateien (bei Bedarf mit Protokoll), nicht den ganzen Zielordner. In den
+Weitergeben sollte man nur die bearbeiteten Dateien (bei Bedarf mit Protokoll), nicht den ganzen Zielordner –
+**„Als ZIP …“** in der Arbeitsliste packt genau die exportierten Ergebnisse, ohne Arbeitsstand. In den
 Zielordner sollten nur Personen schreiben dürfen, denen die Prüfung anvertraut ist – wer dort schreiben darf, kann
 den Arbeitsstand ändern. Eine Ordner-Arbeit, die auf diesem Rechner nicht selbst begonnen wurde, setzt das Programm
 erst nach Rückfrage zum Quellordner fort.

@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 369 Tests (Stand 23.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 376 Tests (Stand 23.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -91,8 +91,12 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 369 Tests (Stand 23.11.2026; 0.8.7: 
   **Nicht** gebaut: neu analysieren vor jedem automatischen Export, Signatur des Arbeitsstands (ein Schlüssel je
   Person verhindert die Zusammenarbeit). Gebaut (Schritt 4): keine erratbaren Prüfsummen, Rückfrage zum Quellordner,
   Texterkennung aus dem geladenen Dokument, ohne Prüfsumme keine Übernahme, Dateiname „(nicht weitergeben)“.
-  Spalte „SHA-256 Original“ im Protokoll entfällt (Entscheidung des Nutzers). Geplant: ZIP der Ergebnisse zum
-  Weitergeben (Schritt 5).
+  Spalte „SHA-256 Original“ im Protokoll entfällt (Entscheidung des Nutzers). **ZIP der Ergebnisse** (Schritt 5,
+  Vorschlag des Nutzers): `Workspace.result_files`/`pack_results` – nur laut Arbeitsstand exportierte Dateien, die
+  wie ein Ergebnis heißen (`is_result`) und nach `resolve()` im Zielordner liegen (sonst ließen sich über
+  `exported_as` oder Verknüpfungen fremde Dateien ins ZIP schmuggeln); Protokoll nur mit Häkchen (aus), ZIP nicht
+  im Zielordner. Oberfläche: Knopf „Als ZIP …“, *Datei → Ergebnisse als ZIP speichern …*, Angebot in der
+  Abschlussmeldung (`_offer_zip_when_done`), Rückfrage `_ask_zip` (in Tests ersetzen). Kommandozeile: noch nicht.
 - **Modellvergleich** `tools/ki_vergleich.py`/`.bat`: sechs erfundene Testfälle `tools/ki_testfaelle.json`;
   Bericht `ki_vergleich_<Datum>.md` (gitignored). Modellwahl ist Sache der IT.
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,

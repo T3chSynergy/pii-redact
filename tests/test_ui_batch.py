@@ -364,9 +364,10 @@ def test_confirm_and_next_reports_leftovers_and_end_of_folder(batch, monkeypatch
     monkeypatch.setattr(wb, "export_document", real)
     ws.set_error("c.txt", "kaputt")
     window.confirm_and_next()                             # b.txt war die letzte offene Datei
-    kind, title, text = d.shown[1]
-    assert (kind, title) == ("information", "Ordner bearbeitet") and len(d.shown) == 2
-    assert "2 geprüft, 0 automatisch, 1 mit Fehler" in text and str(ws.target) in text
+    done = d.boxes[-1]                                    # Zusammenfassung mit Angebot, als ZIP zu speichern
+    assert done["title"] == "Ordner bearbeitet" and len(d.shown) == 1
+    assert "2 geprüft, 0 automatisch, 1 mit Fehler" in done["text"] and str(ws.target) in done["text"]
+    assert "Als ZIP speichern …" in done["buttons"] and done["default"] == "OK"
     assert window.batch_rel == "b.txt"
     # Anzeige in der Leiste: wer geprüft hat
     assert "geprüft von" in window.review_bar.state.text()

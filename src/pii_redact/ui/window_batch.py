@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressDialog
+from PySide6.QtWidgets import QApplication, QCheckBox, QFileDialog, QMessageBox, QProgressDialog
 
 from ..core import UnsupportedFileError
 from ..core.batch import Status, Workspace, export_document, held_for_check
@@ -329,12 +329,73 @@ class BatchMixin:
             self.status_label.setText(f"{rel} geprüft und exportiert.")
         else:
             self._refresh_batch()
-            c = self.batch.counts()
-            QMessageBox.information(
-                self, "Ordner bearbeitet",
-                f"Alle Dateien sind bearbeitet.\n\n{c.get(Status.REVIEWED, 0)} geprüft, "
-                f"{c.get(Status.AUTO, 0)} automatisch, {c.get(Status.ERROR, 0)} mit Fehler.\n\n"
-                f"Ergebnisse und Protokoll:\n{self.batch.target}")
+            self._offer_zip_when_done()
+
+    def _offer_zip_when_done(self) -> None:
+        """Alle Dateien bearbeitet: Zusammenfassung, dazu das Angebot, die Ergebnisse als ZIP zu speichern."""
+        c = self.batch.counts()
+        box = QMessageBox(QMessageBox.Icon.Information, "Ordner bearbeitet", plain_text(
+            f"Alle Dateien sind bearbeitet.\n\n{c.get(Status.REVIEWED, 0)} geprüft, "
+            f"{c.get(Status.AUTO, 0)} automatisch, {c.get(Status.ERROR, 0)} mit Fehler.\n\n"
+            f"Ergebnisse und Protokoll:\n{self.batch.target}"), QMessageBox.StandardButton.NoButton, self)
+        box.setInformativeText("Zum Weitergeben am besten nur die bereinigten Dateien – als ZIP, ohne Arbeitsstand.")
+        zip_button = box.addButton("Als ZIP speichern …", QMessageBox.ButtonRole.ActionRole)
+        ok = box.addButton("OK", QMessageBox.ButtonRole.AcceptRole)
+        box.setDefaultButton(ok)
+        box.setEscapeButton(ok)
+        box.exec()
+        if box.clickedButton() is zip_button:
+            self.save_results_zip()
+
+    def save_results_zip(self) -> None:
+        """Bereinigte Dateien zum Weitergeben als ZIP – nur, was das Programm exportiert hat, ohne Arbeitsstand;
+        das Protokoll nur auf Wunsch."""
+        if not self.batch:
+            return
+        self._store_batch_session()
+        self._save_batch()
+        files, pending = self.batch.result_files()
+        if not files:
+            QMessageBox.information(self, "Ergebnisse als ZIP speichern",
+                                    "Es gibt noch keine fertigen Ergebnisse – erst Dateien prüfen und exportieren.")
+            return
+        with_protocol = self._ask_zip(len(files), pending)
+        if with_protocol is None:
+            return
+        target = self.batch.target
+        path, _ = QFileDialog.getSaveFileName(self, "Ergebnisse als ZIP speichern",
+                                              str(target.parent / f"{target.name}.zip"), "ZIP-Archiv (*.zip)")
+        if not path:
+            return
+        try:
+            packed = self.batch.pack_results(Path(path), with_protocol=with_protocol)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "ZIP nicht gespeichert", plain_text(str(exc)))
+            return
+        self._show_saved(Path(path), f"{len(packed)} Ergebnis(se) als ZIP"
+                         + (" mit Protokoll" if with_protocol else ""))
+
+    def _ask_zip(self, count: int, pending: int) -> bool | None:
+        """Rückfrage vor dem ZIP. Rückgabe: Protokoll beilegen? None = abgebrochen."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Ergebnisse als ZIP speichern")
+        box.setText(f"{count} bereinigte Datei(en) kommen in das ZIP – mit Ordnerstruktur, ohne Arbeitsstand.")
+        info = []
+        if pending:
+            info.append(f"{pending} Datei(en) sind noch nicht fertig (zu prüfen, wartend oder mit Fehler) und fehlen "
+                        "im ZIP.")
+        info.append("Das Protokoll enthält Dateinamen und die Anmeldenamen der Prüfenden – nur beilegen, wenn der "
+                    "Empfänger es braucht.")
+        box.setInformativeText("\n\n".join(info))
+        protocol = QCheckBox("Protokoll beilegen")
+        box.setCheckBox(protocol)
+        save = box.addButton("Speichern …", QMessageBox.ButtonRole.AcceptRole)
+        cancel = box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save)
+        box.setEscapeButton(cancel)
+        box.exec()
+        return protocol.isChecked() if box.clickedButton() is save else None
 
     def _step_file(self, delta: int) -> None:
         if not self.batch:

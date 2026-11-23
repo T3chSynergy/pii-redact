@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import re
+import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -191,6 +192,12 @@ def finding_stats(findings: list[Finding]) -> dict:
 
 
 # ---------------------------------------------------------------------- Ordner
+def is_result(name: str) -> bool:
+    """Heißt die Datei wie ein Ergebnis des Programms (``…_geschwaerzt.pdf``, ``…_anonymisiert.txt``)?"""
+    stem = Path(name).stem
+    return stem.endswith("_geschwaerzt") or stem.endswith("_anonymisiert")
+
+
 def is_generated(name: str) -> bool:
     stem = Path(name).stem
     return (stem.endswith("_geschwaerzt") or stem.endswith("_anonymisiert")
@@ -523,6 +530,53 @@ class Workspace:
         e.exported_as = exported_as.relative_to(self.target).as_posix()
         e.export_note = (f"Kontrolle: {len(leftovers)} Rest(e) im Ergebnis gefunden" if leftovers else "")
         e.note = ""
+
+    # ------------------------------------------------------------------ Weitergeben
+    def result_files(self) -> tuple[list[str], int]:
+        """Ergebnisse zum Weitergeben: nur Dateien, die das Programm laut Arbeitsstand selbst exportiert hat, die wie
+        ein Ergebnis heißen und tatsächlich im Zielordner liegen (auch nach Auflösen von Verknüpfungen) – nicht
+        einfach alles im Zielordner. Wer dort schreiben darf, könnte sonst fremde Dateien unterschieben oder
+        ``exported_as`` auf Dateien außerhalb zeigen lassen. Rückgabe: Pfade relativ zum Zielordner und die Zahl
+        der Dateien ohne Ergebnis (noch zu prüfen, wartend, Fehler)."""
+        root = self.target.resolve()
+        found: set[str] = set()
+        pending = 0
+        for e in self.ordered():
+            if e.status == Status.MISSING:
+                continue
+            if not e.done or not e.exported_as:
+                pending += 1
+                continue
+            path = self.target / e.exported_as
+            try:
+                real = path.resolve(strict=True)
+            except (OSError, RuntimeError):
+                pending += 1                          # Ergebnis fehlt (gelöscht, verschoben)
+                continue
+            if is_result(real.name) and real.is_file() and real.is_relative_to(root):
+                found.add(real.relative_to(root).as_posix())
+        return sorted(found, key=str.casefold), pending
+
+    def pack_results(self, dest: Path, with_protocol: bool = False) -> list[str]:
+        """Ergebnisse (siehe :meth:`result_files`) als ZIP mit der Ordnerstruktur speichern, ohne Arbeitsstand;
+        das Protokoll nur auf Wunsch. Das ZIP darf nicht im Zielordner liegen. Rückgabe: die gepackten Dateien."""
+        root = self.target.resolve()
+        dest = Path(dest)
+        if dest.resolve().is_relative_to(root):
+            raise ValueError("Das ZIP bitte außerhalb des Zielordners speichern.")
+        files, _pending = self.result_files()
+        tmp = dest.with_name(dest.name + ".tmp")
+        try:
+            with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as z:
+                for rel in files:
+                    z.write(root / rel, arcname=rel)
+                if with_protocol and self.protocol_path.is_file():
+                    z.write(self.protocol_path, arcname=PROTOCOL_NAME)
+            os.replace(tmp, dest)
+        except OSError:
+            tmp.unlink(missing_ok=True)
+            raise
+        return files
 
     # ------------------------------------------------------------------ Protokoll
     def write_protocol(self) -> None:

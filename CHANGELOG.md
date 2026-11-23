@@ -52,6 +52,12 @@
 - **KI-Nachprüfung fragt bei einem anderen Server erneut:** Die Rückfrage vor dem Senden kam bisher einmal pro
   Programmstart. Jetzt kommt sie erneut, wenn sich der Server seitdem geändert hat.
 
+**Ordner-Bearbeitung**
+- **Ergebnisse als ZIP weitergeben:** „Als ZIP …“ in der Arbeitsliste bzw. *Datei → Ergebnisse als ZIP speichern …*
+  packt die bereinigten Dateien mit Ordnerstruktur in ein ZIP – ohne Arbeitsstand, das Protokoll nur auf Wunsch
+  (voreingestellt aus). Ins ZIP kommen nur Dateien, die das Programm selbst exportiert hat und die im Zielordner
+  liegen; andere Dateien dort bleiben draußen. Sind alle Dateien bearbeitet, bietet das Programm das ZIP selbst an.
+
 **Einstellungen**
 - **Ungültige Werte in einer Einstellungsdatei werden übergangen und gemeldet:** Stand in einer von Hand
   bearbeiteten `settings.json` oder in der `defaults.json` der IT ein Wert außerhalb des gültigen Bereichs,
