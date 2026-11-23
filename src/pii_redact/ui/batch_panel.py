@@ -170,6 +170,7 @@ class BatchPanel(QWidget):
     exportUnreviewed = Signal()
     openProtocol = Signal()
     openTarget = Signal()
+    saveZip = Signal()
     closeRequested = Signal()
 
     def __init__(self, parent=None):
@@ -211,6 +212,9 @@ class BatchPanel(QWidget):
         btn_prot.clicked.connect(self.openProtocol)
         btn_target = QToolButton(text="Zielordner")
         btn_target.clicked.connect(self.openTarget)
+        btn_zip = QToolButton(text="Als ZIP …")
+        btn_zip.setToolTip("Bereinigte Dateien als ZIP speichern – zum Weitergeben, ohne Arbeitsstand.")
+        btn_zip.clicked.connect(self.saveZip)
         btn_close = QToolButton(text="Schließen")
         btn_close.setToolTip("Ordner-Arbeit beenden – der Stand ist gespeichert und kann fortgesetzt werden.")
         btn_close.clicked.connect(self.closeRequested)
@@ -218,6 +222,7 @@ class BatchPanel(QWidget):
         row = QHBoxLayout()
         row.addWidget(btn_prot)
         row.addWidget(btn_target)
+        row.addWidget(btn_zip)
         row.addStretch(1)
         row.addWidget(btn_close)
 

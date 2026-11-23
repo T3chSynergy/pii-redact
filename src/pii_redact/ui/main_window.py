@@ -259,6 +259,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         self.batch_panel.exportUnreviewed.connect(self.export_unreviewed)
         self.batch_panel.openProtocol.connect(lambda: self._open_path(self.batch.protocol_path if self.batch else None))
         self.batch_panel.openTarget.connect(lambda: self._open_path(self.batch.target if self.batch else None))
+        self.batch_panel.saveZip.connect(self.save_results_zip)
         self.batch_panel.closeRequested.connect(self.close_batch)
         self._batch_save_timer = QTimer(self, singleShot=True, interval=800)
         self._batch_save_timer.timeout.connect(self._save_batch)
@@ -387,6 +388,8 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         act("open_folder", "&Ordner bearbeiten …", lambda: self.open_folder_dialog(), "Ctrl+Shift+O",
             SP.SP_DirOpenIcon, "Alle Dateien eines Ordners analysieren, prüfen und exportieren")
         act("resume_folder", "Ordner-Arbeit fo&rtsetzen …", self.resume_folder_dialog)
+        act("zip_results", "&Ergebnisse als ZIP speichern …", self.save_results_zip, tip=
+            "Bereinigte Dateien der Ordner-Arbeit als ZIP speichern – zum Weitergeben, ohne Arbeitsstand")
         act("close_folder", "Ordner-Arbeit &schließen", self.close_batch)
         act("confirm_next", "&Geprüft && weiter", self.confirm_and_next, "Ctrl+Return")
         act("prev_file", "&Vorherige Datei", lambda: self._step_file(-1), "Alt+Left")
@@ -430,7 +433,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         m.addActions([a["open"], a["open_folder"], a["resume_folder"]])
         self.recent_menu = m.addMenu("&Zuletzt bearbeitete Ordner")
         self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
-        m.addAction(a["close_folder"])
+        m.addActions([a["zip_results"], a["close_folder"]])
         m.addSeparator()
         m.addAction(a["reanalyze"])
         m.addSeparator()
@@ -800,7 +803,7 @@ class MainWindow(BatchMixin, KiMixin, EditMixin, ViewMixin, ExportMixin, QMainWi
         awaiting = in_batch and self._awaiting_rel is not None and self._awaiting_rel == self.batch_rel
         a["reanalyze"].setEnabled(a["reanalyze"].isEnabled() and not awaiting)
         a["confirm_next"].setEnabled(in_batch and has and not busy and not awaiting)
-        for k in ("prev_file", "next_file", "close_folder"):
+        for k in ("prev_file", "next_file", "zip_results", "close_folder"):
             a[k].setEnabled(in_batch)
         ki = llm_review.is_configured(self.settings)
         a["ki_review"].setVisible(ki)

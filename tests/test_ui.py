@@ -598,7 +598,10 @@ def test_auto_export_holds_back_files_with_further_occurrences(window, tmp_path,
     suggestion = next(f for f in window.session.findings if f.source == "kontrolle")
     window.session.set_active([suggestion.id], True)
     monkeypatch.setattr(MainWindow, "_ask_further", lambda self, new: pytest.fail("keine Rückfrage erwartet"))
+    boxes = []                                    # Abschlussmeldung (letzte Datei) mit Angebot, als ZIP zu speichern
+    monkeypatch.setattr(QMessageBox, "exec", lambda box: boxes.append(box.windowTitle()) or 0)
     window.confirm_and_next()
+    assert boxes == ["Ordner bearbeitet"]
     assert ws.entries["a_antrag.txt"].status == Status.REVIEWED
     assert "kaya" not in (tmp_path / "ziel" / "a_antrag_anonymisiert.txt").read_text(encoding="utf-8").casefold()
     window.close_batch()
