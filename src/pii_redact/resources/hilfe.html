@@ -364,7 +364,12 @@ Zum Weitermachen:</p>
   <li><i>Datei → Ordner-Arbeit fortsetzen …</i> und den <b>Zielordner</b> wählen.</li>
 </ul>
 <p>Hat sich ein Original inzwischen geändert, erkennt das Programm das und analysiert die Datei neu – sie muss
-dann erneut geprüft werden. Neue Dateien im Quellordner kommen automatisch hinzu.</p>
+dann erneut geprüft werden. Bei Text- und Markdown-Dateien genügt dafür schon ein neues Änderungsdatum. Neue
+Dateien im Quellordner kommen automatisch hinzu.</p>
+<p>Setzen Sie eine Ordner-Arbeit fort, die Sie auf diesem Rechner nicht selbst begonnen haben (etwa die einer
+Kollegin), zeigt das Programm vorher, zu welchem <b>Quellordner</b> der Arbeitsstand gehört, und fragt nach.
+Ebenso, wenn der Arbeitsstand inzwischen auf einen anderen Quellordner zeigt. Brechen Sie ab, wenn Ihnen der
+Ordner fremd vorkommt – dann wird nichts gelesen und nichts geschrieben.</p>
 
 <h3>Ungeprüfte Dateien trotzdem exportieren</h3>
 <p><i>Ungeprüfte trotzdem exportieren …</i> (unten in der Arbeitsliste) schwärzt alle noch offenen Dateien
@@ -382,10 +387,15 @@ zulässig ist.</p>
   <tr><td><code>pii-redact-protokoll.csv</code></td><td>Protokoll zum Nachweis der Prüfung (öffnet in Excel):
       Datei, Status, geprüft von, Zeitpunkt, Anzahl der Funde je Datenart, abgewählte und ergänzte Funde,
       frei geschwärzte Bereiche,
-      Analyse-Modus, Prüfsumme des Originals, Hinweise. <b>Enthält keine der gefundenen Daten.</b></td></tr>
-  <tr><td><code>pii-redact-arbeitsstand.json</code></td><td>Arbeitsstand zum Fortsetzen. Enthält nur
-      Textpositionen, <b>keine Inhalte</b>. Bitte nicht löschen, solange die Arbeit nicht abgeschlossen ist.</td></tr>
+      Analyse-Modus, Hinweise. <b>Enthält keine der gefundenen Daten.</b></td></tr>
+  <tr><td><code>pii-redact-arbeitsstand (nicht weitergeben).json</code></td><td>Arbeitsstand zum Fortsetzen.
+      Enthält keine Texte der Dokumente, aber <b>Lage und Länge der geschwärzten Stellen</b> – deshalb
+      <b>nicht weitergeben</b>. Bitte nicht löschen, solange die Arbeit nicht abgeschlossen ist.</td></tr>
 </table>
+<p class="wichtig"><b>Weitergeben:</b> nur die bereinigten Dateien (und bei Bedarf das Protokoll), nicht den
+ganzen Zielordner. <b>Schreibrechte:</b> In den Zielordner sollten nur Personen schreiben dürfen, denen Sie die
+Prüfung anvertrauen. Wer dort schreiben darf, kann den Arbeitsstand ändern – etwa Funde entfernen, bevor
+ungeprüfte Dateien automatisch exportiert werden.</p>
 <p>Über die Knöpfe <i>Protokoll</i> und <i>Zielordner</i> unten in der Arbeitsliste öffnen Sie beides direkt.
 <i>Schließen</i> beendet die Ordner-Arbeit (der Stand bleibt gespeichert).</p>
 

@@ -106,6 +106,10 @@ class Settings:
     llm_timeout: int = 180        # Sekunden je Anfrage
     llm_max_chars: int = 24000    # Zeichen je Anfrage (längere Dokumente werden seitenweise aufgeteilt)
     recent_batches: list[str] = field(default_factory=list)   # Zielordner zuletzt bearbeiteter Ordner
+    #: Zielordner → {"source": Quellordner, "recursive": mit Unterordnern}, wie von dieser Person angelegt oder
+    #: bestätigt. Der Arbeitsstand im Zielordner kann von anderen geändert worden sein; weicht sein Quellordner
+    #: hiervon ab, fragt die Oberfläche vor jedem Zugriff nach.
+    confirmed_sources: dict = field(default_factory=dict)
     # Zentrale Listen der Organisation (aus defaults.json, werden nicht im Nutzerprofil gespeichert)
     org_allow_list: list[str] = field(default_factory=list)
     org_deny_list: list[str] = field(default_factory=list)

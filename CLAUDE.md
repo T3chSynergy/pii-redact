@@ -16,7 +16,7 @@ Nummern über zwei Zeilen werden vollständig geschwärzt – Anwendermeldung); 
 README mit Download der fertigen Version zuerst); v0.8.0 (Barrierefreiheit, Kommandozeile ohne Klartext/`--ueberschreiben`,
 Testtexte + Erkennungsquote, Refactoring PDF-Laden; davor 0.7.2: Office-Hinweis, CI mit automatischem Release-Build;
 0.7.1: Refactoring Hauptfenster, `.tmp`-Export, 0.7.0: Python 3.14, 0.6.0: ZIP statt MSI, 0.5.0: KI-Nachprüfung +
-Modellvergleich), Lizenz AGPL-3.0-or-later. 358 Tests (Stand 22.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
+Modellvergleich), Lizenz AGPL-3.0-or-later. 369 Tests (Stand 23.11.2026; 0.8.7: Klicktest des Nutzers unter Windows auf `dev` einschließlich #85, dabei der Fehlalarm aus #82 bestätigt behoben; PR #67–#74 für 0.8.6 nur in der CI geprüft, kein eigener Windows-Klicktest des Nutzers vor dem Release; Release-Builds 0.8.4 und 0.8.5 in der CI erfolgreich). `run.bat` und `build.bat` auf Windows mit
 3.14 erfolgreich getestet (26.10.2026, Stand 0.8.3: Klicktest, Selbsttest, ETW-Aufzeichnung ohne Modell-Ereignisse). v0.3.0 läuft auf dem Test-PC.
 
 ## Arbeitsweise
@@ -84,6 +84,15 @@ Modellvergleich), Lizenz AGPL-3.0-or-later. 358 Tests (Stand 22.11.2026; 0.8.7: 
   zentral vorgegeben werden können (`defaults.json` + `locked`, `PII_REDACT_LLM_KEY`) – sonst ergibt es keinen Sinn.
   Der Anmeldespeicher wäre nur etwas für Einzelanwender mit eigenem Modell und eigenem Endpunkt. **Idee für später,
   erst wenn dieser Bedarf erkennbar ist** – nicht von sich aus wieder vorschlagen.
+- **Arbeitsstand bleibt im Zielordner** (Entscheidung des Nutzers 22.11.2026, Sicherheitsprüfung): Er soll auch auf
+  Netzlaufwerken und von mehreren Personen weitergeführt werden können. Preis, bewusst getragen und dokumentiert
+  (Hilfe Kap. 6, README, `SECURITY.md` „Bewusst getragene Grenzen“): Wer in den Zielordner schreiben darf, gilt als
+  vertrauenswürdig – er könnte gespeicherte Funde ändern, bevor ungeprüfte Dateien automatisch exportiert werden.
+  **Nicht** gebaut: neu analysieren vor jedem automatischen Export, Signatur des Arbeitsstands (ein Schlüssel je
+  Person verhindert die Zusammenarbeit). Gebaut (Schritt 4): keine erratbaren Prüfsummen, Rückfrage zum Quellordner,
+  Texterkennung aus dem geladenen Dokument, ohne Prüfsumme keine Übernahme, Dateiname „(nicht weitergeben)“.
+  Spalte „SHA-256 Original“ im Protokoll entfällt (Entscheidung des Nutzers). Geplant: ZIP der Ergebnisse zum
+  Weitergeben (Schritt 5).
 - **Modellvergleich** `tools/ki_vergleich.py`/`.bat`: sechs erfundene Testfälle `tools/ki_testfaelle.json`;
   Bericht `ki_vergleich_<Datum>.md` (gitignored). Modellwahl ist Sache der IT.
 - **PDF:** echte Schwärzung (PyMuPDF `apply_redactions` inkl. Bildpixel + `scrub`), Bereinigung (Kommentare,
@@ -404,6 +413,20 @@ aktualisiert; `tests/test_erkennung.py` prüft Mindestquoten (Schnell/Gründlich
   („Schlüssel (Datei)“, wird nicht gespeichert): Die Kommandozeile meldet sie auf stderr (auch bei `--selftest`),
   das Hauptfenster im Protokoll. Eine ungültige Vorgabe der IT sperrt nichts (`locked` greift nur bei gültigem Wert).
   Neue Einstellung mit begrenztem Wertebereich → in `_ALLOWED` eintragen.
+- **Prüfsummen im Arbeitsstand** (Format 2, seit 22.11.2026): `layout_sha` = SHA-256 über den Text mit jedem
+  Nicht-Leerraum-Zeichen als `x` – erkennt verschobene Positionen (Texterkennung ein/aus, andere Programmversion),
+  verrät aber nichts, was nicht schon im Ergebnis steht (Länge der Stellen steht ohnehin in `findings`). Bewusst
+  nicht „Text ohne Fundstellen“: hinge von den Funden ab, die sich beim Prüfen ändern (manuell ergänzte Namen
+  stünden ungeschützt in der Prüfsumme). Datei-`sha256` nur bei PDFs (`keeps_file_sha`); TXT/MD → neue
+  Änderungszeit = erneut prüfen. Format 1 (`text_sha` über den ganzen Text): `restore_findings` vergleicht einmal
+  damit und stellt um; TXT-`sha256` fällt beim Laden weg. Ohne jede Prüfsumme keine Übernahme der Funde.
+  Dateiname `pii-redact-arbeitsstand (nicht weitergeben).json`; der alte Name wird gelesen und beim Speichern
+  gelöscht (`OLD_WORKSPACE_NAME`). **Quellordner:** `Workspace.stored_source` liest nur den Text; Oberfläche
+  (`resume_folder`, „Zuletzt bearbeitet“) vergleicht mit `Settings.confirmed_sources` (Zielordner → Quelle +
+  Unterordner, gesetzt in `_activate_batch`), sonst `_ask_source` („Fortsetzen“/„Abbrechen“); `open_folder_dialog`
+  und Kommandozeile vergleichen als Text mit dem gewählten Quellordner, bevor `Workspace.load` den Pfad auflöst
+  (unter Windows meldet sich `resolve()` bei einem Netzwerkpfad am Server an). Tests: `tests/test_workspace_trust.py`;
+  Oberflächentests, die ohne `_activate_batch` fortsetzen, bestätigen mit `Dialogs(..., click="Fortsetzen")`.
 - Arbeitsstand mit „..“ im Pfad (von Hand verändert) ist unkritisch: `sync_with_disk` setzt alles, was der
   Abgleich im Quellordner nicht findet, auf „fehlt“; Kommandozeile und Oberfläche übergehen diese Einträge (Test).
 - KI-Tests gegen lokalen Fake-Server; Proxy-Variablen entfernen; Tools-Skripte per importlib → vorher in

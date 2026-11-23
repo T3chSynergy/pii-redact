@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import html
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -12,6 +14,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QProgressD
 
 from ..core import UnsupportedFileError
 from ..core.batch import Status, Workspace, export_document, held_for_check
+from . import dialogs
 from .batch_panel import NewBatchDialog, confirm_auto_export, status_style
 from .safe_text import plain_text
 from .window_export import ELSEWHERE
@@ -40,13 +43,15 @@ class BatchMixin:
         src, tgt, recursive = dlg.values()
         try:
             if Workspace.exists_in(tgt):
-                ws = Workspace.load(tgt)
-                if ws.source != src.resolve():
+                # erst als Text vergleichen – der Pfad im Arbeitsstand wird nicht angefasst, bevor er passt
+                stored, _recursive = Workspace.stored_source(tgt)
+                if not _same_path(stored, str(src.resolve())):
                     QMessageBox.warning(
                         self, "Anderer Arbeitsstand",
-                        plain_text(f"Im Zielordner liegt bereits ein Arbeitsstand für den Quellordner\n{ws.source}\n\n"
+                        plain_text(f"Im Zielordner liegt bereits ein Arbeitsstand für den Quellordner\n{stored}\n\n"
                                    "Bitte einen anderen Zielordner wählen."))
                     return
+                ws = Workspace.load(tgt)
             else:
                 ws = Workspace.create(src, tgt, recursive)
         except (OSError, ValueError, KeyError) as exc:
@@ -66,11 +71,40 @@ class BatchMixin:
             self._forget_recent(target)
             return
         try:
+            stored, recursive = Workspace.stored_source(target)
+            # Der Arbeitsstand liegt im Zielordner und kann von anderen geändert worden sein: Einen Quellordner,
+            # den diese Person hier nicht selbst angelegt oder bestätigt hat, erst zeigen – vor jedem Zugriff
+            if not self._source_confirmed(target, stored, recursive) and not self._ask_source(target, stored,
+                                                                                               recursive):
+                return
             ws = Workspace.load(target)
         except (OSError, ValueError, KeyError) as exc:
             QMessageBox.warning(self, "Arbeitsstand kann nicht geladen werden", plain_text(str(exc)))
             return
         self._activate_batch(ws)
+
+    # ------------------------------------------------------------------ Quellordner bestätigen
+    def _source_confirmed(self, target: Path, source: str, recursive: bool) -> bool:
+        known = self.settings.confirmed_sources.get(_target_key(target))
+        return (isinstance(known, dict) and isinstance(known.get("source"), str)
+                and _same_path(known["source"], source) and known.get("recursive") is recursive)
+
+    def _ask_source(self, target: Path, source: str, recursive: bool) -> bool:
+        return dialogs.ask_yes_no(
+            self, "Ordner-Arbeit fortsetzen",
+            f"Der Arbeitsstand in <b>{html.escape(str(target))}</b> gehört zum Quellordner<br>"
+            f"<b>{html.escape(source)}</b> ({'mit' if recursive else 'ohne'} Unterordner).<br><br>"
+            "Dieser Ordner wird jetzt durchsucht, seine Dateien werden analysiert und die Ergebnisse in den "
+            "Zielordner geschrieben. Ist das der richtige Quellordner?<br><span style='color:gray'>Die Frage "
+            "erscheint, wenn Sie diese Ordner-Arbeit auf diesem Rechner nicht selbst begonnen oder bestätigt haben "
+            "oder der Arbeitsstand inzwischen auf einen anderen Quellordner zeigt.</span>",
+            yes="Fortsetzen", no="Abbrechen")
+
+    def _remember_source(self, ws: Workspace) -> None:
+        """Quellordner einer angelegten oder bestätigten Ordner-Arbeit merken (höchstens 50 Zielordner)."""
+        sources = {k: v for k, v in self.settings.confirmed_sources.items() if k != _target_key(ws.target)}
+        sources[_target_key(ws.target)] = {"source": str(ws.source), "recursive": ws.recursive}
+        self.settings.confirmed_sources = dict(list(sources.items())[-50:])
 
     def _activate_batch(self, ws: Workspace) -> None:
         if self.batch:
@@ -92,7 +126,8 @@ class BatchMixin:
         self._awaiting_rel = None
         self._auto_export = False
         self._model_error_shown = False
-        self._remember_recent(ws.target)
+        self._remember_source(ws)
+        self._remember_recent(ws.target)          # speichert die Einstellungen
         self.batch_panel.load(ws)
         self.batch_dock.show()
         self.review_bar.show()
@@ -368,9 +403,14 @@ class BatchMixin:
     def _export_unreviewed_file(self, e) -> bool | None:
         """Eine ungeprüfte Datei automatisch exportieren. True = exportiert, False = von der Kontrolle
         zurückgehalten, None = der Text passt nicht mehr zum Arbeitsstand: neu analysieren, danach exportieren."""
-        if e.rel == self.batch_rel and self.session is not None:
-            return self._export_auto(e.rel, self.session.findings, self.session.doc)
-        doc = self._load(self.batch.abs(e.rel))
+        current = e.rel == self.batch_rel and self.session is not None
+        doc = self.session.doc if current else self._load(self.batch.abs(e.rel))
+        if doc.ocr_pages:   # der Arbeitsstand kann verändert sein – entscheidend ist das geladene Dokument
+            e.ocr_pages = [p + 1 for p in doc.ocr_pages]
+            e.note = OCR_NOT_AUTO
+            return False
+        if current:
+            return self._export_auto(e.rel, self.session.findings, doc)
         findings = self.batch.restore_findings(e.rel, doc)
         if findings is None:
             self.runner.enqueue_file(self.batch.abs(e.rel), e.rel, self.settings, self.batch_id)
@@ -430,3 +470,13 @@ class BatchMixin:
             return
         for t in self.settings.recent_batches:
             self.recent_menu.addAction(t, lambda t=t: self.resume_folder(Path(t)))
+
+
+def _target_key(target: Path) -> str:
+    """Schlüssel eines Zielordners in ``confirmed_sources`` (den Zielordner hat diese Person selbst gewählt)."""
+    return os.path.normcase(str(Path(target).resolve()))
+
+
+def _same_path(a: str, b: str) -> bool:
+    """Gleicher Pfad als Text (unter Windows ohne Unterschied der Groß-/Kleinschreibung) – ohne Zugriff."""
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))

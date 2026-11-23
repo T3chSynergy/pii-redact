@@ -23,13 +23,27 @@ Zum Beispiel:
 - Der **Text-Export** (TXT/Markdown) enthält Inhalte, die als geschwärzt angezeigt wurden.
 - Das Programm baut **Netzwerkverbindungen** auf, obwohl die KI-Nachprüfung ausgeschaltet ist – oder sendet bei
   der KI-Nachprüfung mehr als den geschwärzten Text (z. B. das Original).
-- **Klartext** der gefundenen Daten landet im Arbeitsstand (`pii-redact-arbeitsstand.json`), im Protokoll
-  (`pii-redact-protokoll.csv`) oder in der Log-Datei.
+- **Klartext** der gefundenen Daten landet im Arbeitsstand (`pii-redact-arbeitsstand (nicht weitergeben).json`),
+  im Protokoll (`pii-redact-protokoll.csv`) oder in der Log-Datei – oder lässt sich daraus erraten (etwa über
+  eine Prüfsumme).
 - Eine präparierte Eingabedatei führt dazu, dass Code ausgeführt oder auf fremde Dateien zugegriffen wird.
 
 **Keine Sicherheitslücke** ist, dass die automatische Erkennung eine Angabe übersieht (z. B. einen
 ungewöhnlichen Namen). Die Erkennung ist nie vollständig; das Ergebnis muss immer geprüft werden. Solche Fälle
 bitte als normales [Issue](https://github.com/T3chSynergy/pii-redact/issues) melden – mit erfundenen Daten.
+
+### Bewusst getragene Grenzen
+
+- **Wer in den Zielordner einer Ordner-Arbeit schreiben darf, gilt als vertrauenswürdig.** Der Arbeitsstand liegt
+  dort, damit mehrere Personen an einem Ordner arbeiten können. Wer ihn ändern kann, kann auch gespeicherte
+  Entscheidungen ändern – etwa Funde entfernen, bevor ungeprüfte Dateien automatisch exportiert werden. Das
+  Programm fragt vor dem Zugriff auf einen Quellordner nach, den die jeweilige Person nicht selbst angelegt oder
+  bestätigt hat; die Schreibrechte am Zielordner zu beschränken, ist Aufgabe der Anwender bzw. der IT
+  (README, Hilfe).
+- **Lage und Länge geschwärzter Stellen** stehen im Arbeitsstand. Deshalb heißt er „nicht weitergeben“; die
+  Prüfsummen darin lassen keine Rückschlüsse auf die geschwärzten Inhalte zu.
+- **Vorgaben der IT** (`%ProgramData%\pii-redact`) gelten nur aus Dateien, die nur Administratoren ändern dürfen;
+  ungeschützte werden mit Warnung übergangen (IT-Anleitung, „Zentrale Vorgaben“).
 
 ## Melden
 

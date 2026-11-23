@@ -1,9 +1,21 @@
 """Ordner-Bearbeitung: Arbeitsstand, Export mit gespiegelter Ordnerstruktur, Protokoll.
 
-Der Arbeitsstand liegt als ``pii-redact-arbeitsstand.json`` im Zielordner. Er enthält bewusst
-KEINEN Klartext – Funde werden nur als Zeichenpositionen gespeichert und beim Öffnen aus dem
-Original rekonstruiert. Eine SHA-256-Prüfsumme je Datei erkennt, ob sich ein Original seit der
-Analyse geändert hat.
+Der Arbeitsstand liegt als ``pii-redact-arbeitsstand (nicht weitergeben).json`` im Zielordner. Er enthält bewusst
+KEINEN Klartext – Funde werden nur als Zeichenpositionen gespeichert und beim Öffnen aus dem Original
+rekonstruiert. Lage und Länge der geschwärzten Stellen stehen aber darin; deshalb gehört er nicht zu den
+Ergebnissen, die weitergegeben werden.
+
+Prüfsummen (seit Format 2): Der Zielordner wird oft weitergegeben oder ist eine Ablage, die andere lesen. Eine
+Prüfsumme des Originals ließe sich dort durch Raten umkehren („Termin mit Frau [PERSON] am [DATUM]“ – Namen und
+Daten durchprobieren, bis die Prüfsumme passt). Deshalb:
+
+* ``layout_sha`` prüft, ob die gespeicherten Positionen noch zum erkannten Text passen – gebildet über das
+  Textlayout (jedes Zeichen außer Leerraum wird ``x``). Länge und Zeilen weichen ab, sobald sich die Positionen
+  verschieben (Texterkennung ein/aus, andere Programmversion); zu raten gibt es nichts.
+* ``sha256`` (Datei) nur noch bei PDFs – dort lässt sich die Datei nicht aus geratenen Werten nachbauen. Bei
+  TXT/Markdown entscheiden Größe und Änderungszeit; ändert sich die Zeit, wird die Datei erneut geprüft.
+* Ältere Arbeitsstände (Format 1) mit der Prüfsumme des ganzen Texts werden beim nächsten Öffnen einer Datei
+  umgestellt; die Datei-Prüfsumme von TXT/Markdown entfällt beim Laden.
 """
 
 from __future__ import annotations
@@ -14,6 +26,7 @@ import getpass
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -23,9 +36,12 @@ from .loaders import OCR_WARNING_PREFIX, SUPPORTED_SUFFIXES, LoadedDocument
 from .models import Finding, Settings
 from .redactor import redact_text, save_redacted_pdf
 
-WORKSPACE_NAME = "pii-redact-arbeitsstand.json"
+WORKSPACE_NAME = "pii-redact-arbeitsstand (nicht weitergeben).json"
+OLD_WORKSPACE_NAME = "pii-redact-arbeitsstand.json"      # bis 0.8.7; wird gelesen und beim Speichern ersetzt
 PROTOCOL_NAME = "pii-redact-protokoll.csv"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+WORKSPACE_HINT = ("pii-redact Arbeitsstand – nur zum Fortsetzen der Bearbeitung, nicht weitergeben. Enthält keine "
+                  "Texte der Dokumente, aber Lage und Länge der geschwärzten Stellen.")
 
 
 class Status:
@@ -59,7 +75,20 @@ def current_user() -> str:
 
 
 def text_sha(text: str) -> str:
+    """Prüfsumme des ganzen Texts – nur noch zum Umstellen älterer Arbeitsstände (Format 1)."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def layout_sha(text: str) -> str:
+    """Prüfsumme des Textlayouts: Jedes Zeichen außer Leerraum wird ``x``. Passen die gespeicherten Positionen
+    nicht mehr (Texterkennung ein/aus, andere Programmversion), weichen Länge oder Zeilen ab; über den Inhalt
+    verrät die Prüfsumme nichts, was nicht schon im geschwärzten Ergebnis steht."""
+    return hashlib.sha256(re.sub(r"\S", "x", text).encode("utf-8")).hexdigest()
+
+
+def keeps_file_sha(rel: str) -> bool:
+    """Prüfsumme der Datei nur bei PDFs – bei TXT/Markdown wäre sie eine Prüfsumme des Texts selbst."""
+    return Path(rel).suffix.lower() == ".pdf"
 
 
 def sha256_of(path: Path) -> str:
@@ -164,7 +193,8 @@ def finding_stats(findings: list[Finding]) -> dict:
 # ---------------------------------------------------------------------- Ordner
 def is_generated(name: str) -> bool:
     stem = Path(name).stem
-    return stem.endswith("_geschwaerzt") or stem.endswith("_anonymisiert") or name in (WORKSPACE_NAME, PROTOCOL_NAME)
+    return (stem.endswith("_geschwaerzt") or stem.endswith("_anonymisiert")
+            or name in (WORKSPACE_NAME, OLD_WORKSPACE_NAME, PROTOCOL_NAME))
 
 
 def scan_folder(source: Path, recursive: bool, exclude: Path | None = None) -> list[str]:
@@ -215,7 +245,7 @@ class FileEntry:
     status: str = Status.WAITING
     size: int = 0
     mtime_ns: int = 0
-    sha256: str = ""
+    sha256: str = ""        # Prüfsumme der Datei – nur bei PDFs (``keeps_file_sha``)
     findings: list[dict] | None = None
     warnings: list[str] = field(default_factory=list)
     error: str = ""
@@ -227,7 +257,8 @@ class FileEntry:
     export_note: str = ""
     stats: dict = field(default_factory=dict)
     note: str = ""          # z. B. „nach Prüfung geändert“, „Original geändert“
-    text_sha: str = ""      # Prüfsumme des erkannten Texts – Funde passen nur zu genau diesem Text
+    layout_sha: str = ""    # Prüfsumme des Textlayouts – die Funde passen nur zu einem Text mit genau diesem Layout
+    text_sha: str = ""      # nur Format 1: Prüfsumme des ganzen Texts; wird beim nächsten Öffnen ersetzt
     ocr_pages: list[int] = field(default_factory=list)   # per Texterkennung gelesene Seiten (1-basiert)
     ki_review: dict = field(default_factory=dict)         # letzte KI-Nachprüfung: Risiko, Anzahl Hinweise, Modell
 
@@ -306,29 +337,51 @@ class Workspace:
         ws.save()
         return ws
 
-    @classmethod
-    def load(cls, target: Path) -> Workspace:
+    @staticmethod
+    def _read(target: Path) -> dict:
+        """Inhalt der Datei des Arbeitsstands (neuer oder alter Name), Format geprüft."""
         path = Path(target) / WORKSPACE_NAME
+        if not path.is_file():
+            path = Path(target) / OLD_WORKSPACE_NAME
         data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("source"), str):
+            raise ValueError("Der Arbeitsstand ist beschädigt (kein Quellordner).")
         if data.get("version", 0) > FORMAT_VERSION:
             raise ValueError("Der Arbeitsstand stammt aus einer neueren Programmversion.")
+        return data
+
+    @classmethod
+    def stored_source(cls, target: Path) -> tuple[str, bool]:
+        """Quellordner und „mit Unterordnern“ laut Arbeitsstand – nur gelesen, ohne auf den Ordner zuzugreifen.
+        Wer in den Zielordner schreiben darf, kann hier einen anderen Ordner eintragen (auch einen
+        Netzwerkpfad, bei dem sich Windows dort anmeldet). Deshalb erst vergleichen bzw. bestätigen lassen, dann
+        :meth:`load`."""
+        data = cls._read(target)
+        return data["source"], bool(data.get("recursive", True))
+
+    @classmethod
+    def load(cls, target: Path) -> Workspace:
+        data = cls._read(target)
         ws = cls(Path(data["source"]), Path(target), data.get("recursive", True))
         ws.created = data.get("created", ws.created)
         ws.updated = data.get("updated", ws.updated)
         known = FileEntry.__dataclass_fields__
         for rel, raw in data.get("files", {}).items():
-            ws.entries[rel] = FileEntry(rel=rel, **{k: v for k, v in raw.items() if k in known and k != "rel"})
+            e = FileEntry(rel=rel, **{k: v for k, v in raw.items() if k in known and k != "rel"})
+            if not keeps_file_sha(rel):
+                e.sha256 = ""           # Format 1: Prüfsumme einer Textdatei = Prüfsumme ihres Texts
+            ws.entries[rel] = e
         return ws
 
     @staticmethod
     def exists_in(target: Path) -> bool:
-        return (Path(target) / WORKSPACE_NAME).is_file()
+        return (Path(target) / WORKSPACE_NAME).is_file() or (Path(target) / OLD_WORKSPACE_NAME).is_file()
 
     def save(self) -> None:
         self.updated = now_iso()
         data = {
             "version": FORMAT_VERSION,
-            "hinweis": "pii-redact Arbeitsstand – enthält nur Positionen, keine Inhalte der Dokumente.",
+            "hinweis": WORKSPACE_HINT,
             "source": str(self.source),
             "target": str(self.target),
             "recursive": self.recursive,
@@ -341,6 +394,7 @@ class Workspace:
         tmp = self.path.with_name(self.path.name + ".tmp")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
+        (self.target / OLD_WORKSPACE_NAME).unlink(missing_ok=True)     # bis 0.8.7 hieß die Datei so
         self.write_protocol()
 
     def sync_with_disk(self) -> list[str]:
@@ -361,10 +415,10 @@ class Workspace:
             if e.status == Status.MISSING:
                 e.status = Status.WAITING
             if e.size != st.st_size or e.mtime_ns != st.st_mtime_ns:
-                # Zeitstempel/Größe weichen ab → Prüfsumme entscheidet (Kopieren ändert nur die Zeit)
-                digest = sha256_of(p)
+                # Zeitstempel/Größe weichen ab → bei PDFs entscheidet die Prüfsumme (Kopieren ändert nur die Zeit);
+                # TXT/Markdown haben keine (siehe Modulbeschreibung) und werden erneut geprüft
                 e.size, e.mtime_ns = st.st_size, st.st_mtime_ns
-                if e.sha256 and digest == e.sha256:
+                if e.sha256 and sha256_of(p) == e.sha256:
                     continue
                 self._reset(e, "Original seit der Analyse geändert – bitte erneut prüfen")
                 todo.append(rel)
@@ -379,7 +433,7 @@ class Workspace:
     @staticmethod
     def _reset(e: FileEntry, note: str) -> None:
         e.findings = None
-        e.sha256 = ""
+        e.sha256 = e.layout_sha = e.text_sha = ""
         e.status = Status.WAITING
         e.reviewed_by = e.reviewed_at = ""
         e.stats = {}
@@ -388,10 +442,11 @@ class Workspace:
 
     # ------------------------------------------------------------------ Zustandsänderungen
     def set_analysis(self, rel: str, *, sha256: str, size: int, mtime_ns: int, findings: list[Finding],
-                     warnings: list[str], mode: str, text_sha: str = "", ocr_pages: list[int] | None = None) -> None:
+                     warnings: list[str], mode: str, layout_sha: str = "", ocr_pages: list[int] | None = None) -> None:
         e = self.entries[rel]
-        e.sha256, e.size, e.mtime_ns = sha256, size, mtime_ns
-        e.text_sha = text_sha
+        e.sha256 = sha256 if keeps_file_sha(rel) else ""
+        e.size, e.mtime_ns = size, mtime_ns
+        e.layout_sha, e.text_sha = layout_sha, ""
         e.ocr_pages = list(ocr_pages or [])
         e.findings = findings_to_compact(findings)
         e.warnings = list(warnings)
@@ -407,16 +462,24 @@ class Workspace:
         """Ergebnis von :func:`analyze_file` übernehmen."""
         self.set_analysis(rel, sha256=result["sha256"], size=result["size"], mtime_ns=result["mtime_ns"],
                           findings=result["findings"], warnings=result["warnings"], mode=result["mode"],
-                          text_sha=result.get("text_sha", ""), ocr_pages=result.get("ocr_pages"))
+                          layout_sha=result.get("layout_sha", ""), ocr_pages=result.get("ocr_pages"))
 
     def restore_findings(self, rel: str, doc: LoadedDocument) -> list[Finding] | None:
         """Gespeicherte Funde für das geladene Dokument – oder None, wenn der erkannte Text nicht mehr
-        zu den gespeicherten Positionen passt (z. B. andere Programmversion, Texterkennung ein/aus).
-        Der Eintrag wird dann zur erneuten Analyse zurückgesetzt."""
+        zu den gespeicherten Positionen passt (z. B. andere Programmversion, Texterkennung ein/aus) oder sich das
+        nicht prüfen lässt (keine Prüfsumme). Der Eintrag wird dann zur erneuten Analyse zurückgesetzt."""
         e = self.entries[rel]
         if e.findings is None:
             return None
-        if e.text_sha and e.text_sha != text_sha(doc.text):
+        if e.layout_sha:
+            fits = e.layout_sha == layout_sha(doc.text)
+        elif e.text_sha:                                  # Format 1: einmal mit der alten Prüfsumme vergleichen
+            fits = e.text_sha == text_sha(doc.text)
+            if fits:
+                e.layout_sha, e.text_sha = layout_sha(doc.text), ""
+        else:
+            fits = False                                  # ohne Prüfsumme nicht ungeprüft übernehmen
+        if not fits:
             self._reset(e, "Erkannter Text hat sich geändert (z. B. Texterkennung) – neu analysiert, "
                            "bitte erneut prüfen")
             return None
@@ -465,7 +528,7 @@ class Workspace:
     def write_protocol(self) -> None:
         cols = ["Datei", "Status", "Geprüft von", "Zeitpunkt", "Exportiert als", "Funde gesamt", "Geschwärzt",
                 "Datenarten", "Manuell hinzugefügt", "Bereiche", "Abgewählt", "Typ geändert", "Analyse-Modus",
-                "OCR-Seiten", "KI-Prüfung", "SHA-256 Original", "Hinweise"]
+                "OCR-Seiten", "KI-Prüfung", "Hinweise"]
         tmp = self.protocol_path.with_name(self.protocol_path.name + ".tmp")
         with open(tmp, "w", encoding="utf-8-sig", newline="") as fh:
             w = csv.writer(fh, delimiter=";")
@@ -497,7 +560,6 @@ class Workspace:
                     {"schnell": "Schnell", "gruendlich": "Gründlich"}.get(e.analysis_mode, e.analysis_mode),
                     ", ".join(map(str, e.ocr_pages)),
                     ki_summary(e.ki_review),
-                    e.sha256,
                     " | ".join(hints),
                 ])
         try:
@@ -514,11 +576,11 @@ def analyze_file(path: Path, analyzer: PiiAnalyzer, settings: Settings,
     from .loaders import load_document
 
     st = path.stat()
-    digest = sha256_of(path)
+    digest = sha256_of(path) if keeps_file_sha(path.name) else ""
     doc = load_document(path, ocr=settings.ocr)
     findings = analyzer.analyze(doc.text, settings, progress=progress)
     return {
-        "text_sha": text_sha(doc.text),
+        "layout_sha": layout_sha(doc.text),
         "ocr_pages": [p + 1 for p in doc.ocr_pages],
         "sha256": digest,
         "size": st.st_size,
