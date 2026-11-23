@@ -60,7 +60,7 @@ def test_compact_roundtrip_without_text():
 
 def _analyze_fake(ws: Workspace):
     """Analyse ohne Sprachmodell simulieren: jede Datei bekommt einen Fund an Position 0–4."""
-    from pii_redact.core.batch import sha256_of
+    from pii_redact.core.batch import layout_sha, sha256_of
     from pii_redact.core.loaders import load_document
 
     for e in ws.ordered():
@@ -68,7 +68,8 @@ def _analyze_fake(ws: Workspace):
         doc = load_document(p)
         st = p.stat()
         ws.set_analysis(e.rel, sha256=sha256_of(p), size=st.st_size, mtime_ns=st.st_mtime_ns,
-                        findings=[Finding(0, 4, "PERSON", doc.text[0:4])], warnings=doc.warnings, mode="schnell")
+                        findings=[Finding(0, 4, "PERSON", doc.text[0:4])], warnings=doc.warnings, mode="schnell",
+                        layout_sha=layout_sha(doc.text))
 
 
 def test_workspace_entry_outside_source_is_not_processed(folder, tmp_path):
@@ -124,10 +125,19 @@ def test_workspace_resume_and_change_detection(folder, tmp_path):
     assert ws2.next_open() == "protokoll.md"
     assert ws2.sync_with_disk() == []
 
-    # Nur Zeitstempel geändert (z. B. kopiert) → Prüfsumme gleich → Stand bleibt
+    # Nur Zeitstempel geändert (z. B. kopiert): beim PDF entscheidet die Prüfsumme der Datei → Stand bleibt;
+    # Textdateien haben keine (sie wäre eine Prüfsumme des Texts selbst) → werden erneut geprüft
+    pdf = "Verträge/akte.pdf"
+    doc = load_document(ws2.abs(pdf))
+    ws2.mark_done(pdf, reviewed=True, exported_as=ws2.out(pdf), leftovers=[],
+                  findings=findings_from_compact(ws2.entries[pdf].findings, doc.text))
+    assert ws2.entries[pdf].sha256 and not ws2.entries[rel].sha256
+    for name in (pdf, rel):
+        os.utime(ws2.abs(name), ns=(time.time_ns(), time.time_ns() + 5_000_000_000))
+    assert ws2.sync_with_disk() == [rel] and ws2.entries[pdf].status == Status.REVIEWED
+    assert ws2.entries[rel].status == Status.WAITING and "geändert" in ws2.entries[rel].note
+    _analyze_fake(ws2)
     p = ws2.abs(rel)
-    os.utime(p, ns=(time.time_ns(), time.time_ns() + 5_000_000_000))
-    assert ws2.sync_with_disk() == [] and ws2.entries[rel].status == Status.REVIEWED
 
     # Inhalt geändert → Funde und Prüfstatus verworfen, muss neu analysiert werden
     p.write_text(p.read_text(encoding="utf-8") + "\nNachtrag", encoding="utf-8")

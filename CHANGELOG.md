@@ -27,6 +27,28 @@
   Kommandozeile (auch `--selftest`) nennen Datei und Grund. **Für die IT:** den Ordner immer anlegen und sperren,
   auch ohne `defaults.json` – Befehle in der IT-Anleitung (`packaging/README.md`, „Zentrale Vorgaben“). Den Ordner
   ProgramData fragt das Programm bei Windows ab statt aus der Umgebungsvariablen.
+- **Keine Prüfsummen der Originale mehr im Zielordner:** Protokoll und Arbeitsstand der Ordner-Bearbeitung
+  enthielten Prüfsummen (SHA-256) der Originale. Bei kurzen Textdateien ließen sich geschwärzte Namen, Daten oder
+  Orte damit erraten – durchprobieren, bis die Prüfsumme passt –, sobald der Zielordner weitergegeben wurde oder
+  andere ihn lesen konnten. Die Spalte „SHA-256 Original“ im Protokoll entfällt. Der Arbeitsstand prüft jetzt nur
+  noch das Textlayout (passen die gespeicherten Positionen noch?) und speichert Prüfsummen der Datei nur bei PDFs;
+  Text- und Markdown-Dateien gelten deshalb schon bei neuem Änderungsdatum als geändert. Ältere Arbeitsstände
+  werden übernommen und beim Öffnen einer Datei umgestellt.
+- **Arbeitsstand heißt jetzt „pii-redact-arbeitsstand (nicht weitergeben).json“:** Er enthält keine Texte, aber
+  Lage und Länge der geschwärzten Stellen. Weitergeben sollte man nur die bearbeiteten Dateien. Ein Arbeitsstand
+  unter dem alten Namen wird gelesen und beim nächsten Speichern ersetzt.
+- **Fortsetzen nur nach Rückfrage zum Quellordner:** Der Arbeitsstand liegt im Zielordner und kann von anderen
+  geändert worden sein. Zeigte er auf einen anderen Quellordner, durchsuchte das Programm diesen beim Fortsetzen
+  ohne Rückfrage und schrieb Dateinamen und Ergebnisse in den Zielordner; bei einem Netzwerkpfad meldete sich
+  Windows dort sogar mit dem Konto des Nutzers an. Jetzt fragt das Programm vor jedem Zugriff nach, wenn die
+  Ordner-Arbeit auf diesem Rechner nicht selbst begonnen oder bestätigt wurde oder der Quellordner abweicht. Die
+  Kommandozeile vergleicht den Quellordner im Arbeitsstand, bevor sie auf ihn zugreift.
+- **Gespeicherte Angaben nicht ungeprüft übernehmen:** Ob eine Datei per Texterkennung gelesen wird, entscheidet
+  bei automatischem Export (Kommandozeile, „Ungeprüfte trotzdem exportieren“) jetzt das geladene Dokument, nicht
+  nur der Arbeitsstand. Funde ohne Prüfsumme werden nicht übernommen, die Datei wird neu analysiert.
+- **Wichtig für die Ordner-Bearbeitung:** In den Zielordner sollten nur Personen schreiben dürfen, denen die
+  Prüfung anvertraut ist – wer dort schreiben darf, kann den Arbeitsstand ändern (Hilfe, Kapitel „Ordner
+  bearbeiten“).
 - **KI-Nachprüfung fragt bei einem anderen Server erneut:** Die Rückfrage vor dem Senden kam bisher einmal pro
   Programmstart. Jetzt kommt sie erneut, wenn sich der Server seitdem geändert hat.
 

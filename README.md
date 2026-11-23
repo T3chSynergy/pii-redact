@@ -117,10 +117,16 @@ Im Zielordner:
 | Datei | Inhalt |
 |---|---|
 | `…_geschwaerzt.pdf`, `…_anonymisiert.txt/.md` | bearbeitete Dateien, Ordnerstruktur wie im Quellordner |
-| `pii-redact-protokoll.csv` | je Datei: Status, geprüft von/am, Anzahl Funde je Datenart, manuelle Änderungen, Analyse-Modus, SHA-256 des Originals, Hinweise – **ohne** die gefundenen Daten selbst (öffnet direkt in Excel) |
-| `pii-redact-arbeitsstand.json` | Arbeitsstand zum Fortsetzen – enthält nur Textpositionen, **keinen Klartext** |
+| `pii-redact-protokoll.csv` | je Datei: Status, geprüft von/am, Anzahl Funde je Datenart, manuelle Änderungen, Analyse-Modus, Hinweise – **ohne** die gefundenen Daten selbst (öffnet direkt in Excel) |
+| `pii-redact-arbeitsstand (nicht weitergeben).json` | Arbeitsstand zum Fortsetzen – **kein Klartext**, aber Lage und Länge der geschwärzten Stellen; nicht weitergeben |
 
-Ändert sich ein Original nach der Analyse (Prüfsumme), verliert es seinen Prüfstatus und wird neu analysiert.
+Weitergeben sollte man nur die bearbeiteten Dateien (bei Bedarf mit Protokoll), nicht den ganzen Zielordner. In den
+Zielordner sollten nur Personen schreiben dürfen, denen die Prüfung anvertraut ist – wer dort schreiben darf, kann
+den Arbeitsstand ändern. Eine Ordner-Arbeit, die auf diesem Rechner nicht selbst begonnen wurde, setzt das Programm
+erst nach Rückfrage zum Quellordner fort.
+
+Ändert sich ein Original nach der Analyse (Größe/Änderungszeit, bei PDFs Prüfsumme), verliert es seinen
+Prüfstatus und wird neu analysiert.
 Fehlende Dateien werden markiert. Die freie Textbearbeitung ist in der Ordner-Bearbeitung ausgeblendet, damit
 jede Änderung nachvollziehbar über die Fundliste läuft.
 

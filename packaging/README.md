@@ -413,7 +413,7 @@ statt zu einer scheinbar harmlosen Bewertung.
 | `C:\ProgramData\pii-redact\defaults.json` | zentrale Vorgaben (optional; gilt nur, wenn nur Administratoren schreiben dürfen) |
 | `%APPDATA%\pii-redact\settings.json` | persönliche Einstellungen |
 | `%LOCALAPPDATA%\pii-redact\logs\pii-redact.log` | Programmprotokoll für den Support (keine Dokumentinhalte) |
-| Zielordner der Ordner-Bearbeitung | Ergebnisse, `pii-redact-protokoll.csv`, `pii-redact-arbeitsstand.json` |
+| Zielordner der Ordner-Bearbeitung | Ergebnisse, `pii-redact-protokoll.csv`, `pii-redact-arbeitsstand (nicht weitergeben).json` (Schreibrecht nur für Personen, denen die Prüfung anvertraut ist) |
 
 ## Prüfen einer Installation
 

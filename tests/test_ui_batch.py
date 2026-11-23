@@ -197,22 +197,25 @@ def test_resume_folder_dialog_missing_and_broken_workspace(window, folder, tmp_p
 
     target = tmp_path / "ziel"
     Workspace.create(folder, target)
+    monkeypatch.undo()
+    d = Dialogs(monkeypatch, click="Fortsetzen")          # Rückfrage zum Quellordner (nicht hier angelegt)
     good = (target / WORKSPACE_NAME).read_text(encoding="utf-8")
     (target / WORKSPACE_NAME).write_text(good[: len(good) // 2], encoding="utf-8")      # abgeschnittene Datei
     window.resume_folder(target)
-    assert d.shown[1][:2] == ("warning", "Arbeitsstand kann nicht geladen werden") and window.batch is None
+    assert d.shown[0][:2] == ("warning", "Arbeitsstand kann nicht geladen werden") and window.batch is None
 
     data = json.loads(good)
     data["version"] = 999
     (target / WORKSPACE_NAME).write_text(json.dumps(data), encoding="utf-8")
     window.resume_folder(target)
-    assert "neueren Programmversion" in d.shown[2][2] and window.batch is None
+    assert "neueren Programmversion" in d.shown[1][2] and window.batch is None and not d.boxes
 
     (target / WORKSPACE_NAME).write_text(good, encoding="utf-8")
     monkeypatch.setattr(Workspace, "sync_with_disk", lambda self: (_ for _ in ()).throw(OSError("Laufwerk getrennt")))
     window.resume_folder(target)
-    assert d.shown[3] == ("warning", "Ordner kann nicht bearbeitet werden", "Laufwerk getrennt")
+    assert d.shown[2] == ("warning", "Ordner kann nicht bearbeitet werden", "Laufwerk getrennt")
     assert window.batch is None and QApplication.overrideCursor() is None
+    assert [b["title"] for b in d.boxes] == ["Ordner-Arbeit fortsetzen"] and str(folder.resolve()) in d.boxes[0]["text"]
 
 
 def test_missing_and_unreadable_files_are_marked_not_fatal(window, folder, tmp_path, monkeypatch):
@@ -223,7 +226,7 @@ def test_missing_and_unreadable_files_are_marked_not_fatal(window, folder, tmp_p
     (folder / "a.txt").unlink()                                   # nach dem Anlegen gelöscht
     (folder / "b.txt").write_bytes(b"")                           # leer
     (folder / "d.pdf").write_bytes(b"%PDF-1.4 kaputt")            # kein gültiges PDF
-    d = Dialogs(monkeypatch)
+    d = Dialogs(monkeypatch, click="Fortsetzen")                  # Rückfrage zum Quellordner (nicht hier angelegt)
     window.resume_folder(target)
     _idle(window)
     ws = window.batch
@@ -271,15 +274,16 @@ def test_failed_analysis_marks_file_and_missing_model_stops_the_batch(batch, mon
 
 def test_late_analysis_result_updates_open_file_and_ignores_strangers(batch):
     window, ws = batch, batch.batch
-    result = {"findings": [], "sha256": "x", "size": 1, "mtime_ns": 1, "text_sha": "y", "warnings": [],
+    result = {"findings": [], "sha256": "x", "size": 1, "mtime_ns": 1, "layout_sha": "y", "warnings": [],
               "mode": "schnell"}
     window._on_file_finished("a.txt", window.batch_id + 1, result)        # anderer Ordner
     window._on_file_finished("fremd.txt", window.batch_id, result)        # unbekannte Datei
-    assert window.session.counts()[0] > 0 and ws.entries["a.txt"].sha256 != "x"
+    assert window.session.counts()[0] > 0 and ws.entries["a.txt"].layout_sha != "y"
 
     # Ergebnis für eine andere als die offene Datei: Arbeitsstand ja, Ansicht nein
     window._on_file_finished("b.txt", window.batch_id, result)
-    assert ws.entries["b.txt"].sha256 == "x" and ws.entries["b.txt"].findings == []
+    assert ws.entries["b.txt"].layout_sha == "y" and ws.entries["b.txt"].findings == []
+    assert ws.entries["b.txt"].sha256 == ""                               # Textdatei: keine Datei-Prüfsumme
     assert window.session.counts()[0] > 0
 
     # Ergebnis für die offene Datei, auf das die Ansicht wartet
@@ -492,7 +496,7 @@ def test_export_unreviewed_reanalyses_changed_file_first(batch, folder, monkeypa
 def test_auto_export_after_analysis_skips_ocr_and_records_export_errors(batch, monkeypatch):
     window, ws = batch, batch.batch
     result = {"findings": [], "sha256": ws.entries["b.txt"].sha256, "size": ws.entries["b.txt"].size,
-              "mtime_ns": ws.entries["b.txt"].mtime_ns, "text_sha": ws.entries["b.txt"].text_sha, "ocr_pages": [1],
+              "mtime_ns": ws.entries["b.txt"].mtime_ns, "layout_sha": ws.entries["b.txt"].layout_sha, "ocr_pages": [1],
               "warnings": [], "mode": "schnell"}
     window._auto_export = True
     window._on_file_finished("b.txt", window.batch_id, result)
@@ -503,7 +507,7 @@ def test_auto_export_after_analysis_skips_ocr_and_records_export_errors(batch, m
 
     monkeypatch.setattr(wb, "export_document", broken)
     result = dict(result, sha256=ws.entries["c.txt"].sha256, size=ws.entries["c.txt"].size,
-                  mtime_ns=ws.entries["c.txt"].mtime_ns, text_sha=ws.entries["c.txt"].text_sha, ocr_pages=[])
+                  mtime_ns=ws.entries["c.txt"].mtime_ns, layout_sha=ws.entries["c.txt"].layout_sha, ocr_pages=[])
     window._auto_export = True
     window._on_file_finished("c.txt", window.batch_id, result)
     assert ws.entries["c.txt"].status == Status.ERROR

@@ -225,10 +225,13 @@ def open_workspace(source: Path, target: Path, recursive: bool):
 
     try:
         if Workspace.exists_in(target):
-            ws = Workspace.load(target)
-            if ws.source != source.resolve():
-                print(f"✗ {target} enthält einen Arbeitsstand für {ws.source}", file=sys.stderr)
+            # erst als Text vergleichen: Der Pfad im Arbeitsstand wird nicht angefasst, bevor er zum angegebenen
+            # Quellordner passt (der Arbeitsstand im Zielordner kann von anderen geändert worden sein)
+            stored, _recursive = Workspace.stored_source(target)
+            if os.path.normcase(os.path.normpath(stored)) != os.path.normcase(str(source.resolve())):
+                print(f"✗ {target} enthält einen Arbeitsstand für {stored}", file=sys.stderr)
                 return None
+            ws = Workspace.load(target)
         else:
             ws = Workspace.create(source, target, recursive=recursive)
         ws.sync_with_disk()
@@ -244,12 +247,12 @@ def export_entry(ws, e, settings: Settings, analyzer) -> int:
     from .core.batch import analyze_file
 
     if e.has_ocr:
-        e.note = "Texterkennung (OCR) – nicht automatisch exportiert, bitte in der Oberfläche prüfen"
-        print(f"  ! {e.rel}: Texterkennung (OCR, Seiten {', '.join(map(str, e.ocr_pages))}) – "
-              "nicht automatisch exportiert, bitte in der Oberfläche prüfen")
-        return OCR_SKIPPED
+        return _ocr_not_exported(e)
     path = ws.abs(e.rel)
     doc = load_document(path, ocr=settings.ocr)
+    if doc.ocr_pages:   # der Arbeitsstand kann verändert sein – entscheidend ist das geladene Dokument
+        e.ocr_pages = [p + 1 for p in doc.ocr_pages]
+        return _ocr_not_exported(e)
     findings = ws.restore_findings(e.rel, doc)
     if findings is None:
         res = analyze_file(path, analyzer, settings)
@@ -265,6 +268,13 @@ def export_entry(ws, e, settings: Settings, analyzer) -> int:
     ws.mark_done(e.rel, reviewed=False, exported_as=out, leftovers=leftovers, findings=findings)
     print(f"  → {e.rel}: {e.active_count} Stellen geschwärzt" + (" ⚠ Reste im PDF" if leftovers else ""))
     return LEFTOVERS if leftovers else OK
+
+
+def _ocr_not_exported(e) -> int:
+    e.note = "Texterkennung (OCR) – nicht automatisch exportiert, bitte in der Oberfläche prüfen"
+    print(f"  ! {e.rel}: Texterkennung (OCR, Seiten {', '.join(map(str, e.ocr_pages))}) – "
+          "nicht automatisch exportiert, bitte in der Oberfläche prüfen")
+    return OCR_SKIPPED
 
 
 def process_folder(source: Path, args, settings: Settings, analyzer) -> int:
