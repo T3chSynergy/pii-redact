@@ -205,13 +205,16 @@ def _run(*args: str) -> str:
 
 
 def _protect(path: Path) -> None:
-    """Wie in der IT-Anleitung: Vererbung aus, SYSTEM und Administratoren Vollzugriff, Benutzer lesen,
-    Besitzer Administratoren – bei Ordnern für alles darin."""
-    inherit = "(OI)(CI)" if path.is_dir() else ""
-    tree = ["/T"] if path.is_dir() else []
-    _run("icacls", str(path), "/inheritance:r", "/grant:r", f"{SYSTEM}:{inherit}F", f"{ADMINS}:{inherit}F",
-         f"{USERS}:{inherit}RX", *tree)
-    _run("icacls", str(path), "/setowner", ADMINS, *tree)
+    """Genau die Befehle der IT-Anleitung: Vererbung aus, SYSTEM und Administratoren Vollzugriff, Benutzer lesen –
+    bei Ordnern vererbt auf alles darin (ohne ``/T``: Windows überträgt geerbte Rechte selbst; mit ``/T`` blieben
+    Dateien ganz ohne Rechte zurück) –, dann Besitzer Administratoren, bei Ordnern für alles darin."""
+    if path.is_dir():
+        _run("icacls", str(path), "/inheritance:r", "/grant:r", f"{SYSTEM}:(OI)(CI)F", f"{ADMINS}:(OI)(CI)F",
+             f"{USERS}:(OI)(CI)RX")
+        _run("icacls", str(path), "/setowner", ADMINS, "/T")
+    else:
+        _run("icacls", str(path), "/inheritance:r", "/grant:r", f"{SYSTEM}:F", f"{ADMINS}:F", f"{USERS}:RX")
+        _run("icacls", str(path), "/setowner", ADMINS)
 
 
 @pytest.fixture()
@@ -230,7 +233,8 @@ def admin():
 def plain_user(admin):
     """Eigens angelegtes einfaches Konto (kein Administrator) – so sähe ein Angreifer auf dem Rechner aus."""
     name = "piitest" + secrets.token_hex(3)
-    _run("net", "user", name, "Pw-" + secrets.token_urlsafe(12) + "-9a", "/add")
+    # höchstens 14 Zeichen – sonst fragt „net user“ nach (Kompatibilität mit alten Windows-Versionen)
+    _run("net", "user", name, "Pw" + secrets.token_hex(5) + "!9", "/add")
     yield name
     subprocess.run(["net", "user", name, "/delete"], capture_output=True)
 
